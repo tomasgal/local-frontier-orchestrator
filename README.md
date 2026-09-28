@@ -49,7 +49,8 @@ The local model is therefore more than a router. It remains part of the conversa
 - **Controlled frontier action:** the local model does not receive a general shell. It can request a bounded `ask_codex` action implemented by the wrapper.
 - **Read-only frontier MVP:** `codex exec` is launched with read-only sandboxing and without interactive approval.
 - **Bounded escalation:** the current design allows at most one frontier call per user turn.
-- **Conversation continuity:** the frontier result returns to the local model, which produces the final user-facing response and keeps the interaction coherent.
+- **Persistent conversation continuity:** recent raw turns plus compacted local working memory survive process restarts; `/exit` ends the process, while `/clear` explicitly resets active memory without deleting historical logs.
+- **Conversation continuity across frontier calls:** bounded persistent memory and recent dialogue are supplied to LOCAL routing, frontier delegation, and post-frontier synthesis.
 - **Evidence anchoring without turning the local model into a pipe:** researched frontier facts are treated as the primary factual substrate, while the local model is still allowed to reorganize, explain, criticize, and add clearly distinguishable interpretation.
 - **Host-specific runtime, common orchestration:** GPU/CPU placement, context length, thread count, quantization, and model selection belong to runtime/model profiles rather than the orchestration logic.
 - **Policy/config separation:** routing/system policy, synthesis policy, frontier-subagent instructions, hard gates, and generation defaults are externalized from the transport/orchestration script so they can be reviewed and changed without editing process-control code.
@@ -146,7 +147,8 @@ See [`docs/HUMAN_AI_BIAS_BALANCER.md`](docs/HUMAN_AI_BIAS_BALANCER.md).
 │   ├── Start-Ollama.bat
 │   └── Start-Ollama.ps1
 └── src/
-    └── QwenChat.ps1
+    ├── QwenChat.ps1
+    └── QwenMemory.ps1
 ```
 
 ## Requirements
@@ -187,6 +189,8 @@ launch\QwenChat.bat -Model "your-local-model:tag"
 ```
 
 The local model profile should carry hardware/runtime placement settings appropriate for that machine. The chat client intentionally avoids overriding GPU/CPU placement, context length, or thread count per request.
+
+QwenChat v9 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. After every completed turn, Qwen writes a compact semantic memory note; every six successful notes the wrapper compacts them into bounded working memory. Complete conversation and research traces are stored in monthly JSONL files. The model receives no filesystem tool: PowerShell owns all persistence deterministically.
 
 For a clean Windows host bootstrap, see [`docs/NOTEBOOK_SETUP.md`](docs/NOTEBOOK_SETUP.md). Do not copy a tuned context/GPU profile from another machine before measuring the new host.
 

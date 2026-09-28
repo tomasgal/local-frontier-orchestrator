@@ -143,17 +143,28 @@ A change to language policy or synthesis behaviour should not require editing th
 
 Avoid using a single surprising answer as a reason to retune the sampler or routing policy. The system is stochastic; changes should be driven by repeated, categorized failures or explicit experimental conditions.
 
-## 7. Context and memory
+## 7. Context, persistent memory, and logs
 
-The current CLI keeps a bounded recent conversation history.
+QwenChat v9 treats terminal restarts as continuation of one ongoing conversation. `/exit` ends the process but preserves memory. `/clear` explicitly resets active working memory and recent conversational context while retaining historical logs.
 
-Longer-term architecture may separate:
+The persistent layer separates:
 
-- short conversational working context;
-- durable project state;
-- local retrieval;
-- provenance-aware trace logs;
-- user-model variables for the bias-balancing research track.
+```text
+recent raw turns              bounded conversational continuity
+working_memory.json           compacted durable working context
+pending_notes.jsonl           one semantic Qwen note per completed turn
+conversation / trace JSONL    append-only history and research evidence
+```
+
+After every completed turn, a separate bounded local Qwen call extracts a compact memory note. Every configured number of successful notes (default six), another local call merges them into `working_memory.json`, tracking current focus, topic frequency, decisions, preferences, and open loops.
+
+Frequency is a **retrieval/salience signal, not an epistemic signal**. Repetition must never upgrade a user claim into a verified fact.
+
+Bounded working memory and recent dialogue are supplied to LOCAL Qwen, FRONTIER Codex delegation, and post-frontier Qwen synthesis. Qwen receives no filesystem tool; the PowerShell wrapper owns persistence and logging.
+
+Host-specific capacity remains separate from memory semantics. A constrained 5k host can expose fewer recent turns and smaller character budgets than a 22k GPU host while running the same shared memory code.
+
+Per-turn bias signals are kept in the research trace, not fed back into compacted working memory, reducing the risk of self-reinforcing labels.
 
 Durable factual/project memory should not be conflated with opaque model weights.
 

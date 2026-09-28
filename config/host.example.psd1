@@ -24,4 +24,13 @@
         MaxCallsPerTurn = 1
         ReadOnly        = $true
     }
+
+    # Example launcher capacity values. These affect how much persistent/recent
+    # context is injected, not what the memory system considers important.
+    MemoryCapacity = @{
+        ContextLengthHint = 32768
+        RecentTurns = 6
+        MemoryContextMaxChars = 12000
+        RecentContextMaxChars = 12000
+    }
 }
