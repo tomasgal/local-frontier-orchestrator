@@ -31,14 +31,13 @@ if (-not (Test-Path -LiteralPath $OllamaExe)) {
     throw "Ollama executable not found: $OllamaExe"
 }
 
-if ([string]::IsNullOrWhiteSpace($ModelsDirectory)) {
-    $ModelsDirectory = Join-Path $env:LOCALAPPDATA 'local-frontier-orchestrator\models'
+$env:OLLAMA_HOST = $HostAddress
+
+if (-not [string]::IsNullOrWhiteSpace($ModelsDirectory)) {
+    New-Item -ItemType Directory -Force -Path $ModelsDirectory | Out-Null
+    $env:OLLAMA_MODELS = $ModelsDirectory
 }
 
-New-Item -ItemType Directory -Force -Path $ModelsDirectory | Out-Null
-
-$env:OLLAMA_HOST = $HostAddress
-$env:OLLAMA_MODELS = $ModelsDirectory
 $env:OLLAMA_CONTEXT_LENGTH = [string]$ContextLength
 $env:OLLAMA_NUM_PARALLEL = [string]$NumParallel
 $env:OLLAMA_MAX_LOADED_MODELS = [string]$MaxLoadedModels
@@ -46,7 +45,11 @@ $env:OLLAMA_NO_CLOUD = $(if ($AllowCloud) { '0' } else { '1' })
 
 Write-Host "Starting Ollama"
 Write-Host "Host: $env:OLLAMA_HOST"
-Write-Host "Models: $env:OLLAMA_MODELS"
+if ($env:OLLAMA_MODELS) {
+    Write-Host "Models: $env:OLLAMA_MODELS"
+} else {
+    Write-Host "Models: Ollama default model store"
+}
 Write-Host "Default context ceiling: $env:OLLAMA_CONTEXT_LENGTH"
 Write-Host "Parallel requests: $env:OLLAMA_NUM_PARALLEL"
 Write-Host "Max loaded models: $env:OLLAMA_MAX_LOADED_MODELS"
