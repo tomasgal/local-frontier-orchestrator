@@ -96,3 +96,39 @@ At this point the notebook is ready for host-specific work:
 5. run LOCAL, FRONTIER, and named-product regression smoke tests.
 
 Do not optimize before those measurements exist.
+
+## 8. Clean-host validation result — 2026-09-28
+
+A clean second-host bootstrap was completed on a constrained legacy notebook class to test portability rather than peak performance.
+
+Observed host class:
+
+- Intel Core i7-6600U, 2 cores / 4 threads;
+- 8 GB RAM;
+- Intel HD Graphics 520;
+- normal desktop workload intentionally left running during the proof-of-concept test, with about 1.1 GiB physical RAM available before model load;
+- Ollama 0.34.4;
+- `qwen3.5:4b-q4_K_M` (about 3.3 GiB model size).
+
+Ollama detected the Intel integrated GPU through Vulkan but dropped it by default, so the validated baseline remained **CPU-only**. No iGPU override was forced.
+
+The initial 8k bootstrap ceiling was reduced to **4096** for the constrained-host proof of concept. The actual runner initialized with `n_ctx_slot = 4096`; the LOCAL smoke test used a 396-token prompt, generated 463 tokens, reported about **14.29 prompt tok/s** and **4.23 generation tok/s**, and completed without truncation. The first/cold wrapper turn took about 163 seconds including model load and warm-up.
+
+Regression results:
+
+- LOCAL routing: **PASS**;
+- explicit web/freshness FRONTIER routing: **PASS**;
+- named-product specification hard gate: **PASS**;
+- post-frontier local synthesis: **PASS**;
+- clean shutdown of the controlled Ollama process tree: **PASS**.
+
+Warm frontier synthesis on the same host was around **5.1 tok/s**. These results validate orchestration and capacity only; they do not imply that every local 4B answer is factually correct.
+
+The clean-host test also found a Windows Codex CLI shim issue. An npm installation exposed `codex.ps1`, `codex.cmd`, and `codex`; resolving the PowerShell shim caused `codex exec` to fail under the wrapper. The shared resolver was fixed to prefer **`codex.cmd`** on Windows and fall back to `codex`.
+
+### Ollama desktop-app interference
+
+A Windows Ollama desktop app may already own `127.0.0.1:11434`. In the validated host, `ollama app.exe` spawned `ollama.exe serve`; killing only the child caused it to be respawned. For controlled benchmarking, stop the parent app/process first and verify that the listener is gone before launching the project-managed server.
+
+A 4096-token context is the currently validated constrained-host proof-of-concept baseline. A modest increase such as **5120** is a reasonable next capacity experiment, but it should remain a measured host-specific choice rather than a shared default.
+

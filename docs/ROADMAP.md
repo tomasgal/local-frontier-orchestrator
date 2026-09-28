@@ -10,12 +10,14 @@ This roadmap describes engineering directions, not release commitments.
 - Behavioural policy and common generation settings are separated from transport/orchestration code.
 - Hardware placement remains host-specific and outside QwenChat request payloads.
 - Public repository hygiene excludes personal paths, private hostnames, LAN details, and private hardware sizing.
+- Clean second-host validation passed on an older CPU-only 8 GB Windows notebook at 4k context under normal desktop memory pressure.
+- Windows npm Codex shim portability was fixed by preferring `codex.cmd` in the shared resolver.
 
 ## Near term
 
 - Keep hard freshness/capability gates intentionally narrow.
 - Add structured trace logging.
-- Validate the same orchestration contract on a clean second Windows host.
+- Extend the clean second-host result with measured context sizing; keep the validated 4k constrained-host profile until a larger context proves worthwhile.
 - Evaluate routing and synthesis over longer-term real use rather than a tiny prompt set.
 - Add configurable debug logging for raw frontier results versus local synthesis.
 - Keep host/model profiles separate; do not transplant tuned context/GPU values between machines without measurement.

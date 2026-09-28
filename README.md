@@ -10,7 +10,7 @@ The current reference implementation uses **Qwen via Ollama** as the local conve
 
 This repository is intentionally experimental. Routing, synthesis policy, context handling, and future bias-balancing behaviour are being tuned through longer-term use rather than optimized around a small fixed benchmark.
 
-As of **2026-09-28**, the first Windows/GPU reference deployment has reached a stable baseline. Its next role is regression reference rather than continued prompt-by-prompt tuning. The next engineering validation target is a clean second host with no prior project installation.
+As of **2026-09-28**, the first Windows/GPU reference deployment is frozen as a regression baseline, and a clean second Windows host has also passed the same Qwen-first contract on much more constrained CPU-only hardware. The second-host result is a proof-of-concept capacity and portability validation rather than a performance target. Clean-host validation also exposed a Windows npm-shim portability issue; QwenChat now prefers `codex.cmd` before falling back to other Codex command shims.
 
 ## Core architecture
 
@@ -216,7 +216,7 @@ Current work focuses on:
 - faithful-but-useful frontier synthesis;
 - context continuity;
 - structured trace logging;
-- second-host validation with a clean install;
+- additional host validation and context sizing;
 - multi-host profiles;
 - bias-aware mediation;
 - future edge/SBC execution.
