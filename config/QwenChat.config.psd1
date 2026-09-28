@@ -5,6 +5,25 @@
     CodexTimeoutSec = 300
     HistoryMaxMessages = 12
 
+    Memory = @{
+        Enabled = $true
+        DataDirectory = '%LOCALAPPDATA%\\LocalFrontierOrchestrator'
+        RecentTurns = 4
+        ContextMaxChars = 7000
+        RecentContextMaxChars = 7000
+        CompactionEvery = 6
+        NoteNumPredict = 384
+        CompactionNumPredict = 1024
+        Temperature = 0.10
+        FrontierForNoteMaxChars = 5000
+    }
+
+    ResearchLogging = @{
+        Enabled = $true
+        IncludeRawText = $true
+        IncludeMemorySnapshots = $true
+    }
+
     LocalGeneration = @{
         NumPredictNormal = 1024
         NumPredictThink  = 2048
