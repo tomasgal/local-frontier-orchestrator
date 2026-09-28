@@ -1,0 +1,184 @@
+# Architecture
+
+## 1. Purpose
+
+Local Frontier Orchestrator is a research-oriented local-first AI gateway. It separates three concerns that are often collapsed into one model call:
+
+1. **conversation and local execution**;
+2. **routing / escalation policy**;
+3. **frontier research or stronger reasoning**.
+
+The current reference implementation uses a small Qwen model through Ollama for the local layer and native Codex CLI for frontier escalation.
+
+## 2. Primary Qwen-first flow
+
+```text
+user request
+    |
+    v
+hard capability / freshness policy
+    |
+    +-- forced FRONTIER ------------------------------+
+    |                                                 |
+    v                                                 |
+local Qwen route decision                             |
+    |                                                 |
+    +-- LOCAL -> answer ------------------------------+
+    |
+    +-- FRONTIER
+           |
+           v
+     bounded ask_codex
+           |
+           v
+   codex exec (read-only)
+           |
+           v
+  frontier result / web research
+           |
+           v
+ Qwen final synthesis / critique
+           |
+           v
+          user
+```
+
+### Why keep Qwen after the frontier call?
+
+Conversation continuity alone does not require rewriting the frontier output, but the research architecture intentionally keeps a local post-processing layer.
+
+The desired behaviour is **creative but anchored**:
+
+- concrete researched facts, numbers, identifiers, dates, dimensions, prices, caveats, and source links should not be silently replaced by model memory;
+- Qwen may reorganize and explain the result;
+- Qwen may identify a conflict or uncertainty;
+- Qwen may add stable background knowledge or interpretation when clearly distinguishable from the researched evidence;
+- the local layer may later implement bias-aware critique and metacognitive interventions.
+
+This creates a useful boundary:
+
+```text
+frontier evidence -> sticky provenance
+local layer       -> interpretation, critique, presentation, policy
+```
+
+The distinction is a behavioural target, not a formal guarantee. It must be evaluated empirically over long-term use.
+
+## 3. Routing
+
+The MVP combines two mechanisms.
+
+### Deterministic hard gates
+
+Some task classes should not depend on a small model's confidence:
+
+- explicit requests to browse/search/use frontier;
+- current or recent information;
+- live state;
+- current software versions/releases;
+- URLs that need to be fetched;
+- exact specifications of named external products.
+
+These rules are intentionally narrow.
+
+### Model routing
+
+When no hard gate fires, Qwen returns one of:
+
+```text
+ROUTE: LOCAL
+ROUTE: FRONTIER
+```
+
+Malformed routing fails closed to LOCAL rather than silently spending frontier resources.
+
+## 4. Frontier transport
+
+The frontier action is a wrapper around native `codex exec`.
+
+Current constraints:
+
+- read-only sandbox;
+- no interactive approval;
+- web search available to the frontier;
+- prompt via UTF-8 stdin;
+- bounded prompt size;
+- timeout;
+- one frontier call per user turn;
+- no generic command execution exposed to Qwen.
+
+This is deliberately not a general tool-use framework yet.
+
+## 5. Runtime profiles
+
+The orchestration layer should not hard-code a single machine profile.
+
+Runtime/model profiles own:
+
+- model tag;
+- quantization;
+- CPU/GPU offload;
+- context length;
+- thread count;
+- model storage;
+- accelerator-specific settings.
+
+This supports heterogeneous deployments: a modern GPU host, an older CPU-oriented host, or an edge/SBC accelerator can all present the same orchestration contract.
+
+## 6. Context and memory
+
+The current CLI keeps a bounded recent conversation history.
+
+Longer-term architecture may separate:
+
+- short conversational working context;
+- durable project state;
+- local retrieval;
+- provenance-aware trace logs;
+- user-model variables for the bias-balancing research track.
+
+Durable factual/project memory should not be conflated with opaque model weights.
+
+## 7. Synthesis policy
+
+The current prototype uses non-zero sampling during frontier synthesis because the local layer is intentionally allowed to act as an editor and critic rather than a byte-for-byte pipe.
+
+The desired property is not maximal copying. It is **semantic fidelity for sourced facts plus useful transformation for presentation and reasoning**.
+
+Long-term evaluation should therefore track at least:
+
+- factual preservation;
+- unsupported additions;
+- loss of caveats;
+- source-link preservation;
+- useful restructuring;
+- independent critique;
+- latency and token cost.
+
+## 8. Security boundary
+
+The local model should not be trusted as a shell command generator.
+
+A deterministic wrapper owns:
+
+- the executable;
+- fixed Codex arguments;
+- sandbox mode;
+- web policy;
+- timeout;
+- environment filtering;
+- prompt transport.
+
+Future write-capable modes should be separate capabilities rather than a silent expansion of `ask_codex`.
+
+## 9. Alternative Codex-first branch
+
+Experiments with Codex Router demonstrate a complementary architecture:
+
+```text
+Codex interface -> Codex Router -> local model
+```
+
+This can expose the local model through the Codex agent interface. It is technically functional, but small local models can be burdened by a large agent/tool context and require further tuning.
+
+The Qwen-first and Codex-first paths are treated as separate experimental branches rather than forced into one runtime dependency graph.
