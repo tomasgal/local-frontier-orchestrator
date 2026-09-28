@@ -2,15 +2,23 @@
 
 This roadmap describes engineering directions, not release commitments.
 
+## Baseline reached — 2026-09-28
+
+- First Windows/GPU reference deployment is considered stable enough to freeze as a regression baseline.
+- Qwen-first LOCAL/FRONTIER routing and bounded read-only `ask_codex` are working.
+- Frontier synthesis has explicit factual-preservation rules while keeping the local model as an independent editor/critic.
+- Behavioural policy and common generation settings are separated from transport/orchestration code.
+- Hardware placement remains host-specific and outside QwenChat request payloads.
+- Public repository hygiene excludes personal paths, private hostnames, LAN details, and private hardware sizing.
+
 ## Near term
 
-- Stabilize the Qwen-first CLI.
 - Keep hard freshness/capability gates intentionally narrow.
-- Separate behavioural policy from host/runtime configuration.
 - Add structured trace logging.
+- Validate the same orchestration contract on a clean second Windows host.
 - Evaluate routing and synthesis over longer-term real use rather than a tiny prompt set.
 - Add configurable debug logging for raw frontier results versus local synthesis.
-- Improve configuration loading without hard-coding model tags or machine paths.
+- Keep host/model profiles separate; do not transplant tuned context/GPU values between machines without measurement.
 
 ## Multi-host
 

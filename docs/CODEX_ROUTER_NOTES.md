@@ -62,3 +62,12 @@ Best suited for exploring:
 - compatibility and tool-surface reduction.
 
 The Codex-first branch remains active research and will continue to be tuned independently.
+
+
+## Upstream contribution status
+
+An upstream contribution is currently under review:
+
+- [duolahypercho/codex-router PR #925 — Allow local Ollama context and timeout overrides](https://github.com/duolahypercho/codex-router/pull/925)
+
+As of **2026-09-28**, the PR is open, mergeable, and not yet merged. The project therefore records this as an **open upstream contribution**, not yet as a merged upstream-contributor credit.

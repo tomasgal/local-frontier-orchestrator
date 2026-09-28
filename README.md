@@ -10,6 +10,8 @@ The current reference implementation uses **Qwen via Ollama** as the local conve
 
 This repository is intentionally experimental. Routing, synthesis policy, context handling, and future bias-balancing behaviour are being tuned through longer-term use rather than optimized around a small fixed benchmark.
 
+As of **2026-09-28**, the first Windows/GPU reference deployment has reached a stable baseline. Its next role is regression reference rather than continued prompt-by-prompt tuning. The next engineering validation target is a clean second host with no prior project installation.
+
 ## Core architecture
 
 ```text
@@ -50,6 +52,7 @@ The local model is therefore more than a router. It remains part of the conversa
 - **Conversation continuity:** the frontier result returns to the local model, which produces the final user-facing response and keeps the interaction coherent.
 - **Evidence anchoring without turning the local model into a pipe:** researched frontier facts are treated as the primary factual substrate, while the local model is still allowed to reorganize, explain, criticize, and add clearly distinguishable interpretation.
 - **Host-specific runtime, common orchestration:** GPU/CPU placement, context length, thread count, quantization, and model selection belong to runtime/model profiles rather than the orchestration logic.
+- **Policy/config separation:** routing/system policy, synthesis policy, frontier-subagent instructions, hard gates, and generation defaults are externalized from the transport/orchestration script so they can be reviewed and changed without editing process-control code.
 - **Traceable experimentation:** longer-term failures and corrections are more informative than tuning the system around one or two prompts.
 
 ## Why not simply run the frontier model for everything?
@@ -126,12 +129,18 @@ See [`docs/HUMAN_AI_BIAS_BALANCER.md`](docs/HUMAN_AI_BIAS_BALANCER.md).
 ├── README.md
 ├── .gitignore
 ├── config/
-│   └── host.example.psd1
+│   ├── host.example.psd1
+│   └── QwenChat.config.psd1
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── CODEX_ROUTER_NOTES.md
 │   ├── HUMAN_AI_BIAS_BALANCER.md
+│   ├── NOTEBOOK_SETUP.md
 │   └── ROADMAP.md
+├── policy/
+│   ├── orchestrator-system.txt
+│   ├── synthesis-system.txt
+│   └── frontier-subagent.txt
 ├── launch/
 │   ├── QwenChat.bat
 │   ├── Start-Ollama.bat
@@ -179,6 +188,8 @@ launch\QwenChat.bat -Model "your-local-model:tag"
 
 The local model profile should carry hardware/runtime placement settings appropriate for that machine. The chat client intentionally avoids overriding GPU/CPU placement, context length, or thread count per request.
 
+For a clean Windows host bootstrap, see [`docs/NOTEBOOK_SETUP.md`](docs/NOTEBOOK_SETUP.md). Do not copy a tuned context/GPU profile from another machine before measuring the new host.
+
 ## Security and privacy notes
 
 The current frontier wrapper is intentionally constrained:
@@ -204,9 +215,9 @@ Current work focuses on:
 - long-term routing quality;
 - faithful-but-useful frontier synthesis;
 - context continuity;
-- configuration separation;
+- structured trace logging;
+- second-host validation with a clean install;
 - multi-host profiles;
-- trace logging;
 - bias-aware mediation;
 - future edge/SBC execution.
 

@@ -1,37 +1,63 @@
 param(
-    [string]$Model = 'qwen3.5:4b-q4_K_M',
+    [string]$Model,
     [switch]$Think,
-    [int]$CodexTimeoutSec = 300
+    [Nullable[int]]$CodexTimeoutSec,
+    [string]$ConfigPath
 )
 
 $ErrorActionPreference = 'Stop'
-$BaseUri = 'http://127.0.0.1:11434'
+
+if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
+    $ConfigPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'config\QwenChat.config.psd1'
+}
+if (-not (Test-Path -LiteralPath $ConfigPath)) {
+    throw "QwenChat config not found: $ConfigPath"
+}
+
+$script:Config = Import-PowerShellDataFile -LiteralPath $ConfigPath
+
+if ([string]::IsNullOrWhiteSpace($Model)) {
+    $Model = [string]$script:Config.Model
+}
+if ([string]::IsNullOrWhiteSpace($Model)) {
+    throw 'No Ollama model is configured. Set Model in config or pass -Model.'
+}
+
+if ($null -eq $CodexTimeoutSec) {
+    $CodexTimeoutSec = [int]$script:Config.CodexTimeoutSec
+}
+if ($CodexTimeoutSec -le 0) {
+    throw 'CodexTimeoutSec must be greater than zero.'
+}
+
+$BaseUri = [string]$script:Config.BaseUri
+if ([string]::IsNullOrWhiteSpace($BaseUri)) {
+    throw 'BaseUri is missing from QwenChat config.'
+}
+
+$PolicyDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'policy'
+
+function Read-PolicyTemplate([string]$FileName) {
+    $path = Join-Path $PolicyDir $FileName
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "Policy file not found: $path"
+    }
+    return (Get-Content -LiteralPath $path -Raw -Encoding UTF8).TrimEnd()
+}
+
+$script:OrchestratorSystemTemplate = Read-PolicyTemplate 'orchestrator-system.txt'
+$script:SynthesisSystemTemplate    = Read-PolicyTemplate 'synthesis-system.txt'
+$script:FrontierSubagentTemplate   = Read-PolicyTemplate 'frontier-subagent.txt'
+
 $ThinkEnabled = [bool]$Think
 
-function Get-OrchestratorSystemPrompt {
+function Expand-RuntimePolicy([string]$Template) {
     $currentLocalDate = (Get-Date).ToString('yyyy-MM-dd')
-    return @"
-You are Qwen, the local first-line assistant and routing model. Answer in the user's language.
-Language policy:
-- Answer in the language used by the user unless the user explicitly requests another language.
-- Preserve the user's language across frontier synthesis instead of switching to a statistically similar language.
+    return $Template.Replace('{{CURRENT_DATE}}', $currentLocalDate)
+}
 
-Authoritative runtime date: $currentLocalDate.
-Treat this date as ground truth. Do not infer today's date from model memory.
-
-For every normal user turn that reaches you, begin the final response with exactly one routing marker:
-
-ROUTE: LOCAL
-Use LOCAL when stable local knowledge and reasoning are sufficient. Ordinary explanations, mathematics, stable technical knowledge, writing, translation, summarization of supplied text, and general factual knowledge are LOCAL. Do not choose FRONTIER merely because a question is factual.
-
-ROUTE: FRONTIER
-Use FRONTIER when the task materially requires current/recent/changing real-world information, live web research, information unavailable from the supplied context, specialist knowledge you are not confident about, substantially stronger reasoning, independent external verification, or exact specifications of a named external product that are not supplied in the conversation. If you choose FRONTIER, output only the line "ROUTE: FRONTIER" and nothing else.
-
-If you choose LOCAL, put the answer immediately after the marker. Do not mention routing or tools in the answer itself.
-
-When answering LOCAL, be epistemically conservative. Do not invent real-world facts to satisfy a premise. If the subject is fictional, mythical, ambiguous, underspecified, or depends on a particular fictional canon, say so explicitly and answer conditionally where useful. Do not invent a taxonomic or semantic distinction between word forms without evidence.
-
-"@
+function Get-OrchestratorSystemPrompt {
+    return Expand-RuntimePolicy $script:OrchestratorSystemTemplate
 }
 
 function Reset-Messages {
@@ -62,10 +88,13 @@ function Test-Ollama {
 }
 
 function Trim-Messages {
-    # The system routing prompt must survive trimming; keep the last 11 non-system messages.
-    if ($script:Messages.Count -gt 12) {
+    $maxMessages = [int]$script:Config.HistoryMaxMessages
+    if ($maxMessages -lt 2) { $maxMessages = 12 }
+
+    if ($script:Messages.Count -gt $maxMessages) {
         $system = @($script:Messages | Where-Object { $_.role -eq 'system' } | Select-Object -First 1)
-        $tail = @($script:Messages | Where-Object { $_.role -ne 'system' } | Select-Object -Last 11)
+        $tailCount = $maxMessages - 1
+        $tail = @($script:Messages | Where-Object { $_.role -ne 'system' } | Select-Object -Last $tailCount)
         $script:Messages = @($system + $tail)
     }
 }
@@ -74,41 +103,15 @@ function Trim-Messages {
 function Get-FrontierPolicyReason([string]$Prompt) {
     if ([string]::IsNullOrWhiteSpace($Prompt)) { return $null }
 
-    # Exact model-specific product specs are an external-source capability.
-    # Keep this intentionally narrow: a spec request plus a product/model signal.
-    $productSpecPattern = '(?i)(\bpresn\p{L}*\b|\bexact(?:ly)?\b|\bšpecifikáci\p{L}*\b|\bspecification\p{L}*\b|\bspecs?\b|\brozmer\p{L}*\b|\bdimensions?\b|\bpríkon\p{L}*\b|\bpower\s+(?:draw|consumption|limit)\b|\bTBP\b|\bTDP\b|\bnapájac\p{L}*\s+konektor\p{L}*\b|\bpower\s+connector\p{L}*\b|\bhmotnos\p{L}*\b|\bweight\b)'
-    $productIdentityPattern = '(?i)(\b(?:ASRock|NVIDIA|AMD|Intel|ASUS|MSI|Gigabyte|Lenovo|Dell|HP|Acer|Apple|Samsung|Sony|Canon|Nikon|Corsair|Crucial|Kingston|Western\s+Digital|WD|Seagate|Sapphire|PowerColor|XFX|PNY|Zotac|Palit|Gainward)\b|\b(?:RTX|GTX|RX|Arc|Ryzen|Core|GeForce|Radeon|iPhone|Galaxy|ThinkPad)\b|\b[A-Z]{1,6}\d{2,5}[A-Z0-9._+-]*\b)'
-    if ($Prompt -match $productSpecPattern -and $Prompt -match $productIdentityPattern) {
+    $gates = $script:Config.HardGates
+
+    if ($Prompt -match [string]$gates.ProductSpecPattern -and
+        $Prompt -match [string]$gates.ProductIdentityPattern) {
         return 'named-product-specification'
     }
 
-    # Hard capability gate: only strong, low-ambiguity signals.
-    # Ambiguous cases remain Qwen's own route-marker decision.
-    $rules = @(
-        @{
-            Reason = 'explicit-frontier-or-web'
-            Pattern = '(?i)(\bask[_ -]?codex\b|\bdopyt\p{L}*\s+na\s+frontier\b|\bpouži\p{L}*[^.!?]{0,60}\bfrontier\b|\bopýtaj\p{L}*[^.!?]{0,40}\bcodex\b|\buse\s+(?:the\s+)?(?:frontier|codex)\b|\bask\s+(?:the\s+)?(?:frontier|codex)\b|\bsearch the web\b|\bbrowse the web\b|\blook it up online\b|\bna webe\b|\bcez web\b|\bna internete\b|\bonline zdroj\p{L}*\b|\bvyhľadaj\p{L}*\s+(?:na\s+)?webe\b|\bzisti\p{L}*\s+(?:na\s+)?webe\b)'
-        },
-        @{
-            Reason = 'explicit-freshness'
-            Pattern = '(?i)(\bdnes\b|\bvčera\b|\bzajtra\b|\bpráve teraz\b|\btento týždeň\b|\btento mesiac\b|\bnajnovš\p{L}*\b|\bnajčerstv\p{L}*\b|\blatest\b|\bnewest\b|\btoday\b|\byesterday\b|\btomorrow\b|\bthis week\b|\bthis month\b|\bas of\b|\bup[- ]to[- ]date\b)'
-        },
-        @{
-            Reason = 'live-state'
-            Pattern = '(?i)(\bčo sa (?:práve |teraz |aktuálne )?deje\b|\bwhat(?:''s| is) happening\b|\bpočasie\b|\bpredpoveď počasia\b|\bweather\b|\bforecast\b|\blive score\b|\bvýsledok zápasu\b|\bexchange rate\b)'
-        },
-        @{
-            Reason = 'current-version-or-release'
-            Pattern = '(?i)(\baktuáln\p{L}*\s+(?:stabiln\p{L}*\s+)?verzi\p{L}*\b|\baktuáln\p{L}*\s+release\b|\bcurrent\s+(?:stable\s+)?version\b|\bcurrent\s+release\b|\bnovš\p{L}*\s+verzi\p{L}*\b)'
-        },
-        @{
-            Reason = 'url-needs-fetch'
-            Pattern = '(?i)https?://'
-        }
-    )
-
-    foreach ($rule in $rules) {
-        if ($Prompt -match $rule.Pattern) {
+    foreach ($rule in @($gates.Rules)) {
+        if ($Prompt -match [string]$rule.Pattern) {
             return [string]$rule.Reason
         }
     }
@@ -116,13 +119,15 @@ function Get-FrontierPolicyReason([string]$Prompt) {
 }
 
 function Get-HardGateContext([string]$Prompt) {
-    # For a self-contained freshness/web request, send only the current request to Codex.
-    # Add prior context only for short, clearly anaphoric follow-ups.
-    if ([string]::IsNullOrWhiteSpace($Prompt) -or $Prompt.Length -gt 220) {
+    $gates = $script:Config.HardGates
+    $maxPromptChars = [int]$gates.FollowUpMaxPromptChars
+    $maxContextChars = [int]$gates.FollowUpContextChars
+    $followUpPattern = [string]$gates.FollowUpPattern
+
+    if ([string]::IsNullOrWhiteSpace($Prompt) -or $Prompt.Length -gt $maxPromptChars) {
         return ''
     }
 
-    $followUpPattern = '(?i)^\s*(a\s+)?(čo|co|ako|a\s+čo|a\s+co|toto|to|tam|ten|tá|ta|tú|tu|tie|rovnako|oproti tomu|what about|and what|this|that|it|same|there)\b'
     if ($Prompt -notmatch $followUpPattern) {
         return ''
     }
@@ -136,8 +141,8 @@ function Get-HardGateContext([string]$Prompt) {
 
     $text = [string]$lastUser[0].content
     if ([string]::IsNullOrWhiteSpace($text)) { return '' }
-    if ($text.Length -gt 1800) {
-        $text = $text.Substring($text.Length - 1800)
+    if ($text.Length -gt $maxContextChars) {
+        $text = $text.Substring($text.Length - $maxContextChars)
     }
     return $text.Trim()
 }
@@ -188,8 +193,9 @@ function Invoke-CodexReadOnly([string]$Prompt) {
     if ([string]::IsNullOrWhiteSpace($Prompt)) {
         throw 'ask_codex received an empty prompt.'
     }
-    if ($Prompt.Length -gt 12000) {
-        throw 'ask_codex prompt is too long (MVP maximum: 12000 characters).'
+    $maxFrontierPromptChars = [int]$script:Config.Frontier.MaxPromptChars
+    if ($Prompt.Length -gt $maxFrontierPromptChars) {
+        throw "ask_codex prompt is too long (maximum: $maxFrontierPromptChars characters)."
     }
 
     $spec = Get-CodexProcessSpec
@@ -225,17 +231,8 @@ function Invoke-CodexReadOnly([string]$Prompt) {
         $stdoutTask = $p.StandardOutput.ReadToEndAsync()
         $stderrTask = $p.StandardError.ReadToEndAsync()
 
-        $currentLocalDate = (Get-Date).ToString('yyyy-MM-dd')
-        $delegatedPrompt = @"
-You are being called as a read-only frontier subagent by a local Qwen orchestrator.
-Authoritative local date supplied by the wrapper: $currentLocalDate.
-Live web search is enabled. If the task asks about current, recent, time-sensitive, or changing real-world information, use live web search instead of relying on model memory. Prefer current authoritative sources and make relevant dates explicit when freshness matters. For non-current tasks, use web search only when it materially improves the answer.
-
-Answer the task directly and concisely with enough factual/source context for Qwen to synthesize the final response. Do not modify files. Do not commit, push, or otherwise change git state. Do not ask for permission to make changes.
-
-TASK:
-$Prompt
-"@
+        $delegatedPrompt = Expand-RuntimePolicy $script:FrontierSubagentTemplate
+        $delegatedPrompt = $delegatedPrompt.Replace('{{TASK}}', $Prompt)
         # Write exact UTF-8 bytes; do not let Windows PowerShell choose an OEM/ANSI encoding.
         $stdinBytes = [System.Text.Encoding]::UTF8.GetBytes($delegatedPrompt)
         $p.StandardInput.BaseStream.Write($stdinBytes, 0, $stdinBytes.Length)
@@ -297,8 +294,12 @@ function Invoke-QwenLocalApi {
         # to the selected Ollama model profile. Keep only per-request generation
         # controls here so QwenChat does not override host-specific profiles.
         options    = @{
-            num_predict = $(if ($script:ThinkEnabled) { 2048 } else { 1024 })
-            temperature = 0.2
+            num_predict = $(if ($script:ThinkEnabled) {
+                [int]$script:Config.LocalGeneration.NumPredictThink
+            } else {
+                [int]$script:Config.LocalGeneration.NumPredictNormal
+            })
+            temperature = [double]$script:Config.LocalGeneration.Temperature
         }
     }
 
@@ -308,30 +309,7 @@ function Invoke-QwenLocalApi {
 }
 
 function Invoke-QwenSynthesis([string]$OriginalPrompt, [string]$FrontierResult) {
-    $currentLocalDate = (Get-Date).ToString('yyyy-MM-dd')
-    $synthesisSystem = @"
-You are Qwen performing the final user-facing synthesis after an external frontier subagent has already researched the task.
-
-Authoritative runtime date: $currentLocalDate.
-Answer the ORIGINAL USER REQUEST in the user's language.
-Language policy:
-- Answer in the language used by the user unless the user explicitly requests another language.
-- Preserve the user's language across frontier synthesis instead of switching to a statistically similar language.
-
-Treat FRONTIER RESULT as the primary factual substrate for externally researched or current information. Be a useful editor and explainer, not a passive pipe, but preserve its factual payload carefully.
-
-Rules:
-- Preserve concrete researched facts such as names, model identifiers, numbers, dimensions, dates, prices, capacities, interfaces, quotations, caveats, uncertainty, and source links unless the FRONTIER RESULT itself clearly marks them as uncertain.
-- Do not silently replace a concrete fact from FRONTIER RESULT with a conflicting fact from your own model memory.
-- If you notice a plausible conflict or suspect an error, preserve the distinction and state the uncertainty instead of silently "correcting" it.
-- You may reorganize, summarize, clarify, connect ideas, and add concise explanatory context where useful.
-- You may add stable background knowledge, reasoning, or interpretation when it genuinely helps, but do not present such additions as if they came from FRONTIER RESULT or its cited sources.
-- Do not strengthen tentative claims into certainty and do not invent missing product specifications.
-- Preserve useful source links and keep them attached to the claims they support.
-- Do not plan, discuss routing, request another tool, or second-guess the runtime date because it is newer than your training data.
-- Return only the final user-facing answer.
-
-"@
+    $synthesisSystem = Expand-RuntimePolicy $script:SynthesisSystemTemplate
 
     $synthesisUser = @"
 ORIGINAL USER REQUEST:
@@ -353,9 +331,13 @@ $FrontierResult
         # Do not override num_gpu/num_ctx/num_thread here; they are defined
         # by the selected Ollama model profile.
         options    = @{
-            num_predict      = $(if ($script:ThinkEnabled) { 3072 } else { 1536 })
-            temperature      = 0.25
-            presence_penalty = 0.15
+            num_predict = $(if ($script:ThinkEnabled) {
+                [int]$script:Config.SynthesisGeneration.NumPredictThink
+            } else {
+                [int]$script:Config.SynthesisGeneration.NumPredictNormal
+            })
+            temperature      = [double]$script:Config.SynthesisGeneration.Temperature
+            presence_penalty = [double]$script:Config.SynthesisGeneration.PresencePenalty
         }
     }
 
@@ -422,7 +404,8 @@ function Test-UnfinishedSynthesis($Response, [string]$Content) {
     # caller will fall back to the already complete frontier result instead.
     if ([string]$Response.done_reason -eq 'length') { return $true }
 
-    if ($Response.eval_count -ge 1500 -and
+    $unfinishedThreshold = [int]$script:Config.SynthesisGeneration.UnfinishedEvalThreshold
+    if ($Response.eval_count -ge $unfinishedThreshold -and
         $Content -match '(?is)^\s*(okay,?\s+let me|let me|first,?\s+i\s+need|we\s+need|i\s+need\s+to|let''s\s+(?:tackle|work|analyze))') {
         return $true
     }
@@ -540,7 +523,7 @@ $recentContext
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat. Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "Qwen local chat v8 (external policy/config). Commands: /exit, /clear, /paste, /think on, /think off"
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)

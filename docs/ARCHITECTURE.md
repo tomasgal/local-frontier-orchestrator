@@ -125,7 +125,25 @@ Runtime/model profiles own:
 
 This supports heterogeneous deployments: a modern GPU host, an older CPU-oriented host, or an edge/SBC accelerator can all present the same orchestration contract.
 
-## 6. Context and memory
+## 6. Policy and configuration boundary
+
+The Windows reference implementation keeps process-control logic separate from behavioural policy:
+
+```text
+src/QwenChat.ps1              orchestration / transport
+config/QwenChat.config.psd1  hard gates and generation defaults
+policy/orchestrator-system.txt
+policy/synthesis-system.txt
+policy/frontier-subagent.txt
+```
+
+This is intentionally different from host runtime configuration. GPU/CPU placement, context length, thread count, quantization, and model storage remain properties of the selected Ollama runtime/model profile.
+
+A change to language policy or synthesis behaviour should not require editing the Codex process wrapper. Conversely, moving to a weaker or stronger host should not require rewriting routing logic.
+
+Avoid using a single surprising answer as a reason to retune the sampler or routing policy. The system is stochastic; changes should be driven by repeated, categorized failures or explicit experimental conditions.
+
+## 7. Context and memory
 
 The current CLI keeps a bounded recent conversation history.
 
@@ -139,7 +157,7 @@ Longer-term architecture may separate:
 
 Durable factual/project memory should not be conflated with opaque model weights.
 
-## 7. Synthesis policy
+## 8. Synthesis policy
 
 The current prototype uses non-zero sampling during frontier synthesis because the local layer is intentionally allowed to act as an editor and critic rather than a byte-for-byte pipe.
 
@@ -155,7 +173,7 @@ Long-term evaluation should therefore track at least:
 - independent critique;
 - latency and token cost.
 
-## 8. Security boundary
+## 9. Security boundary
 
 The local model should not be trusted as a shell command generator.
 
@@ -171,7 +189,7 @@ A deterministic wrapper owns:
 
 Future write-capable modes should be separate capabilities rather than a silent expansion of `ask_codex`.
 
-## 9. Alternative Codex-first branch
+## 10. Alternative Codex-first branch
 
 Experiments with Codex Router demonstrate a complementary architecture:
 
