@@ -148,7 +148,10 @@ function Get-HardGateContext([string]$Prompt) {
 }
 
 function Get-CodexProcessSpec {
-    $cmd = Get-Command codex -ErrorAction Stop | Select-Object -First 1
+    $cmd = Get-Command codex.cmd -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $cmd) {
+        $cmd = Get-Command codex -ErrorAction Stop | Select-Object -First 1
+    }
     $path = [string]$cmd.Source
     if ([string]::IsNullOrWhiteSpace($path)) {
         $path = [string]$cmd.Path
