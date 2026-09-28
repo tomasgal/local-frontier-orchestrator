@@ -602,12 +602,16 @@ function Persist-TurnAndMemory(
             bias_signals = $biasSignals
         }
 
+        if ($null -ne $memoryNote) {
+            $trace['memory_note'] = $memoryNote.Parsed
+        }
+
         if ([bool]$script:Config.ResearchLogging.IncludeRawText) {
-            $trace.user = $Prompt
-            $trace.local_raw = $LocalRaw
-            $trace.frontier_raw = $FrontierResult
-            $trace.final_answer = $FinalContent
-            $trace.memory_note_raw = if ($null -ne $memoryNote) {
+            $trace['user'] = $Prompt
+            $trace['local_raw'] = $LocalRaw
+            $trace['frontier_raw'] = $FrontierResult
+            $trace['final_answer'] = $FinalContent
+            $trace['memory_note_raw'] = if ($null -ne $memoryNote) {
                 $memoryNote.Raw
             } else {
                 $null
@@ -615,8 +619,8 @@ function Persist-TurnAndMemory(
         }
 
         if ([bool]$script:Config.ResearchLogging.IncludeMemorySnapshots) {
-            $trace.memory_before = $memoryBefore
-            $trace.memory_after = $memoryAfter
+            $trace['memory_before'] = $memoryBefore
+            $trace['memory_after'] = $memoryAfter
         }
 
         Append-JsonLine (Get-MonthlyLogPath 'trace') $trace
