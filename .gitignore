@@ -1,0 +1,28 @@
+# Local runtime/config
+config/local.psd1
+config/*.local.psd1
+*.local.json
+*.local.yaml
+*.local.yml
+
+# Logs / traces
+logs/
+traces/
+*.log
+*.sqlite
+*.db
+
+# Model/runtime artifacts
+models/
+runtime/
+
+# Codex/Ollama credentials or state must never be committed
+.codex/
+.ollama/
+.env
+
+# OS/editor
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
