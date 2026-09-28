@@ -2,7 +2,11 @@ param(
     [string]$Model,
     [switch]$Think,
     [Nullable[int]]$CodexTimeoutSec,
-    [string]$ConfigPath
+    [string]$ConfigPath,
+    [Nullable[int]]$ContextLengthHint,
+    [Nullable[int]]$MemoryRecentTurns,
+    [Nullable[int]]$MemoryContextMaxChars,
+    [Nullable[int]]$MemoryRecentContextMaxChars
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,8 +52,21 @@ function Read-PolicyTemplate([string]$FileName) {
 $script:OrchestratorSystemTemplate = Read-PolicyTemplate 'orchestrator-system.txt'
 $script:SynthesisSystemTemplate    = Read-PolicyTemplate 'synthesis-system.txt'
 $script:FrontierSubagentTemplate   = Read-PolicyTemplate 'frontier-subagent.txt'
+$script:MemoryNoteTemplate          = Read-PolicyTemplate 'memory-note-system.txt'
+$script:MemoryCompactionTemplate    = Read-PolicyTemplate 'memory-compaction-system.txt'
+
+$memoryModule = Join-Path $PSScriptRoot 'QwenMemory.ps1'
+if (-not (Test-Path -LiteralPath $memoryModule)) {
+    throw "Qwen memory module not found: $memoryModule"
+}
+. $memoryModule
 
 $ThinkEnabled = [bool]$Think
+Initialize-QwenMemoryConfiguration `
+    $ContextLengthHint `
+    $MemoryRecentTurns `
+    $MemoryContextMaxChars `
+    $MemoryRecentContextMaxChars
 
 function Expand-RuntimePolicy([string]$Template) {
     $currentLocalDate = (Get-Date).ToString('yyyy-MM-dd')
@@ -289,7 +306,7 @@ function Invoke-CodexReadOnly([string]$Prompt) {
 function Invoke-QwenLocalApi {
     $bodyObj = @{
         model      = $Model
-        messages   = @($script:Messages)
+        messages   = @(Get-QwenConversationMessages)
         think      = $script:ThinkEnabled
         stream     = $false
         keep_alive = '5m'
@@ -313,8 +330,16 @@ function Invoke-QwenLocalApi {
 
 function Invoke-QwenSynthesis([string]$OriginalPrompt, [string]$FrontierResult) {
     $synthesisSystem = Expand-RuntimePolicy $script:SynthesisSystemTemplate
+    $memoryBlock = Get-MemoryContextBlock
+    $recentConversation = Get-RecentConversationText -ExcludeLastUser
 
     $synthesisUser = @"
+PERSISTENT CONVERSATION MEMORY:
+$memoryBlock
+
+RECENT CONVERSATION:
+$recentConversation
+
 ORIGINAL USER REQUEST:
 $OriginalPrompt
 
@@ -331,8 +356,6 @@ $FrontierResult
         think      = $script:ThinkEnabled
         stream     = $false
         keep_alive = '5m'
-        # Do not override num_gpu/num_ctx/num_thread here; they are defined
-        # by the selected Ollama model profile.
         options    = @{
             num_predict = $(if ($script:ThinkEnabled) {
                 [int]$script:Config.SynthesisGeneration.NumPredictThink
@@ -430,6 +453,7 @@ function Invoke-Qwen([string]$Prompt) {
     $r = $null
     $frontierResult = $null
     $finalContent = $null
+    $localRaw = $null
 
     if (-not [string]::IsNullOrWhiteSpace($policyReason)) {
         $route = 'FRONTIER'
@@ -440,6 +464,7 @@ function Invoke-Qwen([string]$Prompt) {
         $r = Invoke-QwenLocalApi
         Show-QwenThinking $r
         $candidate = Get-CleanQwenContent $r
+        $localRaw = $candidate
         $route = Get-QwenRoute $candidate
 
         if ($route -eq 'FRONTIER') {
@@ -457,13 +482,24 @@ function Invoke-Qwen([string]$Prompt) {
     }
 
     if ($route -eq 'FRONTIER') {
-        $codexPrompt = $Prompt
-        if (-not [string]::IsNullOrWhiteSpace($recentContext)) {
-            $codexPrompt = @"
+        $memoryBlock = Get-MemoryContextBlock
+        $recentConversation = Get-RecentConversationText -ExcludeLastUser
+
+        $codexPrompt = @"
+PERSISTENT CONVERSATION MEMORY:
+$memoryBlock
+
+RECENT CONVERSATION:
+$recentConversation
+
 CURRENT USER REQUEST:
 $Prompt
+"@
 
-PREVIOUS USER TURN:
+        if (-not [string]::IsNullOrWhiteSpace($recentContext)) {
+            $codexPrompt += @"
+
+FOLLOW-UP ANCHOR (previous user turn):
 $recentContext
 "@
         }
@@ -521,15 +557,35 @@ $recentContext
         Write-Host ("`n[{0:n2}s; think={1}; route={2}]" -f `
             $sw.Elapsed.TotalSeconds, $script:ThinkEnabled, $route) -ForegroundColor DarkGray
     }
+
+    if (-not [string]::IsNullOrWhiteSpace($finalContent)) {
+        Persist-TurnAndMemory `
+            -Prompt $Prompt `
+            -FinalContent $finalContent `
+            -Route $route `
+            -PolicyReason $policyReason `
+            -LocalRaw $localRaw `
+            -FrontierResult $frontierResult `
+            -Response $r `
+            -AnswerSeconds $sw.Elapsed.TotalSeconds
+    }
 }
 
 
+Initialize-PersistentMemory
+$script:PolicyFingerprint = Get-PolicyFingerprint
+
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v8 (external policy/config). Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "Qwen local chat v9 (persistent memory + research logging). Commands: /exit, /clear, /paste, /think on, /think off"
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
+if ($script:MemoryEnabled) {
+    Write-Host ("Persistent memory: ON; recent turns={0}; compact every={1}" -f `
+        $script:MemoryRecentTurns, $script:MemoryCompactionEvery)
+    Write-Host ("Memory/log path: {0}" -f $script:DataRoot)
+}
 Write-Host ""
 
 while ($true) {
@@ -541,8 +597,8 @@ while ($true) {
             exit 0
         }
         '^/clear$' {
-            Reset-Messages
-            Write-Host "Conversation history cleared."
+            Clear-PersistentConversationMemory
+            Write-Host "Working memory and active conversation context cleared. Historical logs retained."
             continue
         }
         '^/paste$' {
