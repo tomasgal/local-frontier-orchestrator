@@ -190,7 +190,7 @@ launch\QwenChat.bat -Model "your-local-model:tag"
 
 The local model profile should carry hardware/runtime placement settings appropriate for that machine. The chat client intentionally avoids overriding GPU/CPU placement, context length, or thread count per request.
 
-QwenChat v9.1 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. Each completed turn produces a **0–40 character micro-memory note**; every five turns those notes are compacted into a **0–160 character rolling state**. Exact historical data is not compressed away: the wrapper keeps full conversation JSONL and injects a bounded set of lexically relevant older raw snippets when needed. Complete conversation and research traces remain append-only. The model receives no filesystem tool: PowerShell owns persistence and retrieval deterministically.
+QwenChat v9.1.1 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. Each completed turn produces a **0–40 character user-delta-first micro-memory note**; every five turns those notes are compacted into a **0–160 character rolling state**. Exact historical data is not compressed away: the wrapper keeps full conversation JSONL and injects a bounded set of lexically relevant older raw snippets when needed. Complete conversation and research traces remain append-only. The model receives no filesystem tool: PowerShell owns persistence and retrieval deterministically.
 
 For a clean Windows host bootstrap, see [`docs/NOTEBOOK_SETUP.md`](docs/NOTEBOOK_SETUP.md). Do not copy a tuned context/GPU profile from another machine before measuring the new host.
 
