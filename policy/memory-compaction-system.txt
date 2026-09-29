@@ -10,9 +10,17 @@ Purpose: preserve conversational orientation only. Full raw conversation and exa
 
 Rules:
 - Merge repeated topics and keep the currently active workstream.
-- Preserve important entities, current goals, decisions, and corrections.
+- Preserve important entities, current goals, decisions, constraints, and corrections.
 - Later explicit corrections supersede older values in the STATE.
+- Preserve distinct durable deltas when they fit; do not collapse a goal/constraint into a generic status word.
+- Do not invent status, readiness, certainty, labels, or connecting facts that are absent from STATE/NOTES.
+- Prefer compact factual fragments over prose.
 - Frequency means salience only, never truth.
 - Do not try to preserve every fact; exact historical data belongs to the raw store.
 - Do not infer sensitive traits.
 - If no durable state is useful, output only "-".
+
+Example:
+STATE: ORION24G | VEGA32G
+NOTES: ORION localLM | ORION lowRAM priority | CORR VEGA=48GB
+OUTPUT: ORION24G localLM lowRAM; VEGA48G
