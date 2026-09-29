@@ -130,5 +130,9 @@ The clean-host test also found a Windows Codex CLI shim issue. An npm installati
 
 A Windows Ollama desktop app may already own `127.0.0.1:11434`. In the validated host, `ollama app.exe` spawned `ollama.exe serve`; killing only the child caused it to be respawned. For controlled benchmarking, stop the parent app/process first and verify that the listener is gone before launching the project-managed server.
 
-The constrained host was subsequently re-tested successfully at **5120** context, which is now the frozen Lenovo proof-of-concept default; 4096 remains a conservative fallback. For v9.1 memory tests, the host launcher should use a small memory envelope (3 recent turns, about 500 characters of micro-memory, and bounded exact-data retrieval) while preserving the shared memory semantics.
+The constrained host was subsequently re-tested successfully at **5120** context, which is now the frozen notebook proof-of-concept default; 4096 remains a conservative fallback. The host launcher uses a small memory envelope (3 recent turns, about 500 characters of micro-memory, and bounded exact-data retrieval) while preserving the shared memory semantics.
+
+### Persistent-memory validation — 2026-09-29
+
+QwenChat **v9.1.3** passed the constrained-host micro-memory regression at the 5120 context baseline. A clean five-turn test produced correct user-delta notes, preserved a correction through compaction, normalized the final rolling state, and survived process restart with the corrected value and active goal/constraint intact. Post-turn micro-memory extraction was about **18–21 s**; the fifth turn including compaction was about **40 s**. Exact-data retrieval from older raw JSONL remains the next isolated regression test.
 
