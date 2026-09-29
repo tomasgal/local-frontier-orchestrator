@@ -2,7 +2,7 @@
 
 ## Goals
 
-QwenChat v9.1.2 treats the terminal as one continuing conversation rather than a set of disposable process sessions.
+QwenChat v9.1.3 treats the terminal as one continuing conversation rather than a set of disposable process sessions.
 
 - `/exit` stops the process and preserves memory.
 - restarting QwenChat restores bounded recent raw turns plus persistent memory.
@@ -70,7 +70,7 @@ Output:
 STATE: <=160 chars
 ```
 
-Compaction is intentionally lossy. It preserves active entities, goals, decisions, and corrections, but it is not the authoritative data store.
+Compaction is intentionally lossy. It preserves active entities, goals, decisions, constraints, preferences, and corrections, but it is not the authoritative data store. v9.1.3 also normalizes the result to state-only form: input labels are dropped and corrected values are stored once.
 
 Repeated mentions may increase salience, never factual certainty. Later explicit corrections should supersede obsolete values in the rolling state while the raw history remains intact.
 
