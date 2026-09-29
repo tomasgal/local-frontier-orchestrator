@@ -30,7 +30,9 @@
     MemoryCapacity = @{
         ContextLengthHint = 32768
         RecentTurns = 6
-        MemoryContextMaxChars = 12000
+        MemoryContextMaxChars = 600
         RecentContextMaxChars = 12000
+        RetrievalMaxChars = 4000
+        RetrievalMaxItems = 4
     }
 }
