@@ -102,6 +102,22 @@ rolling state
 
 Host launchers control capacity only. The semantic rules remain shared.
 
+## Validated v9.1.3 baseline — 2026-09-29
+
+On the constrained CPU-only Windows notebook, the final v9.1.3 validation used a clean memory epoch and a five-turn correction scenario.
+
+Observed results:
+
+- user-delta micro-notes preserved new facts, goals, constraints, and a later correction;
+- normalized compaction produced a clean rolling state without leaking internal `STATE`/`NOTES`/`CORR` labels;
+- post-turn micro-memory extraction was about **18–21 seconds** on this host;
+- the fifth-turn extraction plus compaction was about **40 seconds**;
+- after process exit and restart, the conversation continuity pipeline restored the corrected value and active goal/constraint correctly.
+
+The earlier verbose v9.1.1 policy roughly doubled post-turn memory latency on this CPU. v9.1.2 restored the same user-delta semantics with a much shorter policy prompt, and v9.1.3 added compaction-output normalization without reintroducing the latency regression.
+
+This validates micro-memory, compaction, and restart continuity. **Exact historical retrieval still requires an isolated regression test** in which the requested fact is outside the recent raw-turn window.
+
 ## Research trace
 
 Monthly JSONL traces remain append-only and can record:
