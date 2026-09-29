@@ -130,5 +130,5 @@ The clean-host test also found a Windows Codex CLI shim issue. An npm installati
 
 A Windows Ollama desktop app may already own `127.0.0.1:11434`. In the validated host, `ollama app.exe` spawned `ollama.exe serve`; killing only the child caused it to be respawned. For controlled benchmarking, stop the parent app/process first and verify that the listener is gone before launching the project-managed server.
 
-A 4096-token context is the currently validated constrained-host proof-of-concept baseline. A modest increase such as **5120** is a reasonable next capacity experiment, but it should remain a measured host-specific choice rather than a shared default.
+The constrained host was subsequently re-tested successfully at **5120** context, which is now the frozen Lenovo proof-of-concept default; 4096 remains a conservative fallback. For v9.1 memory tests, the host launcher should use a small memory envelope (3 recent turns, about 500 characters of micro-memory, and bounded exact-data retrieval) while preserving the shared memory semantics.
 
