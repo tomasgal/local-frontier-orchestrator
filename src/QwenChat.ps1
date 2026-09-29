@@ -6,7 +6,9 @@ param(
     [Nullable[int]]$ContextLengthHint,
     [Nullable[int]]$MemoryRecentTurns,
     [Nullable[int]]$MemoryContextMaxChars,
-    [Nullable[int]]$MemoryRecentContextMaxChars
+    [Nullable[int]]$MemoryRecentContextMaxChars,
+    [Nullable[int]]$MemoryRetrievalMaxChars,
+    [Nullable[int]]$MemoryRetrievalMaxItems
 )
 
 $ErrorActionPreference = 'Stop'
@@ -66,7 +68,9 @@ Initialize-QwenMemoryConfiguration `
     $ContextLengthHint `
     $MemoryRecentTurns `
     $MemoryContextMaxChars `
-    $MemoryRecentContextMaxChars
+    $MemoryRecentContextMaxChars `
+    $MemoryRetrievalMaxChars `
+    $MemoryRetrievalMaxItems
 
 function Expand-RuntimePolicy([string]$Template) {
     $currentLocalDate = (Get-Date).ToString('yyyy-MM-dd')
@@ -330,7 +334,7 @@ function Invoke-QwenLocalApi {
 
 function Invoke-QwenSynthesis([string]$OriginalPrompt, [string]$FrontierResult) {
     $synthesisSystem = Expand-RuntimePolicy $script:SynthesisSystemTemplate
-    $memoryBlock = Get-MemoryContextBlock
+    $memoryBlock = Get-MemoryContextBlock $OriginalPrompt
     $recentConversation = Get-RecentConversationText -ExcludeLastUser
 
     $synthesisUser = @"
@@ -482,7 +486,7 @@ function Invoke-Qwen([string]$Prompt) {
     }
 
     if ($route -eq 'FRONTIER') {
-        $memoryBlock = Get-MemoryContextBlock
+        $memoryBlock = Get-MemoryContextBlock $Prompt
         $recentConversation = Get-RecentConversationText -ExcludeLastUser
 
         $codexPrompt = @"
@@ -577,13 +581,15 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9 (persistent memory + research logging). Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "Qwen local chat v9.1 (micro-memory + exact-data retrieval + research logging). Commands: /exit, /clear, /paste, /think on, /think off"
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
 if ($script:MemoryEnabled) {
-    Write-Host ("Persistent memory: ON; recent turns={0}; compact every={1}" -f `
-        $script:MemoryRecentTurns, $script:MemoryCompactionEvery)
+    Write-Host ("Persistent memory: ON; recent turns={0}; compact every={1}; note<={2} chars; state<={3} chars" -f `
+        $script:MemoryRecentTurns, $script:MemoryCompactionEvery, $script:MemoryNoteMaxChars, $script:MemoryStateMaxChars)
+    Write-Host ("Exact-data retrieval: max {0} items / {1} chars" -f `
+        $script:MemoryRetrievalMaxItems, $script:MemoryRetrievalMaxChars)
     Write-Host ("Memory/log path: {0}" -f $script:DataRoot)
 }
 Write-Host ""
