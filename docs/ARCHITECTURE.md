@@ -143,28 +143,40 @@ A change to language policy or synthesis behaviour should not require editing th
 
 Avoid using a single surprising answer as a reason to retune the sampler or routing policy. The system is stochastic; changes should be driven by repeated, categorized failures or explicit experimental conditions.
 
-## 7. Context, persistent memory, and logs
+## 7. Context, persistent memory, exact data, and logs
 
-QwenChat v9 treats terminal restarts as continuation of one ongoing conversation. `/exit` ends the process but preserves memory. `/clear` explicitly resets active working memory and recent conversational context while retaining historical logs.
+QwenChat v9.1 treats terminal restarts as continuation of one ongoing conversation. `/exit` ends the process but preserves memory. `/clear` resets active context and memory while retaining historical logs.
 
-The persistent layer separates:
+The persistent layer separates four roles:
 
 ```text
-recent raw turns              bounded conversational continuity
-working_memory.json           compacted durable working context
-pending_notes.jsonl           one semantic Qwen note per completed turn
-conversation / trace JSONL    append-only history and research evidence
+recent raw turns              immediate conversational continuity
+0-40 char micro-notes         tiny per-turn orientation
+0-160 char rolling state      compact active workstream
+conversation / trace JSONL    authoritative raw history and research evidence
 ```
 
-After every completed turn, a separate bounded local Qwen call extracts a compact memory note. Every configured number of successful notes (default six), another local call merges them into `working_memory.json`, tracking current focus, topic frequency, decisions, preferences, and open loops.
+Every completed turn triggers a bounded local micro-memory extraction. Every five memory steps, pending notes are compacted into the rolling state.
 
-Frequency is a **retrieval/salience signal, not an epistemic signal**. Repetition must never upgrade a user claim into a verified fact.
+The state is deliberately lossy. Exact historical facts are preserved in raw JSONL and can be reintroduced through deterministic lexical retrieval. Retrieval uses the current request plus memory cues, excludes already-present recent turns, and returns only a bounded number of older raw snippets.
 
-Bounded working memory and recent dialogue are supplied to LOCAL Qwen, FRONTIER Codex delegation, and post-frontier Qwen synthesis. Qwen receives no filesystem tool; the PowerShell wrapper owns persistence and logging.
+This yields the active context pattern:
 
-Host-specific capacity remains separate from memory semantics. A constrained 5k host can expose fewer recent turns and smaller character budgets than a 22k GPU host while running the same shared memory code.
+```text
+rolling state
++ pending micro-notes
++ relevant exact old data
++ recent raw turns
++ current request
+```
 
-Per-turn bias signals are kept in the research trace, not fed back into compacted working memory, reducing the risk of self-reinforcing labels.
+Frequency is a relevance signal, not an epistemic signal. Repetition must never upgrade a claim into a verified fact. Explicit later corrections may supersede an earlier value in the rolling state, while the original and corrected values remain available in the raw history.
+
+Qwen receives no filesystem tool. The PowerShell wrapper owns persistence, lexical retrieval, migration, clearing, and logging.
+
+Host-specific capacity remains separate from memory semantics. A constrained 5k-context host can use smaller recent-history and retrieval budgets than a 22k host while running identical shared memory logic.
+
+Research traces preserve raw intermediate/final text, retrieval context, timing/token metadata, memory changes, and policy fingerprints for later Local Epistemic Balancer replay. Bias labels are not automatically written into working memory.
 
 Durable factual/project memory should not be conflated with opaque model weights.
 
