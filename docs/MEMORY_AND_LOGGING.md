@@ -2,7 +2,7 @@
 
 ## Goals
 
-QwenChat v9.1.1 treats the terminal as one continuing conversation rather than a set of disposable process sessions.
+QwenChat v9.1.2 treats the terminal as one continuing conversation rather than a set of disposable process sessions.
 
 - `/exit` stops the process and preserves memory.
 - restarting QwenChat restores bounded recent raw turns plus persistent memory.
@@ -49,7 +49,7 @@ The post-turn memory call receives only bounded portions of:
 - a shorter assistant outcome as secondary evidence;
 - the route marker.
 
-It does not receive the whole previous memory or frontier payload. The extractor records the **new conversational delta**, not a summary of the full turn: explicit user facts, corrections, decisions, constraints, preferences, and goals outrank facts merely repeated or suggested by the assistant. Output is plain text rather than JSON and is hard-capped to 40 characters by the wrapper.
+It does not receive the whole previous memory or frontier payload. The extractor records the **new conversational delta**, not a summary of the full turn. In v9.1.2 the same user-delta-first semantics are expressed with a shorter policy prompt to reduce repeated prompt-evaluation cost on slow CPU hosts. Output is plain text rather than JSON and is hard-capped to 40 characters by the wrapper.
 
 This keeps maximum-quality per-turn semantic extraction while greatly reducing prompt and generation cost on slow CPU-only hosts.
 
