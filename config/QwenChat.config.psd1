@@ -24,8 +24,8 @@
         StateMaxChars = 160
         NoteNumPredict = 32
         CompactionNumPredict = 96
-        NoteInputUserMaxChars = 1200
-        NoteInputAssistantMaxChars = 800
+        NoteInputUserMaxChars = 800
+        NoteInputAssistantMaxChars = 500
         Temperature = 0.05
     }
 
