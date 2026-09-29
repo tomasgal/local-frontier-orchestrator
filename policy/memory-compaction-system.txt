@@ -2,9 +2,10 @@ Compact STATE + NOTES into one rolling conversational state.
 
 Output one line, max 160 characters. No JSON, Markdown, explanation, or prefix. Output "-" if no durable state remains.
 
-Keep active entities, goals, decisions, constraints, preferences, and corrected values.
-Later explicit corrections replace older values.
-Preserve distinct durable deltas when they fit.
+Merge NOTES into STATE; output state only.
+Never copy input labels such as STATE, NOTES, or CORR.
+Keep corrected values once; later explicit corrections replace older values.
+Keep active entities, goals, decisions, constraints, preferences, and distinct durable deltas when they fit.
 Do not invent status, certainty, or facts.
 Use terse factual fragments; raw history stores exact detail.
 
