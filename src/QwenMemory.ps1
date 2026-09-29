@@ -460,8 +460,11 @@ function Invoke-QwenMemoryNote(
 
     $memoryInput = @"
 ROUTE:$Route
-USER:$userText
-ANSWER:$answerText
+NEW USER TURN:
+$userText
+
+ASSISTANT OUTCOME (secondary evidence only):
+$answerText
 "@
 
     $r = Invoke-QwenMemoryCall `
