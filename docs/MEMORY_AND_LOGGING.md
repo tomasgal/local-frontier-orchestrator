@@ -2,26 +2,26 @@
 
 ## Goals
 
-The terminal client is treated as one continuing conversation rather than a set of disposable process sessions.
+QwenChat v9.1 treats the terminal as one continuing conversation rather than a set of disposable process sessions.
 
 - `/exit` stops the process and preserves memory.
-- restarting QwenChat resumes bounded recent context plus persistent working memory.
+- restarting QwenChat restores bounded recent raw turns plus persistent memory.
 - `/clear` resets active memory/context but never deletes historical logs.
-- Qwen itself has no filesystem or shell tool.
+- Qwen itself receives no filesystem or shell tool.
 
 ## Storage
 
 Default root:
 
 ```text
-%LOCALAPPDATA%\\LocalFrontierOrchestrator
+%LOCALAPPDATA%\LocalFrontierOrchestrator
 ```
 
 Layout:
 
 ```text
 state/
-  working_memory.json
+  working_memory.txt
   pending_notes.jsonl
   runtime_state.json
 logs/
@@ -29,43 +29,94 @@ logs/
   trace-YYYY-MM.jsonl
 ```
 
-The monthly split keeps append-only logs manageable and makes later compression/archival straightforward.
+Legacy v9 JSON working-memory files are left untouched. On first v9.1 start, the runtime state migrates to memory schema 2, clears obsolete pending-note state, and rebuilds active continuity from the raw conversation logs.
 
-## Per-turn memory note
+## Three context layers
 
-After every completed user/assistant turn, a small local Qwen call produces structured JSON containing:
+The memory design deliberately separates orientation from exact data.
 
-- shortened user intent;
-- topic labels;
-- durable facts/context with explicit epistemic status;
-- decisions;
-- open loops;
-- tentative bias-research signals.
+1. **Recent raw turns** — the newest conversation turns are passed verbatim within a host-specific character budget.
+2. **Micro-memory** — every completed turn produces a single 0–40 character orientation note. Every five completed memory steps, the current state plus pending notes are compacted into a 0–160 character rolling state.
+3. **Exact historical data** — full conversation JSONL is never replaced by summaries. A lightweight deterministic lexical retriever can inject a bounded number of relevant older raw snippets.
 
-This is the maximum-quality mode. It intentionally adds latency on slow CPU-only hosts.
+The rolling state answers "what are we doing?" while the raw store answers "what exactly was said?".
+
+## Per-turn micro-memory
+
+The post-turn memory call receives only bounded portions of:
+
+- the user request;
+- the final assistant answer;
+- the route marker.
+
+It does not receive the whole previous memory or frontier payload. Output is plain text rather than JSON and is hard-capped to 40 characters by the wrapper.
+
+This keeps maximum-quality per-turn semantic extraction while greatly reducing prompt and generation cost on slow CPU-only hosts.
 
 ## Compaction
 
-After six successful memory notes by default, Qwen receives the existing working memory plus the pending notes and produces a new compacted `working_memory.json`.
+Default compaction cadence is five completed memory steps.
 
-Compaction tracks frequency, but frequency means conversational salience only. It must never upgrade a repeated claim into a verified fact.
+Input:
 
-Per-turn bias signals remain in the trace log and are not copied into working memory.
+```text
+STATE: <=160 chars
+NOTES: up to five x <=40 chars
+```
+
+Output:
+
+```text
+STATE: <=160 chars
+```
+
+Compaction is intentionally lossy. It preserves active entities, goals, decisions, and corrections, but it is not the authoritative data store.
+
+Repeated mentions may increase salience, never factual certainty. Later explicit corrections should supersede obsolete values in the rolling state while the raw history remains intact.
+
+## Exact-data retrieval
+
+Before LOCAL answering, frontier delegation, or post-frontier synthesis, the wrapper can search older conversation JSONL using a small lexical scorer.
+
+The retrieval query combines:
+
+- the current user request;
+- current rolling state;
+- pending micro-notes.
+
+Recent raw turns are excluded from retrieval to avoid duplication. Older hits are ranked by lexical overlap and recency, then bounded by host-specific item and character limits.
+
+This is deliberately simple: no vector database, embedding model, agent tool, or extra model inference is required.
 
 ## Context injection
 
-Bounded memory and recent raw dialogue are inserted into all three conversational paths:
+The three conversational paths receive the same bounded continuity substrate:
 
 ```text
-LOCAL Qwen
-FRONTIER Codex delegation
-post-frontier Qwen synthesis
+rolling state
++ pending micro-notes
++ relevant older raw snippets
++ recent raw turns
++ current request
 ```
 
-Host launchers can override only capacity parameters such as recent-turn count and character budgets. They do not change memory semantics.
+Host launchers control capacity only. The semantic rules remain shared.
 
 ## Research trace
 
-The trace is intended to support later Local Epistemic Balancer experiments and offline replay. It records routing, raw intermediate/final text when enabled, timing/token metadata, policy fingerprints, memory deltas, and tentative bias signals.
+Monthly JSONL traces remain append-only and can record:
 
-Because the log may contain complete conversation text and frontier results, it should be treated as private local research data.
+- raw user request;
+- raw local result;
+- raw frontier result;
+- final answer;
+- route and route reason;
+- token/timing metadata;
+- retrieved older-data snippets;
+- memory before and after;
+- cleaned micro-note and raw memory-model output;
+- policy fingerprint.
+
+These traces are intended for later offline replay and Local Epistemic Balancer research. Bias labels are not fed back into active memory by default, avoiding a self-reinforcing user model.
+
+Because the logs may contain full conversation text and frontier results, they should be treated as private local research data.
