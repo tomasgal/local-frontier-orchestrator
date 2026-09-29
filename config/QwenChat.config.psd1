@@ -7,15 +7,26 @@
 
     Memory = @{
         Enabled = $true
-        DataDirectory = '%LOCALAPPDATA%\\LocalFrontierOrchestrator'
+        DataDirectory = '%LOCALAPPDATA%\LocalFrontierOrchestrator'
+
+        # Shared semantics; host launchers may override capacity parameters.
         RecentTurns = 4
-        ContextMaxChars = 7000
-        RecentContextMaxChars = 7000
-        CompactionEvery = 6
-        NoteNumPredict = 384
-        CompactionNumPredict = 1024
-        Temperature = 0.10
-        FrontierForNoteMaxChars = 5000
+        ContextMaxChars = 600
+        RecentContextMaxChars = 6000
+        RetrievalMaxChars = 2500
+        RetrievalMaxItems = 3
+        RetrievalScanMaxTurns = 500
+
+        # v9.1 micro-memory: one tiny orientation note per turn and a tiny
+        # rolling state every five turns. Exact data remains in raw JSONL logs.
+        CompactionEvery = 5
+        NoteMaxChars = 40
+        StateMaxChars = 160
+        NoteNumPredict = 32
+        CompactionNumPredict = 96
+        NoteInputUserMaxChars = 1200
+        NoteInputAssistantMaxChars = 800
+        Temperature = 0.05
     }
 
     ResearchLogging = @{
