@@ -16,10 +16,10 @@ This roadmap describes engineering directions, not release commitments.
 ## Near term
 
 - Keep hard freshness/capability gates intentionally narrow.
-- Add structured trace logging.
-- Extend the clean second-host result with measured context sizing; keep the validated 4k constrained-host profile until a larger context proves worthwhile.
+- Validate v9.1 micro-memory under normal use: 0–40 char notes, five-step 0–160 char compaction, restart continuity, and exact-data retrieval.
+- Measure post-turn micro-memory latency on constrained CPU-only hardware and only then consider asynchronous extraction.
 - Evaluate routing and synthesis over longer-term real use rather than a tiny prompt set.
-- Add configurable debug logging for raw frontier results versus local synthesis.
+- Use append-only traces for offline Local Epistemic Balancer replay and bias-analysis experiments.
 - Keep host/model profiles separate; do not transplant tuned context/GPU values between machines without measurement.
 
 ## Multi-host
