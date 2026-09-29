@@ -34,7 +34,7 @@ Local evaluation
 Human final judgement
 ```
 
-Longer-term versions can adapt from interaction traces, but personalization should initially remain explicit and inspectable.
+Longer-term versions can adapt from interaction traces, but personalization should initially remain explicit and inspectable. The orchestration and persistence substrate now exists as an empirical prototype; what remains experimental is the epistemic-balancing policy and the behavioural personalization layer.
 
 ## 2. Biases of interest
 
@@ -98,6 +98,8 @@ Candidate variables:
 - domain-level performance.
 
 The mediator should **not** learn “what the user believes” as a preference that must be preserved. That would risk turning personalization into a self-reinforcing confirmation system.
+
+Persistent conversational memory is therefore distinct from the experimental user model. Conversation state may preserve task goals, corrections, constraints, and interaction continuity, while inferred bias or metacognitive labels should remain separate research variables rather than being fed back into active conversational memory by default.
 
 ## 4. Primary research questions
 
@@ -173,6 +175,8 @@ local post-processing / critique
 user
 ```
 
+It also provides persistent conversational continuity and append-only interaction traces while keeping compact working memory separate from the exact historical record.
+
 It also separates:
 
 - local policy from frontier capability;
@@ -217,13 +221,7 @@ Initial work should avoid making political persuasion, clinical advice, identity
 
 This document is intentionally shorter than the full study design. The project is not yet a preregistered experiment and the implementation does not yet claim to provide validated debiasing.
 
-Near-term engineering work is to make the mediator:
-
-- auditable;
-- configurable;
-- traceable;
-- stable across heterogeneous local hardware;
-- capable of preserving frontier evidence while still acting as an independent local critic.
+The current prototype already provides auditable policy/config separation, persistent conversational state, raw interaction traces, local/frontier intervention points, and restart continuity across heterogeneous local hardware. The next engineering step is to validate exact historical retrieval and then freeze the behavioural interface needed for controlled mediator experiments.
 
 Only after that should specific bias-balancing policies be frozen for controlled human-subject research.
 
