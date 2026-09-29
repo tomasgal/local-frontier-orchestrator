@@ -25,7 +25,7 @@
         NoteNumPredict = 32
         CompactionNumPredict = 96
         NoteInputUserMaxChars = 800
-        NoteInputAssistantMaxChars = 500
+        NoteInputAssistantMaxChars = 250
         Temperature = 0.05
     }
 
