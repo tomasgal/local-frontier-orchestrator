@@ -1,11 +1,13 @@
-# Persistent conversation memory and research logging for QwenChat.
+# Persistent conversation memory, exact-data retrieval, and research logging for QwenChat.
 # Dot-sourced by src/QwenChat.ps1. Qwen receives no filesystem tool.
 
 function Initialize-QwenMemoryConfiguration(
     [Nullable[int]]$ContextLengthHint,
     [Nullable[int]]$MemoryRecentTurns,
     [Nullable[int]]$MemoryContextMaxChars,
-    [Nullable[int]]$MemoryRecentContextMaxChars
+    [Nullable[int]]$MemoryRecentContextMaxChars,
+    [Nullable[int]]$MemoryRetrievalMaxChars,
+    [Nullable[int]]$MemoryRetrievalMaxItems
 ) {
     $script:MemoryEnabled = [bool]$script:Config.Memory.Enabled
     $script:MemoryRecentTurns = if ($null -ne $MemoryRecentTurns) {
@@ -23,7 +25,21 @@ function Initialize-QwenMemoryConfiguration(
     } else {
         [int]$script:Config.Memory.RecentContextMaxChars
     }
+    $script:MemoryRetrievalMaxChars = if ($null -ne $MemoryRetrievalMaxChars) {
+        [int]$MemoryRetrievalMaxChars
+    } else {
+        [int]$script:Config.Memory.RetrievalMaxChars
+    }
+    $script:MemoryRetrievalMaxItems = if ($null -ne $MemoryRetrievalMaxItems) {
+        [int]$MemoryRetrievalMaxItems
+    } else {
+        [int]$script:Config.Memory.RetrievalMaxItems
+    }
+
     $script:MemoryCompactionEvery = [int]$script:Config.Memory.CompactionEvery
+    $script:MemoryNoteMaxChars = [int]$script:Config.Memory.NoteMaxChars
+    $script:MemoryStateMaxChars = [int]$script:Config.Memory.StateMaxChars
+    $script:MemoryRetrievalScanMaxTurns = [int]$script:Config.Memory.RetrievalScanMaxTurns
     $script:ContextLengthHint = if ($null -ne $ContextLengthHint) { [int]$ContextLengthHint } else { 0 }
 
     $dataTemplate = [string]$script:Config.Memory.DataDirectory
@@ -34,7 +50,7 @@ function Initialize-QwenMemoryConfiguration(
     $script:DataRoot = [Environment]::ExpandEnvironmentVariables($dataTemplate)
     $script:StateDir = Join-Path $script:DataRoot 'state'
     $script:LogDir = Join-Path $script:DataRoot 'logs'
-    $script:WorkingMemoryPath = Join-Path $script:StateDir 'working_memory.json'
+    $script:WorkingMemoryPath = Join-Path $script:StateDir 'working_memory.txt'
     $script:PendingNotesPath = Join-Path $script:StateDir 'pending_notes.jsonl'
     $script:RuntimeStatePath = Join-Path $script:StateDir 'runtime_state.json'
     $script:Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -69,33 +85,50 @@ function Get-MonthlyLogPath([string]$Kind) {
     return (Join-Path $script:LogDir ("{0}-{1}.jsonl" -f $Kind, $month))
 }
 
-function New-DefaultWorkingMemory {
-    return [ordered]@{
-        version = 1
-        current_focus = ''
-        topics = @()
-        context_items = @()
-        decisions = @()
-        open_loops = @()
-        preferences = @()
-        updated_at = $null
-    }
-}
-
 function New-DefaultRuntimeState {
     return [ordered]@{
-        version = 1
+        version = 2
+        memory_schema = 2
         epoch = 1
         next_turn_id = 1
         completed_since_compaction = 0
     }
 }
 
-function Get-WorkingMemoryRaw {
-    if (-not (Test-Path -LiteralPath $script:WorkingMemoryPath)) {
-        return ((New-DefaultWorkingMemory) | ConvertTo-Json -Depth 12 -Compress)
+function Get-BoundedText([string]$Text, [int]$MaxChars) {
+    if ([string]::IsNullOrWhiteSpace($Text) -or $MaxChars -le 0) { return '' }
+
+    $clean = [regex]::Replace($Text.Trim(), '\s+', ' ')
+    if ($clean.Length -le $MaxChars) { return $clean }
+    if ($MaxChars -lt 16) { return $clean.Substring(0, $MaxChars) }
+
+    $marker = ' ... '
+    $head = [Math]::Max(1, [int](($MaxChars - $marker.Length) * 0.62))
+    $tail = $MaxChars - $marker.Length - $head
+    return $clean.Substring(0, $head) + $marker + $clean.Substring($clean.Length - $tail)
+}
+
+function Clean-MicroText([string]$Text, [int]$MaxChars) {
+    if ([string]::IsNullOrWhiteSpace($Text)) { return '' }
+
+    $clean = $Text.Trim()
+    $clean = [regex]::Replace($clean, '(?is)^\s*```(?:text)?\s*', '')
+    $clean = [regex]::Replace($clean, '(?is)\s*```\s*$', '')
+    $clean = [regex]::Replace($clean, '(?i)^\s*(MEM|NOTE|STATE)\s*:\s*', '')
+    $clean = [regex]::Replace($clean, '[\r\n]+', ' ')
+    $clean = [regex]::Replace($clean, '\s+', ' ').Trim(' ', '"', [char]39)
+
+    if ($clean -match '^(?i:none|null|empty|-)$') { return '' }
+    if ($clean.Length -gt $MaxChars) {
+        $clean = $clean.Substring(0, $MaxChars).Trim()
     }
-    return (Get-Content -LiteralPath $script:WorkingMemoryPath -Raw -Encoding UTF8).Trim()
+    return $clean
+}
+
+function Get-WorkingMemoryRaw {
+    if (-not (Test-Path -LiteralPath $script:WorkingMemoryPath)) { return '' }
+    $text = (Get-Content -LiteralPath $script:WorkingMemoryPath -Raw -Encoding UTF8).Trim()
+    return Clean-MicroText $text $script:MemoryStateMaxChars
 }
 
 function Get-PendingNoteRecords {
@@ -105,54 +138,201 @@ function Get-PendingNoteRecords {
     foreach ($line in (Get-Content -LiteralPath $script:PendingNotesPath -Encoding UTF8)) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
         try {
-            $result += ($line | ConvertFrom-Json)
+            $row = $line | ConvertFrom-Json
+            $note = Clean-MicroText ([string]$row.note) $script:MemoryNoteMaxChars
+            if (-not [string]::IsNullOrWhiteSpace($note)) {
+                $result += [pscustomobject]@{
+                    turn_id = [int]$row.turn_id
+                    timestamp = [string]$row.timestamp
+                    note = $note
+                }
+            }
         } catch {
         }
     }
     return @($result)
 }
 
+function Get-PendingNotesText {
+    $pending = @(Get-PendingNoteRecords)
+    if ($pending.Count -eq 0) { return '' }
+
+    $parts = @()
+    foreach ($row in $pending) {
+        $parts += ("T{0}:{1}" -f $row.turn_id, [string]$row.note)
+    }
+    return ($parts -join ' | ')
+}
+
 function Clear-PendingNotes {
     Write-TextUtf8NoBom $script:PendingNotesPath ''
 }
 
-function Get-MemoryContextBlock {
-    if (-not $script:MemoryEnabled) { return '' }
+function Get-ConversationRows {
+    if (-not (Test-Path -LiteralPath $script:LogDir)) { return @() }
 
-    $working = Get-WorkingMemoryRaw
-    $pending = @(Get-PendingNoteRecords)
-    $pendingJson = if ($pending.Count -gt 0) {
-        ($pending | ConvertTo-Json -Depth 12 -Compress)
-    } else {
-        '[]'
-    }
-
-    $maxChars = [Math]::Max(1200, $script:MemoryContextMaxChars)
-    $header1 = "WORKING MEMORY (compacted, persistent):`n"
-    $header2 = "`nPENDING MEMORY NOTES (newer than the compacted memory):`n"
-    $block = $header1 + $working + $header2 + $pendingJson
-
-    if ($block.Length -le $maxChars) { return $block }
-
-    $workingBudget = [Math]::Max(600, [int]($maxChars * 0.55))
-    $pendingBudget = [Math]::Max(
-        400,
-        $maxChars - $workingBudget - $header1.Length - $header2.Length - 40
+    $rows = @()
+    $files = @(
+        Get-ChildItem -LiteralPath $script:LogDir -Filter 'conversation-*.jsonl' -File -ErrorAction SilentlyContinue |
+        Sort-Object Name
     )
 
-    $workingPart = if ($working.Length -gt $workingBudget) {
-        $working.Substring(0, $workingBudget) + ' ...[memory truncated]'
-    } else {
-        $working
+    foreach ($f in $files) {
+        foreach ($line in (Get-Content -LiteralPath $f.FullName -Encoding UTF8)) {
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            try {
+                $row = $line | ConvertFrom-Json
+            } catch {
+                continue
+            }
+
+            if ([string]$row.event -eq 'turn' -and
+                [int]$row.epoch -eq [int]$script:RuntimeState.epoch) {
+                $rows += $row
+            }
+        }
     }
 
-    $pendingPart = if ($pendingJson.Length -gt $pendingBudget) {
-        '...[older notes truncated] ' + $pendingJson.Substring($pendingJson.Length - $pendingBudget)
-    } else {
-        $pendingJson
+    if ($script:MemoryRetrievalScanMaxTurns -gt 0 -and
+        $rows.Count -gt $script:MemoryRetrievalScanMaxTurns) {
+        $rows = @($rows | Select-Object -Last $script:MemoryRetrievalScanMaxTurns)
+    }
+    return @($rows)
+}
+
+function ConvertTo-SearchText([string]$Text) {
+    if ([string]::IsNullOrWhiteSpace($Text)) { return '' }
+
+    $formD = $Text.ToLowerInvariant().Normalize([Text.NormalizationForm]::FormD)
+    $sb = New-Object Text.StringBuilder
+    foreach ($ch in $formD.ToCharArray()) {
+        $cat = [Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch)
+        if ($cat -ne [Globalization.UnicodeCategory]::NonSpacingMark) {
+            [void]$sb.Append($ch)
+        }
+    }
+    return $sb.ToString().Normalize([Text.NormalizationForm]::FormC)
+}
+
+function Get-RetrievalQueryTerms([string]$Query) {
+    $state = Get-WorkingMemoryRaw
+    $pending = Get-PendingNotesText
+    $source = ConvertTo-SearchText ("$Query $state $pending")
+
+    $stop = @(
+        'ako','aky','aka','ake','a','aj','ale','alebo','by','co','je','som','sa','si','sme','ste',
+        'ten','ta','to','tie','tento','tato','toto','tam','tu','na','do','od','po','pre','pri','s',
+        'so','z','zo','v','vo','k','ku','u','o','uz','este','mi','ma','mu','ho','ich','ktory',
+        'ktora','ktore','kolko','what','which','that','this','the','and','or','is','are','was',
+        'were','to','of','in','on','for','with','about','it','we','you','i','our','my'
+    )
+
+    $seen = @{}
+    $terms = @()
+    foreach ($token in ($source -split '[^\p{L}\p{N}._+-]+')) {
+        if ([string]::IsNullOrWhiteSpace($token)) { continue }
+        if ($token.Length -lt 3 -and $token -notmatch '^\d+$') { continue }
+        if ($stop -contains $token) { continue }
+        if (-not $seen.ContainsKey($token)) {
+            $seen[$token] = $true
+            $terms += $token
+        }
     }
 
-    return ($header1 + $workingPart + $header2 + $pendingPart)
+    return @($terms | Select-Object -First 24)
+}
+
+function Get-RelevantDataContext([string]$Query) {
+    if (-not $script:MemoryEnabled -or
+        [string]::IsNullOrWhiteSpace($Query) -or
+        $script:MemoryRetrievalMaxChars -le 0 -or
+        $script:MemoryRetrievalMaxItems -le 0) {
+        return ''
+    }
+
+    $rows = @(Get-ConversationRows)
+    if ($rows.Count -le $script:MemoryRecentTurns) { return '' }
+
+    $olderCount = $rows.Count - $script:MemoryRecentTurns
+    $older = @($rows | Select-Object -First $olderCount)
+    $terms = @(Get-RetrievalQueryTerms $Query)
+    if ($terms.Count -eq 0) { return '' }
+
+    $scored = @()
+    foreach ($row in $older) {
+        $u = ConvertTo-SearchText ([string]$row.user)
+        $a = ConvertTo-SearchText ([string]$row.assistant)
+        $score = 0
+
+        foreach ($term in $terms) {
+            $escaped = [regex]::Escape($term)
+            if ($u -match $escaped) { $score += 3 }
+            if ($a -match $escaped) { $score += 1 }
+        }
+
+        if ($score -gt 0) {
+            $scored += [pscustomobject]@{
+                score = $score
+                turn_id = [int]$row.turn_id
+                row = $row
+            }
+        }
+    }
+
+    if ($scored.Count -eq 0) { return '' }
+
+    $best = @(
+        $scored |
+        Sort-Object @{Expression='score';Descending=$true}, @{Expression='turn_id';Descending=$true} |
+        Select-Object -First $script:MemoryRetrievalMaxItems
+    )
+
+    $budget = $script:MemoryRetrievalMaxChars
+    $perItem = [Math]::Max(220, [int]($budget / [Math]::Max(1, $best.Count)))
+    $parts = @()
+    $used = 0
+
+    foreach ($hit in $best) {
+        $row = $hit.row
+        $uBudget = [Math]::Max(120, [int]($perItem * 0.62))
+        $aBudget = [Math]::Max(80, $perItem - $uBudget - 30)
+        $uText = Get-BoundedText ([string]$row.user) $uBudget
+        $aText = Get-BoundedText ([string]$row.assistant) $aBudget
+        $snippet = "T$($hit.turn_id) U:$uText A:$aText"
+
+        if (($used + $snippet.Length) -gt $budget) {
+            $remaining = $budget - $used
+            if ($remaining -ge 120) {
+                $parts += (Get-BoundedText $snippet $remaining)
+            }
+            break
+        }
+
+        $parts += $snippet
+        $used += $snippet.Length + 1
+    }
+
+    return ($parts -join "`n")
+}
+
+function Get-MemoryContextBlock([string]$Query = '') {
+    if (-not $script:MemoryEnabled) { return '' }
+
+    $state = Get-WorkingMemoryRaw
+    $pending = Get-PendingNotesText
+    $core = "STATE:$state`nPENDING:$pending"
+
+    if ($script:MemoryContextMaxChars -gt 0 -and
+        $core.Length -gt $script:MemoryContextMaxChars) {
+        $core = Get-BoundedText $core $script:MemoryContextMaxChars
+    }
+
+    $retrieved = Get-RelevantDataContext $Query
+    if (-not [string]::IsNullOrWhiteSpace($retrieved)) {
+        return "$core`nRELEVANT OLD DATA:`n$retrieved"
+    }
+
+    return $core
 }
 
 function Get-RecentConversationMessages {
@@ -175,18 +355,30 @@ function Get-RecentConversationMessages {
     return @($selected)
 }
 
+function Get-CurrentUserPrompt {
+    $last = @(
+        $script:Messages |
+        Where-Object { $_.role -eq 'user' } |
+        Select-Object -Last 1
+    )
+    if ($last.Count -eq 0) { return '' }
+    return [string]$last[0].content
+}
+
 function Get-QwenConversationMessages {
+    $query = Get-CurrentUserPrompt
     $systemText = Get-OrchestratorSystemPrompt
-    $memoryBlock = Get-MemoryContextBlock
+    $memoryBlock = Get-MemoryContextBlock $query
 
     if (-not [string]::IsNullOrWhiteSpace($memoryBlock)) {
         $systemText += @"
 
-PERSISTENT CONVERSATION MEMORY:
+PERSISTENT CONVERSATION CONTEXT:
 $memoryBlock
 
-Use this memory to resolve references and preserve continuity. It is context, not proof.
-Frequency or repetition increases conversational relevance, never factual certainty.
+STATE and PENDING are lossy orientation memory. RELEVANT OLD DATA contains verbatim historical snippets.
+Use them to resolve references and preserve continuity. Repetition increases relevance, never factual certainty.
+When historical values conflict, prefer explicit later corrections and state uncertainty if needed.
 "@
     }
 
@@ -216,24 +408,6 @@ function Get-RecentConversationText([switch]$ExcludeLastUser) {
         $lines += ("{0}: {1}" -f $role, [string]$m.content)
     }
     return ($lines -join "`n`n")
-}
-
-function Get-JsonObjectFromModelText([string]$Text) {
-    if ([string]::IsNullOrWhiteSpace($Text)) {
-        throw 'Memory model returned empty content.'
-    }
-
-    $clean = $Text.Trim()
-    $clean = [regex]::Replace($clean, '(?is)^\s*```(?:json)?\s*', '')
-    $clean = [regex]::Replace($clean, '(?is)\s*```\s*$', '')
-
-    $start = $clean.IndexOf('{')
-    $end = $clean.LastIndexOf('}')
-    if ($start -ge 0 -and $end -gt $start) {
-        $clean = $clean.Substring($start, $end - $start + 1)
-    }
-
-    return ($clean | ConvertFrom-Json)
 }
 
 function Invoke-QwenMemoryCall(
@@ -267,49 +441,28 @@ function Invoke-QwenMemoryNote(
     [int]$TurnId,
     [string]$Prompt,
     [string]$FinalContent,
-    [string]$Route,
-    [string]$FrontierResult
+    [string]$Route
 ) {
-    $memory = Get-MemoryContextBlock
-    $frontierForNote = [string]$FrontierResult
-    $frontierLimit = [int]$script:Config.Memory.FrontierForNoteMaxChars
+    $userText = Get-BoundedText $Prompt ([int]$script:Config.Memory.NoteInputUserMaxChars)
+    $answerText = Get-BoundedText $FinalContent ([int]$script:Config.Memory.NoteInputAssistantMaxChars)
 
-    if (-not [string]::IsNullOrWhiteSpace($frontierForNote) -and
-        $frontierForNote.Length -gt $frontierLimit) {
-        $frontierForNote = $frontierForNote.Substring(0, $frontierLimit) + ' ...[truncated]'
-    }
-    if ([string]::IsNullOrWhiteSpace($frontierForNote)) {
-        $frontierForNote = '(none)'
-    }
-
-    $userText = @"
-TURN ID: $TurnId
-ROUTE: $Route
-
-CURRENT MEMORY:
-$memory
-
-USER:
-$Prompt
-
-FINAL ASSISTANT ANSWER:
-$FinalContent
-
-FRONTIER RESULT IF USED:
-$frontierForNote
+    $memoryInput = @"
+ROUTE:$Route
+USER:$userText
+ANSWER:$answerText
 "@
 
     $r = Invoke-QwenMemoryCall `
         (Expand-RuntimePolicy $script:MemoryNoteTemplate) `
-        $userText `
+        $memoryInput `
         ([int]$script:Config.Memory.NoteNumPredict)
 
     $raw = [string]$r.message.content
-    $parsed = Get-JsonObjectFromModelText $raw
+    $note = Clean-MicroText $raw $script:MemoryNoteMaxChars
 
     return [pscustomobject]@{
         Raw = $raw
-        Parsed = $parsed
+        Text = $note
         EvalCount = $r.eval_count
         EvalDuration = $r.eval_duration
     }
@@ -317,36 +470,24 @@ $frontierForNote
 
 function Invoke-MemoryCompaction {
     $pending = @(Get-PendingNoteRecords)
-    if ($pending.Count -eq 0) { return $false }
+    if ($pending.Count -eq 0) { return $true }
 
-    $working = Get-WorkingMemoryRaw
-    $pendingJson = $pending | ConvertTo-Json -Depth 14
+    $state = Get-WorkingMemoryRaw
+    $notes = Get-PendingNotesText
 
-    $userText = @"
-EXISTING WORKING MEMORY:
-$working
-
-NEW MEMORY NOTES:
-$pendingJson
+    $memoryInput = @"
+STATE:$state
+NOTES:$notes
 "@
 
     $r = Invoke-QwenMemoryCall `
         (Expand-RuntimePolicy $script:MemoryCompactionTemplate) `
-        $userText `
+        $memoryInput `
         ([int]$script:Config.Memory.CompactionNumPredict)
 
     $raw = [string]$r.message.content
-    $parsed = Get-JsonObjectFromModelText $raw
-
-    if ($parsed.PSObject.Properties.Name -notcontains 'updated_at') {
-        $parsed | Add-Member `
-            -NotePropertyName updated_at `
-            -NotePropertyValue ((Get-Date).ToString('o'))
-    } else {
-        $parsed.updated_at = (Get-Date).ToString('o')
-    }
-
-    Write-JsonAtomic $script:WorkingMemoryPath $parsed
+    $newState = Clean-MicroText $raw $script:MemoryStateMaxChars
+    Write-TextUtf8NoBom $script:WorkingMemoryPath $newState
     Clear-PendingNotes
     return $true
 }
@@ -372,32 +513,7 @@ function Get-PolicyFingerprint {
 function Load-RecentConversationFromDisk {
     if (-not $script:MemoryEnabled) { return }
 
-    $turns = @()
-    $files = @(
-        Get-ChildItem -LiteralPath $script:LogDir `
-            -Filter 'conversation-*.jsonl' `
-            -File `
-            -ErrorAction SilentlyContinue |
-        Sort-Object Name
-    )
-
-    foreach ($f in $files) {
-        foreach ($line in (Get-Content -LiteralPath $f.FullName -Encoding UTF8)) {
-            if ([string]::IsNullOrWhiteSpace($line)) { continue }
-            try {
-                $row = $line | ConvertFrom-Json
-            } catch {
-                continue
-            }
-
-            if ([string]$row.event -eq 'turn' -and
-                [int]$row.epoch -eq [int]$script:RuntimeState.epoch) {
-                $turns += $row
-            }
-        }
-    }
-
-    $turns = @($turns | Select-Object -Last $script:MemoryRecentTurns)
+    $turns = @(Get-ConversationRows | Select-Object -Last $script:MemoryRecentTurns)
 
     foreach ($t in $turns) {
         $script:Messages += @{
@@ -422,24 +538,41 @@ function Initialize-PersistentMemory {
     New-Item -ItemType Directory -Force -Path $script:LogDir | Out-Null
 
     if (-not (Test-Path -LiteralPath $script:WorkingMemoryPath)) {
-        Write-JsonAtomic $script:WorkingMemoryPath (New-DefaultWorkingMemory)
-    }
-    if (-not (Test-Path -LiteralPath $script:PendingNotesPath)) {
-        Clear-PendingNotes
-    }
-    if (-not (Test-Path -LiteralPath $script:RuntimeStatePath)) {
-        Write-JsonAtomic $script:RuntimeStatePath (New-DefaultRuntimeState)
+        Write-TextUtf8NoBom $script:WorkingMemoryPath ''
     }
 
-    try {
-        $script:RuntimeState = Get-Content `
-            -LiteralPath $script:RuntimeStatePath `
-            -Raw `
-            -Encoding UTF8 |
-            ConvertFrom-Json
-    } catch {
+    if (-not (Test-Path -LiteralPath $script:RuntimeStatePath)) {
         $script:RuntimeState = [pscustomobject](New-DefaultRuntimeState)
         Write-JsonAtomic $script:RuntimeStatePath $script:RuntimeState
+    } else {
+        try {
+            $script:RuntimeState = Get-Content `
+                -LiteralPath $script:RuntimeStatePath `
+                -Raw `
+                -Encoding UTF8 |
+                ConvertFrom-Json
+        } catch {
+            $script:RuntimeState = [pscustomobject](New-DefaultRuntimeState)
+        }
+    }
+
+    $needsMigration = $true
+    if ($script:RuntimeState.PSObject.Properties.Name -contains 'memory_schema') {
+        $needsMigration = ([int]$script:RuntimeState.memory_schema -lt 2)
+    }
+
+    if ($needsMigration) {
+        if ($script:RuntimeState.PSObject.Properties.Name -contains 'memory_schema') {
+            $script:RuntimeState.memory_schema = 2
+        } else {
+            $script:RuntimeState | Add-Member -NotePropertyName memory_schema -NotePropertyValue 2
+        }
+        $script:RuntimeState.completed_since_compaction = 0
+        Write-TextUtf8NoBom $script:WorkingMemoryPath ''
+        Clear-PendingNotes
+        Write-JsonAtomic $script:RuntimeStatePath $script:RuntimeState
+    } elseif (-not (Test-Path -LiteralPath $script:PendingNotesPath)) {
+        Clear-PendingNotes
     }
 
     Load-RecentConversationFromDisk
@@ -458,7 +591,7 @@ function Clear-PersistentConversationMemory {
     $script:RuntimeState.epoch = [int]$script:RuntimeState.epoch + 1
     $script:RuntimeState.completed_since_compaction = 0
 
-    Write-JsonAtomic $script:WorkingMemoryPath (New-DefaultWorkingMemory)
+    Write-TextUtf8NoBom $script:WorkingMemoryPath ''
     Clear-PendingNotes
     Save-RuntimeState
 
@@ -467,7 +600,7 @@ function Clear-PersistentConversationMemory {
             event = 'clear'
             timestamp = (Get-Date).ToString('o')
             epoch = [int]$script:RuntimeState.epoch
-            note = 'Working memory and active recent context cleared; historical logs retained.'
+            note = 'Active memory/context cleared; historical logs retained.'
         })
     }
 }
@@ -497,7 +630,12 @@ function Persist-TurnAndMemory(
 
     $timestamp = (Get-Date).ToString('o')
     $memoryBefore = if ($script:MemoryEnabled) {
-        Get-MemoryContextBlock
+        Get-MemoryContextBlock $Prompt
+    } else {
+        ''
+    }
+    $retrievedBefore = if ($script:MemoryEnabled) {
+        Get-RelevantDataContext $Prompt
     } else {
         ''
     }
@@ -524,18 +662,15 @@ function Persist-TurnAndMemory(
 
     if ($script:MemoryEnabled) {
         try {
-            $memoryNote = Invoke-QwenMemoryNote `
-                $turnId `
-                $Prompt `
-                $FinalContent `
-                $Route `
-                $FrontierResult
+            $memoryNote = Invoke-QwenMemoryNote $turnId $Prompt $FinalContent $Route
 
-            Append-JsonLine $script:PendingNotesPath ([ordered]@{
-                turn_id = $turnId
-                timestamp = (Get-Date).ToString('o')
-                note = $memoryNote.Parsed
-            })
+            if (-not [string]::IsNullOrWhiteSpace($memoryNote.Text)) {
+                Append-JsonLine $script:PendingNotesPath ([ordered]@{
+                    turn_id = $turnId
+                    timestamp = (Get-Date).ToString('o')
+                    note = $memoryNote.Text
+                })
+            }
 
             $script:RuntimeState.completed_since_compaction =
                 [int]$script:RuntimeState.completed_since_compaction + 1
@@ -561,7 +696,7 @@ function Persist-TurnAndMemory(
     $memorySw.Stop()
 
     $memoryAfter = if ($script:MemoryEnabled) {
-        Get-MemoryContextBlock
+        Get-MemoryContextBlock $Prompt
     } else {
         ''
     }
@@ -576,12 +711,6 @@ function Persist-TurnAndMemory(
                 eval_duration = $Response.eval_duration
                 done_reason = [string]$Response.done_reason
             }
-        }
-
-        $biasSignals = @()
-        if ($null -ne $memoryNote -and
-            $null -ne $memoryNote.Parsed.bias_signals) {
-            $biasSignals = $memoryNote.Parsed.bias_signals
         }
 
         $trace = [ordered]@{
@@ -599,11 +728,12 @@ function Persist-TurnAndMemory(
             memory_error = $memoryError
             policy_fingerprint = $script:PolicyFingerprint
             performance = $performance
-            bias_signals = $biasSignals
+            retrieved_old_data = $retrievedBefore
+            bias_signals = @()
         }
 
         if ($null -ne $memoryNote) {
-            $trace['memory_note'] = $memoryNote.Parsed
+            $trace['memory_note'] = $memoryNote.Text
         }
 
         if ([bool]$script:Config.ResearchLogging.IncludeRawText) {
@@ -628,11 +758,11 @@ function Persist-TurnAndMemory(
 
     if ($script:MemoryEnabled) {
         if ($compacted) {
-            $state = 'note saved + compacted'
+            $state = 'micro-note saved + compacted'
         } elseif ($memoryError) {
             $state = $memoryError
         } else {
-            $state = 'note saved'
+            $state = 'micro-note saved'
         }
 
         Write-Host (
