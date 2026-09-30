@@ -458,6 +458,7 @@ function Invoke-Qwen([string]$Prompt) {
     $frontierResult = $null
     $finalContent = $null
     $localRaw = $null
+    $inlineMemoryNote = $null
 
     if (-not [string]::IsNullOrWhiteSpace($policyReason)) {
         $route = 'FRONTIER'
@@ -469,19 +470,23 @@ function Invoke-Qwen([string]$Prompt) {
         Show-QwenThinking $r
         $candidate = Get-CleanQwenContent $r
         $localRaw = $candidate
-        $route = Get-QwenRoute $candidate
+        $parsedCandidate = Split-InlineMemoryNote $candidate
+        $visibleCandidate = [string]$parsedCandidate.VisibleText
+        $route = Get-QwenRoute $visibleCandidate
 
         if ($route -eq 'FRONTIER') {
             Write-Host "`n[Qwen route -> FRONTIER]" -ForegroundColor DarkCyan
         } elseif ($route -eq 'LOCAL') {
             Write-Host "`n[Qwen route -> LOCAL]" -ForegroundColor DarkGray
-            $finalContent = Remove-QwenRouteMarker $candidate
+            $inlineMemoryNote = $parsedCandidate
+            $finalContent = Remove-QwenRouteMarker $visibleCandidate
         } else {
             # Fail closed on cost/escalation: malformed routing never triggers
             # frontier automatically. Treat the generation as a local answer.
             Write-Host "`n[Qwen route marker missing; fail-closed -> LOCAL]" -ForegroundColor Yellow
             $route = 'LOCAL'
-            $finalContent = Remove-QwenRouteMarker $candidate
+            $inlineMemoryNote = $parsedCandidate
+            $finalContent = Remove-QwenRouteMarker $visibleCandidate
         }
     }
 
@@ -523,12 +528,16 @@ $recentContext
             $r = Invoke-QwenSynthesis $Prompt $frontierResult
             Show-QwenThinking $r
             $candidate = Get-CleanQwenContent $r
+            $parsedSynthesis = Split-InlineMemoryNote $candidate
+            $visibleSynthesis = [string]$parsedSynthesis.VisibleText
 
-            if (Test-UnfinishedSynthesis $r $candidate) {
+            if (Test-UnfinishedSynthesis $r $visibleSynthesis) {
                 Write-Host "`n[Qwen synthesis did not complete; showing the frontier result directly.]" -ForegroundColor Yellow
                 $finalContent = $frontierResult
+                $inlineMemoryNote = $null
             } else {
-                $finalContent = $candidate
+                $finalContent = $visibleSynthesis
+                $inlineMemoryNote = $parsedSynthesis
             }
         }
     }
@@ -571,7 +580,8 @@ $recentContext
             -LocalRaw $localRaw `
             -FrontierResult $frontierResult `
             -Response $r `
-            -AnswerSeconds $sw.Elapsed.TotalSeconds
+            -AnswerSeconds $sw.Elapsed.TotalSeconds `
+            -InlineMemoryNote $inlineMemoryNote
     }
 }
 
@@ -581,7 +591,7 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.1.3 (clean compaction + exact-data retrieval + research logging). Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "Qwen local chat v9.2-dev1 (single-pass micro-note shadow mode; v9.1.3 memory persistence). Commands: /exit, /clear, /paste, /think on, /think off"
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
