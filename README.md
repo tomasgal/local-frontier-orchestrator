@@ -151,7 +151,28 @@ See [`docs/HUMAN_AI_BIAS_BALANCER.md`](docs/HUMAN_AI_BIAS_BALANCER.md).
     └── QwenMemory.ps1
 ```
 
-## Requirements
+## Hardware and storage requirements
+
+The current reference executor is `qwen3.5:4b-q4_K_M` through Ollama. The orchestration code itself is very small; most resource use comes from the local model, its runtime, and optional long-term research logs.
+
+| Resource | Validated / practical baseline | Recommendation |
+| --- | --- | --- |
+| CPU | x86-64 CPU; CPU-only operation has been validated on an older 2-core / 4-thread notebook CPU | A newer 4-core-or-better CPU improves interactive latency |
+| RAM | **8 GB validated** for a constrained CPU-only proof of concept with a 5k-class context and normal paging | **16 GB or more** for more comfortable CPU-only use and larger headroom |
+| GPU | **Not required**; CPU-only mode is supported | A discrete GPU substantially improves latency and may allow a larger context, depending on VRAM and runtime support |
+| Local model | `qwen3.5:4b-q4_K_M`, about **3.3 GiB** on disk in the validated Ollama installation | The same model is the current reference; other local chat models can be substituted |
+| Context | 4096 is a conservative fallback; **5120 was validated** on the constrained 8 GB host | Size context per host rather than copying another machine's profile |
+| Free disk space | **8 GB** is a practical starting point for the reference model plus runtime overhead | **10 GB or more** leaves useful headroom for runtimes and growing logs |
+
+The repository source, policies, and configuration are **well under 1 MiB**. Disk use is therefore dominated by:
+
+- Ollama model weights (about 3.3 GiB for the current reference model);
+- Ollama, Node.js, and Codex CLI runtime files;
+- append-only conversation and research JSONL logs, which grow with use.
+
+The 8 GB RAM result is a **compatibility/portability baseline, not a performance target**. On that class of CPU, local answers and post-turn memory work can take tens of seconds. A discrete GPU is optional architecturally; it mainly changes latency and the context size that can be used comfortably.
+
+## Software requirements
 
 The current Windows reference implementation assumes:
 
