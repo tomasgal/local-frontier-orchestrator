@@ -4,6 +4,21 @@ This checklist prepares a new Windows machine for Local Frontier Orchestrator wi
 
 The goal is to install prerequisites, clone the repository, pull a neutral base model, and collect hardware facts. **Do not copy a tuned model/context profile from another PC.**
 
+
+## Before you start: capacity planning
+
+For the current reference model, use the following as practical guidance rather than strict universal limits:
+
+- **Model storage:** `qwen3.5:4b-q4_K_M` occupied about **3.3 GiB** in the validated Ollama installation.
+- **Project code:** the Local Frontier Orchestrator source/policy/config footprint is negligible compared with the model (well under 1 MiB).
+- **Free disk:** plan for at least **8 GB** free; **10 GB+** is preferable once Ollama, Node.js, Codex CLI, caches, and growing research logs are included.
+- **RAM:** **8 GB works** for the constrained CPU-only proof of concept, but it relies on a small context and normal Windows paging. **16 GB+** is a better general-purpose target.
+- **GPU:** optional. CPU-only operation is supported. A discrete GPU mainly improves response latency and can increase the usable context ceiling.
+- **Context:** start conservatively. 4096 is a safe fallback for the validated low-memory class; 5120 was also validated there. Larger contexts must be measured per host.
+
+The 8 GB result should not be read as a recommended interactive-performance specification. It demonstrates portability: the system can run there, but local generation and post-turn memory processing can take tens of seconds.
+
+
 ## 1. Install base tools
 
 Open PowerShell as a normal user. Use elevation only when an installer requests it.
