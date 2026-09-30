@@ -126,6 +126,82 @@ function Clean-MicroText([string]$Text, [int]$MaxChars) {
     return $clean
 }
 
+function Split-InlineMemoryNote([string]$Content) {
+    $source = if ($null -eq $Content) { '' } else { [string]$Content }
+
+    if ([string]::IsNullOrWhiteSpace($source)) {
+        return [pscustomobject]@{
+            VisibleText = ''
+            Raw = ''
+            Text = ''
+            ParseStatus = 'missing'
+        }
+    }
+
+    # Accept only one bounded machine tail on the final line. Angle brackets and
+    # line breaks are forbidden inside the payload so an earlier/natural marker
+    # in ordinary prose is not mistaken for the protocol tail.
+    $complete = [regex]::Match(
+        $source,
+        '(?m)(?:^|\r?\n)[ \t]*<LFO_MEM>([^\r\n<>]*)</LFO_MEM>[ \t]*\z',
+        [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+    )
+
+    if ($complete.Success) {
+        $raw = [string]$complete.Groups[1].Value
+        $unbounded = Clean-MicroText $raw ([int]::MaxValue)
+        $note = Clean-MicroText $raw $script:MemoryNoteMaxChars
+
+        $status = if ($unbounded.Length -gt $script:MemoryNoteMaxChars) {
+            'complete-truncated'
+        } elseif ([string]::IsNullOrWhiteSpace($note)) {
+            'complete-empty'
+        } else {
+            'complete'
+        }
+
+        return [pscustomobject]@{
+            VisibleText = $source.Substring(0, $complete.Index).Trim()
+            Raw = $raw
+            Text = $note
+            ParseStatus = $status
+        }
+    }
+
+    # Fail safe for a malformed or generation-truncated machine tail. Strip only
+    # a final protocol block beginning with the exact opening marker, and only
+    # when it is small enough to plausibly be the bounded note tail.
+    $malformed = [regex]::Match(
+        $source,
+        '(?ms)(?:^|\r?\n)[ \t]*<LFO_MEM>.{0,512}\z',
+        [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+    )
+    if (-not $malformed.Success) {
+        # Also hide a final line truncated while emitting the opening tag itself.
+        $malformed = [regex]::Match(
+            $source,
+            '(?m)(?:^|\r?\n)[ \t]*<LFO_[^\r\n]{0,128}\z',
+            [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+        )
+    }
+
+    if ($malformed.Success) {
+        return [pscustomobject]@{
+            VisibleText = $source.Substring(0, $malformed.Index).Trim()
+            Raw = $source.Substring($malformed.Index).Trim()
+            Text = ''
+            ParseStatus = 'malformed'
+        }
+    }
+
+    return [pscustomobject]@{
+        VisibleText = $source.Trim()
+        Raw = ''
+        Text = ''
+        ParseStatus = 'missing'
+    }
+}
+
 function Get-WorkingMemoryRaw {
     if (-not (Test-Path -LiteralPath $script:WorkingMemoryPath)) { return '' }
     $raw = Get-Content -LiteralPath $script:WorkingMemoryPath -Raw -Encoding UTF8
@@ -628,7 +704,8 @@ function Persist-TurnAndMemory(
     [string]$LocalRaw,
     [string]$FrontierResult,
     $Response,
-    [double]$AnswerSeconds
+    [double]$AnswerSeconds,
+    $InlineMemoryNote
 ) {
     if (-not $script:MemoryEnabled -and
         -not [bool]$script:Config.ResearchLogging.Enabled) {
@@ -751,6 +828,14 @@ function Persist-TurnAndMemory(
             $trace['memory_note'] = $memoryNote.Text
         }
 
+        # v9.2-dev shadow observation: parse the note emitted in the answer pass,
+        # but keep the separate v9.1.3 extractor authoritative until regression
+        # tests confirm equivalent semantics.
+        if ($null -ne $InlineMemoryNote) {
+            $trace['single_pass_note'] = [string]$InlineMemoryNote.Text
+            $trace['single_pass_note_parse_status'] = [string]$InlineMemoryNote.ParseStatus
+        }
+
         if ([bool]$script:Config.ResearchLogging.IncludeRawText) {
             $trace['user'] = $Prompt
             $trace['local_raw'] = $LocalRaw
@@ -758,6 +843,11 @@ function Persist-TurnAndMemory(
             $trace['final_answer'] = $FinalContent
             $trace['memory_note_raw'] = if ($null -ne $memoryNote) {
                 $memoryNote.Raw
+            } else {
+                $null
+            }
+            $trace['single_pass_note_raw'] = if ($null -ne $InlineMemoryNote) {
+                [string]$InlineMemoryNote.Raw
             } else {
                 $null
             }
