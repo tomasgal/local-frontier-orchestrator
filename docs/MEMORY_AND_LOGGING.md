@@ -102,7 +102,7 @@ rolling state
 
 Host launchers control capacity only. The semantic rules remain shared.
 
-## Validated v9.1.3 baseline — 2026-09-29
+## Validated v9.1.3 baseline — 2026-09-30
 
 On the constrained CPU-only Windows notebook, the final v9.1.3 validation used a clean memory epoch and a five-turn correction scenario.
 
@@ -116,7 +116,17 @@ Observed results:
 
 The earlier verbose v9.1.1 policy roughly doubled post-turn memory latency on this CPU. v9.1.2 restored the same user-delta semantics with a much shorter policy prompt, and v9.1.3 added compaction-output normalization without reintroducing the latency regression.
 
-This validates micro-memory, compaction, and restart continuity. **Exact historical retrieval still requires an isolated regression test** in which the requested fact is outside the recent raw-turn window.
+An isolated exact-data retrieval regression was then run with the target fact outside the recent raw-turn window and removed from active rolling state. The trace showed empty active `STATE`/`PENDING` fields, the correct older raw turn under `RELEVANT OLD DATA`, and a correct final recall. This validates the complete three-layer memory path:
+
+```text
+recent raw turns
++ compact working memory
++ selective exact historical retrieval
+```
+
+The test also exposed one presentation issue rather than a retrieval failure: internal historical turn markers (for example `T34`) can be echoed in user-facing prose. v9.2 should suppress those internal identifiers.
+
+The next performance target is **single-pass micro-memory**. The current v9.1.3 baseline deliberately uses a second local-model inference after each answer to extract the micro-note; on constrained CPU-only hardware that extra call is operationally significant. v9.2 should attempt to emit a bounded hidden/structured note from the existing LOCAL answer or post-frontier synthesis pass, with the wrapper stripping it from the user-visible answer and persisting it without changing the three-layer memory semantics.
 
 ## Research trace
 
