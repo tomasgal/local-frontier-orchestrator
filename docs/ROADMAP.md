@@ -12,14 +12,16 @@ This roadmap describes engineering directions, not release commitments.
 - Public repository hygiene excludes personal paths, private hostnames, LAN details, and private hardware sizing.
 - Clean second-host validation passed on an older CPU-only 8 GB Windows notebook at 4k context under normal desktop memory pressure.
 - Windows npm Codex shim portability was fixed by preferring `codex.cmd` in the shared resolver.
-- Persistent memory v9.1.3 reached a frozen validation point: user-delta-first micro-notes, compact rolling state, raw JSONL history, and restart continuity are functioning together without the earlier JSON-output failure mode.
+- Persistent memory v9.1.3 reached a frozen validation point: user-delta-first micro-notes, compact rolling state, raw JSONL history, restart continuity, and isolated exact historical retrieval are functioning together without the earlier JSON-output failure mode.
 
 ## Near term
 
 - Keep hard freshness/capability gates intentionally narrow.
-- v9.1.3 micro-memory baseline is validated on the constrained CPU-only notebook: 0–40 char user-delta notes, five-step 0–160 char normalized compaction, and restart continuity all passed.
-- Validate exact-data retrieval independently by recalling facts that have fallen outside the recent raw-turn window.
-- Keep synchronous extraction for the current baseline; consider asynchronous extraction only if longer-term use shows the measured post-turn latency is operationally unacceptable.
+- v9.1.3 memory baseline is validated on the constrained CPU-only notebook: 0–40 char user-delta notes, five-step 0–160 char normalized compaction, restart continuity, and isolated exact historical retrieval all passed.
+- Start v9.2 performance work with **single-pass micro-memory**: produce the bounded micro-note inside the existing LOCAL answer or post-frontier synthesis inference and let the wrapper strip/store it, avoiding a second local-model call on every completed turn.
+- Preserve v9.1.3 memory semantics, raw-history authority, correction handling, and traceability while measuring the latency gain.
+- Benchmark host-capacity reductions separately from the semantic change (for example smaller context/recent/retrieval budgets on constrained CPU-only hosts).
+- Prevent internal retrieval turn markers such as `T34` from leaking into user-facing answers.
 - Evaluate routing and synthesis over longer-term real use rather than a tiny prompt set.
 - Use append-only traces for offline Local Epistemic Balancer replay and bias-analysis experiments.
 - Keep host/model profiles separate; do not transplant tuned context/GPU values between machines without measurement.
