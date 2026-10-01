@@ -1,8 +1,6 @@
 # Local Frontier Orchestrator
 
-**Status:** experimental / research prototype (`v0.1-alpha`) · **Main:** `v9.1.3` · **Validated:** `v9.3` (`pressure-compaction + explicit-memory recovery`)
-
-<!-- Build marker maintenance: update the line above whenever the runtime/project version advances (for example v9.x.x -> v9.x.x+1). For smaller meaningful changes that do not warrant a version bump, keep the current version and update or append a short 1–3 word descriptor in this line. Trivial edits do not require a marker change. -->
+**Status:** experimental / research prototype (`v0.1-alpha`) · **Main build:** `v9.3` (`pressure-compaction + explicit-memory recovery`)
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
@@ -10,9 +8,13 @@ The project starts from a simple premise: a local model does not need to outperf
 
 The current reference implementation uses **Qwen via Ollama** as the local conversational/orchestration model and the authenticated **OpenAI Codex CLI** as an on-demand frontier subagent. It does not require an OpenAI API key for the frontier path when Codex CLI is already authenticated.
 
+For v9.2 memory validation, the project uses a **conservative 90% engineering acceptance floor** for qualitative semantic behavior. This is not a claim that measured reliability is 90% or below 99%: the development smoke suite performed materially better than the acceptance floor, but its size and construction do not support a statistically defensible 99%-class reliability estimate.
+
 This repository is intentionally experimental. Routing, synthesis policy, context handling, and future bias-balancing behaviour are being tuned through longer-term use rather than optimized around a small fixed benchmark.
 
-As of **2026-10-01**, `main` remains the frozen v9.1.3 regression baseline while the v9.3 development line has passed its defined memory-path validation scope. v9.2 validated single-pass micro-memory, eliminating the separate per-turn memory-model call from the normal persistence path. v9.3 adds pressure-triggered compaction (`>=4` pending notes or `>=108` pending-note characters), bounded recovery for explicit memory intent when the single-pass note is empty, invalid-answer sentinel recovery, and hardened correction normalization. Both count-pressure and char-pressure compaction paths passed end-to-end isolated runtime tests; explicit-memory persistence passed with a mix of direct single-pass notes and one bounded memory-only recovery where needed. These are engineering validation results for the tested reference paths, not a statistical reliability claim.
+For the rationale behind the conversational-memory architecture, trade-offs against other memory systems, and the planned path from single-pass micro-memory to pressure-triggered and eventually keyed/deterministic memory updates, see [docs/MEMORY_STRATEGY.md](docs/MEMORY_STRATEGY.md).
+
+As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validation scope on the constrained reference hardware. It preserves v9.2 single-pass micro-memory as the normal path, adds pressure-triggered compaction at `>=4` pending notes or `>=108` pending-note characters, and uses at most one focused memory-only recovery when the user explicitly asks the system to remember something but the single-pass note is empty. Invalid final-answer sentinels are also recovered without regenerating memory, and correction-prefix normalization is hardened across `CORR`, `CORR:` and `CORR :` variants. Isolated end-to-end tests passed both count-pressure and char-pressure compaction, while ordinary implicit memory remains single-pass. Raw JSONL history remains authoritative; rolling memory remains a lossy orientation layer.
 
 ## Core architecture
 
@@ -72,6 +74,28 @@ Potential reasons to keep a local first-line model include:
 - explicit control over routing and intervention policy;
 - a stable place to implement metacognitive and Human–AI bias-balancing experiments;
 - the ability to use different local hardware tiers without changing the user-facing interaction model.
+
+## Scalability of single-pass memory
+
+The v9.2 single-pass memory design is **not specific to the constrained CPU notebook used for validation**. The notebook makes the latency benefit unusually visible, but the architectural gain applies across hardware tiers.
+
+The key change is structural: the local model already performs the answer or post-frontier synthesis inference, and v9.2 asks that same inference to also emit a very small structured `memory_note`. The wrapper then persists that note without launching a second memory-model inference. This does not require a second copy of the model, a second concurrent KV cache, or meaningful additional VRAM. The incremental cost is limited to a small output schema and a short metadata field.
+
+Practical scaling expectations:
+
+| Hardware tier | Expected effect of v9.2 |
+| --- | --- |
+| CPU-only / constrained host | Largest absolute latency gain. On the validated notebook, ordinary post-answer memory work fell from roughly 18–21 s to commonly 0.01–0.05 s. |
+| ~6 GB VRAM | The removed second inference is already much faster than on CPU, but still consumes prompt evaluation, decode, scheduler, and runtime overhead. Single-pass therefore remains useful for latency and efficiency. |
+| ~16–17 GB VRAM | More VRAM can be spent on a larger model, higher-quality quantization, or more context without changing the single-pass memory architecture. A stronger local model may also improve semantic extraction quality. |
+| 24 GB+ / server-class GPU | The absolute latency saving per turn may become small, but removing one model request per conversational turn still improves throughput, concurrency, and energy efficiency. |
+| Multi-user service | The benefit compounds with request volume: v9.2 avoids one separate memory-note inference for each completed turn; only periodic compaction remains an additional model call. |
+
+This should be read as an **architectural scaling argument, not a completed benchmark matrix**. The large latency reduction is directly measured on the constrained CPU host. The same design is expected to remain efficient on 6 GB, ~17 GB, and larger GPUs because the memory side-channel adds negligible model-residency overhead, but those tiers should be benchmarked separately before making hardware-specific latency or throughput claims.
+
+The main scaling boundary is therefore not VRAM but **side-task complexity**. A small schema such as `route + answer + memory_note` is well suited to single-pass generation. If future versions add many independent classifiers, confidence signals, user-model updates, retrieval queries, or tool plans into the same response, those side tasks may eventually compete with answer quality and should then be split into dedicated or background components.
+
+Periodic compaction is intentionally still separate in v9.2. It occurs every five completed memory steps by default and remains the next obvious optimization target if deployment scale makes that cost material.
 
 ## Hardware scope
 
@@ -213,7 +237,7 @@ launch\QwenChat.bat -Model "your-local-model:tag"
 
 The local model profile should carry hardware/runtime placement settings appropriate for that machine. The chat client intentionally avoids overriding GPU/CPU placement, context length, or thread count per request.
 
-QwenChat v9.1.3 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. Each completed turn produces a **0–40 character user-delta-first micro-memory note**; every five turns those notes are compacted into a **0–160 character rolling state**. Exact historical data is not compressed away: the wrapper keeps full conversation JSONL and injects a bounded set of lexically relevant older raw snippets when needed. Complete conversation and research traces remain append-only. The model receives no filesystem tool: PowerShell owns persistence and retrieval deterministically.
+QwenChat v9.3 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. Ordinary memory remains **single-pass**: the LOCAL answer or post-frontier synthesis may emit a bounded 0–40 character user-delta micro-note without a separate per-turn memory inference. Pending notes are compacted into a 0–160 character rolling state when semantic pressure reaches **4 notes or 108 pending-note characters**. If the user explicitly asks the system to remember something and the single-pass note is empty, the wrapper permits at most one focused memory-only recovery call. Exact historical data is not compressed away: full conversation JSONL remains authoritative and bounded relevant raw snippets can be retrieved when needed.
 
 For a clean Windows host bootstrap, see [`docs/NOTEBOOK_SETUP.md`](docs/NOTEBOOK_SETUP.md). Do not copy a tuned context/GPU profile from another machine before measuring the new host.
 
@@ -239,7 +263,7 @@ local model -> ask_codex -> native Codex frontier -> local model
 
 Current work focuses on:
 
-- v9.2 performance work, starting with **single-pass micro-memory** so the bounded note is produced in the existing answer/synthesis pass instead of a second local-model inference;
+- post-v9.3 validation work: longer-term measurement of routing, synthesis, implicit memory quality, and pressure-compaction behaviour across additional hardware tiers;
 - long-term routing quality;
 - faithful-but-useful frontier synthesis;
 - structured trace logging;
