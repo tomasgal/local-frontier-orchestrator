@@ -179,7 +179,7 @@ function Normalize-MemoryNoteForPrompt([string]$Note, [string]$Prompt) {
     if ([string]::IsNullOrWhiteSpace($Note)) { return '' }
 
     $clean = Clean-MicroText $Note $script:MemoryNoteMaxChars
-    if ($clean -match '(?i)^\s*CORR\s+' -and
+    if ($clean -match '(?i)^\s*CORR\b' -and
         -not (Test-ExplicitCorrectionPrompt $Prompt)) {
         $clean = [regex]::Replace($clean, '(?i)^\s*CORR\b\s*:?\s*', '').Trim()
     }
