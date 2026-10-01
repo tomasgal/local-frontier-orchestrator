@@ -531,7 +531,6 @@ function Get-PolicyFingerprint {
         'orchestrator-system.txt',
         'synthesis-system.txt',
         'frontier-subagent.txt',
-        'memory-note-system.txt',
         'memory-compaction-system.txt'
     )) {
         $path = Join-Path $PolicyDir $name
