@@ -339,6 +339,7 @@ CREATE TABLE IF NOT EXISTS entities (
 
 CREATE TABLE IF NOT EXISTS facts (
     id                INTEGER PRIMARY KEY,
+    scope_id          TEXT NOT NULL DEFAULT 'default',
     subject_entity_id INTEGER NOT NULL REFERENCES entities(id),
     predicate         TEXT NOT NULL,
     object_entity_id  INTEGER NULL REFERENCES entities(id),
@@ -358,23 +359,23 @@ CREATE TABLE IF NOT EXISTS facts (
 );
 
 CREATE INDEX IF NOT EXISTS ix_facts_current_subject_predicate
-ON facts(subject_entity_id, predicate)
+ON facts(scope_id, subject_entity_id, predicate)
 WHERE valid_to_turn IS NULL;
 
 CREATE INDEX IF NOT EXISTS ix_facts_current_object
-ON facts(object_entity_id, predicate)
+ON facts(scope_id, object_entity_id, predicate)
 WHERE valid_to_turn IS NULL AND object_entity_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS ix_facts_current_literal_text
-ON facts(predicate, value_text)
+ON facts(scope_id, predicate, value_text)
 WHERE valid_to_turn IS NULL AND value_text IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS ix_facts_current_literal_integer
-ON facts(predicate, value_integer)
+ON facts(scope_id, predicate, value_integer)
 WHERE valid_to_turn IS NULL AND value_integer IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS ix_facts_current_literal_real
-ON facts(predicate, value_real)
+ON facts(scope_id, predicate, value_real)
 WHERE valid_to_turn IS NULL AND value_real IS NOT NULL;
 
 CREATE VIEW IF NOT EXISTS current_facts AS
@@ -383,7 +384,7 @@ FROM facts
 WHERE valid_to_turn IS NULL;
 
 INSERT INTO meta(key, value)
-VALUES ('schema_version', '1')
+VALUES ('schema_version', '2')
 ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 '@
 }
@@ -492,12 +493,14 @@ function Test-LfoSameLiteralFact(
     $Connection,
     [int64]$SubjectEntityId,
     [string]$Predicate,
-    $Literal
+    $Literal,
+    [string]$ScopeId = 'default'
 ) {
     $rows = @(Invoke-LfoSqliteQuery $Connection @'
 SELECT id
 FROM current_facts
-WHERE subject_entity_id = ?1
+WHERE scope_id = ?7
+  AND subject_entity_id = ?1
   AND predicate = ?2
   AND literal_type = ?3
   AND (
@@ -513,7 +516,8 @@ LIMIT 1;
         $Literal.Type,
         $Literal.Text,
         $Literal.Integer,
-        $Literal.Real
+        $Literal.Real,
+        $ScopeId
     ))
 
     return ($rows.Count -gt 0)
@@ -525,7 +529,8 @@ function Set-LfoMemoryAttribute(
     [string]$Predicate,
     $Value,
     [Nullable[int64]]$SourceTurn = $null,
-    [string]$EntityType = $null
+    [string]$EntityType = $null,
+    [string]$ScopeId = 'default'
 ) {
     if ([string]::IsNullOrWhiteSpace($Predicate)) {
         throw 'Predicate must not be empty.'
@@ -535,7 +540,7 @@ function Set-LfoMemoryAttribute(
     $literal = ConvertTo-LfoMemoryLiteral $Value
     $turn = if ($null -eq $SourceTurn) { $null } else { [int64]$SourceTurn }
 
-    if (Test-LfoSameLiteralFact $Connection $subjectId $Predicate $literal) {
+    if (Test-LfoSameLiteralFact $Connection $subjectId $Predicate $literal $ScopeId) {
         return [pscustomobject]@{
             Operation = 'set_attribute'
             Status = 'duplicate'
@@ -549,13 +554,15 @@ function Set-LfoMemoryAttribute(
     Invoke-LfoSqliteNonQuery $Connection @'
 UPDATE facts
 SET valid_to_turn = ?3
-WHERE subject_entity_id = ?1
+WHERE scope_id = ?4
+  AND subject_entity_id = ?1
   AND predicate = ?2
   AND valid_to_turn IS NULL;
-'@ @($subjectId, $Predicate, $turn)
+'@ @($subjectId, $Predicate, $turn, $ScopeId)
 
     Invoke-LfoSqliteNonQuery $Connection @'
 INSERT INTO facts(
+    scope_id,
     subject_entity_id,
     predicate,
     literal_type,
@@ -565,8 +572,9 @@ INSERT INTO facts(
     valid_from_turn,
     source_turn
 )
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7);
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8);
 '@ @(
+        $ScopeId,
         $subjectId,
         $Predicate,
         $literal.Type,
@@ -593,7 +601,8 @@ function Add-LfoMemoryRelation(
     [string]$Object,
     [Nullable[int64]]$SourceTurn = $null,
     [string]$SubjectType = $null,
-    [string]$ObjectType = $null
+    [string]$ObjectType = $null,
+    [string]$ScopeId = 'default'
 ) {
     if ([string]::IsNullOrWhiteSpace($Predicate)) {
         throw 'Predicate must not be empty.'
@@ -606,11 +615,12 @@ function Add-LfoMemoryRelation(
     $existing = @(Invoke-LfoSqliteQuery $Connection @'
 SELECT id
 FROM current_facts
-WHERE subject_entity_id = ?1
+WHERE scope_id = ?4
+  AND subject_entity_id = ?1
   AND predicate = ?2
   AND object_entity_id = ?3
 LIMIT 1;
-'@ @($subjectId, $Predicate, $objectId))
+'@ @($subjectId, $Predicate, $objectId, $ScopeId))
 
     if ($existing.Count -gt 0) {
         return [pscustomobject]@{
@@ -625,14 +635,15 @@ LIMIT 1;
 
     Invoke-LfoSqliteNonQuery $Connection @'
 INSERT INTO facts(
+    scope_id,
     subject_entity_id,
     predicate,
     object_entity_id,
     valid_from_turn,
     source_turn
 )
-VALUES (?1, ?2, ?3, ?4, ?4);
-'@ @($subjectId, $Predicate, $objectId, $turn)
+VALUES (?1, ?2, ?3, ?4, ?5, ?5);
+'@ @($ScopeId, $subjectId, $Predicate, $objectId, $turn)
 
     return [pscustomobject]@{
         Operation = 'add_relation'
@@ -647,7 +658,8 @@ VALUES (?1, ?2, ?3, ?4, ?4);
 function Get-LfoMemoryCurrentAttribute(
     $Connection,
     [string]$Subject,
-    [string]$Predicate
+    [string]$Predicate,
+    [string]$ScopeId = 'default'
 ) {
     $rows = @(Invoke-LfoSqliteQuery $Connection @'
 SELECT
@@ -661,11 +673,12 @@ SELECT
     f.source_turn
 FROM current_facts f
 JOIN entities e ON e.id = f.subject_entity_id
-WHERE e.canonical_name = ?1
+WHERE f.scope_id = ?3
+  AND e.canonical_name = ?1
   AND f.predicate = ?2
   AND f.literal_type IS NOT NULL
 ORDER BY f.id DESC;
-'@ @($Subject, $Predicate))
+'@ @($Subject, $Predicate, $ScopeId))
 
     foreach ($row in $rows) {
         $value = switch ([string]$row.literal_type) {
