@@ -161,7 +161,9 @@ function Get-PendingNotesText {
 
     $parts = @()
     foreach ($row in $pending) {
-        $parts += ("T{0}:{1}" -f $row.turn_id, [string]$row.note)
+        # Preserve note order but keep internal turn IDs out of the semantic
+        # compaction input. turn_id remains available in pending JSONL/logs.
+        $parts += [string]$row.note
     }
     return ($parts -join ' | ')
 }
