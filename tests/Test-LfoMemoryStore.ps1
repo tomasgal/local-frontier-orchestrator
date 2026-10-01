@@ -106,6 +106,61 @@ ORDER BY f.id;
         throw ('Unexpected supersession history: ' + ($history | ConvertTo-Json -Compress))
     }
 
+    # Typed values and relation API.
+    Start-LfoMemoryTransaction $store
+    try {
+        $ram = Set-LfoMemoryAttribute $store 'Core' 'ram_gb' 32 20 'computer'
+        $enabled = Set-LfoMemoryAttribute $store 'Core' 'enabled' $true 20 'computer'
+        $temp = Set-LfoMemoryAttribute $store 'Core' 'temp_limit_c' ([double]83.5) 20 'computer'
+        $relation = Add-LfoMemoryRelation $store 'Core' 'has_gpu' 'GTX1050' 20 'computer' 'gpu'
+        $relationDuplicate = Add-LfoMemoryRelation $store 'Core' 'has_gpu' 'GTX1050' 21 'computer' 'gpu'
+        Complete-LfoMemoryTransaction $store
+    } catch {
+        Undo-LfoMemoryTransaction $store
+        throw
+    }
+
+    $ramNow = @(Get-LfoMemoryCurrentAttribute $store 'Core' 'ram_gb')
+    $enabledNow = @(Get-LfoMemoryCurrentAttribute $store 'Core' 'enabled')
+    $tempNow = @(Get-LfoMemoryCurrentAttribute $store 'Core' 'temp_limit_c')
+
+    if ($ram.Status -notin @('written','duplicate')) { throw "Unexpected RAM status: $($ram.Status)" }
+    if ($enabled.Status -ne 'written') { throw "Boolean SET failed: $($enabled.Status)" }
+    if ($temp.Status -ne 'written') { throw "Real SET failed: $($temp.Status)" }
+    if ($relation.Status -notin @('written','duplicate')) { throw "Relation ADD failed: $($relation.Status)" }
+    if ($relationDuplicate.Status -ne 'duplicate') { throw "Duplicate relation was not suppressed: $($relationDuplicate.Status)" }
+    if ($ramNow.Count -ne 1 -or $ramNow[0].ValueType -ne 'integer' -or $ramNow[0].Value -ne 32) {
+        throw ('Integer round-trip failed: ' + ($ramNow | ConvertTo-Json -Compress))
+    }
+    if ($enabledNow.Count -ne 1 -or $enabledNow[0].ValueType -ne 'boolean' -or $enabledNow[0].Value -ne $true) {
+        throw ('Boolean round-trip failed: ' + ($enabledNow | ConvertTo-Json -Compress))
+    }
+    if ($tempNow.Count -ne 1 -or $tempNow[0].ValueType -ne 'real' -or [Math]::Abs([double]$tempNow[0].Value - 83.5) -gt 0.0001) {
+        throw ('Real round-trip failed: ' + ($tempNow | ConvertTo-Json -Compress))
+    }
+
+    # Close/reopen validates persistence independently of the live connection.
+    Close-LfoSqliteDatabase $store
+    $store = Open-LfoMemoryStore $dbPath
+
+    $afterRestart = @(Get-LfoMemoryCurrentAttribute $store 'ORION' 'os')
+    $relationAfterRestart = @(Invoke-LfoSqliteQuery $store @'
+SELECT s.canonical_name AS subject, f.predicate, o.canonical_name AS object, f.source_turn
+FROM current_facts f
+JOIN entities s ON s.id = f.subject_entity_id
+JOIN entities o ON o.id = f.object_entity_id
+WHERE s.canonical_name = ?1
+  AND f.predicate = ?2
+  AND o.canonical_name = ?3;
+'@ @('Core', 'has_gpu', 'GTX1050'))
+
+    if ($afterRestart.Count -ne 1 -or $afterRestart[0].Value -ne 'Ubuntu 24.04') {
+        throw ('Restart persistence failed for attribute: ' + ($afterRestart | ConvertTo-Json -Compress))
+    }
+    if ($relationAfterRestart.Count -ne 1) {
+        throw ('Restart persistence failed for relation: ' + ($relationAfterRestart | ConvertTo-Json -Compress))
+    }
+
     [pscustomobject]@{
         PASS = $true
         SQLite = $version
@@ -117,6 +172,12 @@ ORDER BY f.id;
         CurrentValue = $current[0].Value
         CurrentSourceTurn = $current[0].SourceTurn
         HistoricalRows = $history.Count
+        IntegerValue = $ramNow[0].Value
+        BooleanValue = $enabledNow[0].Value
+        RealValue = $tempNow[0].Value
+        RelationDuplicate = $relationDuplicate.Status
+        RestartAttribute = $afterRestart[0].Value
+        RestartRelation = $relationAfterRestart[0].object
         Database = $dbPath
         ProductionMemoryTouched = $false
     } | Format-List
