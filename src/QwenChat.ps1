@@ -322,7 +322,7 @@ function Get-QwenLocalOutputFormat {
             memory_note = @{
                 type = 'string'
                 maxLength = $script:MemoryNoteMaxChars
-                description = 'New durable delta from the current user turn only; max 40 chars; use - only when there is no durable fact, correction, decision, constraint, preference, goal, or key entity.'
+                description = 'New durable delta from the current user turn only; max 40 chars; use - when empty; explicit corrections/replacements must start with CORR and contain only the new value.'
             }
         }
         required = @('route', 'answer', 'memory_note')
@@ -341,7 +341,7 @@ function Get-QwenSynthesisOutputFormat {
             memory_note = @{
                 type = 'string'
                 maxLength = $script:MemoryNoteMaxChars
-                description = 'New durable delta from ORIGINAL USER REQUEST only; max 40 chars; use - only when there is no durable fact, correction, decision, constraint, preference, goal, or key entity.'
+                description = 'New durable delta from ORIGINAL USER REQUEST only; max 40 chars; use - when empty; explicit corrections/replacements must start with CORR and contain only the new value.'
             }
         }
         required = @('answer', 'memory_note')
