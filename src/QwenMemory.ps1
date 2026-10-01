@@ -394,6 +394,20 @@ When historical values conflict, prefer explicit later corrections and state unc
 "@
     }
 
+    $systemText += @"
+
+STRUCTURED MEMORY FIELD — FINAL RULE:
+For route LOCAL, memory_note must capture the NEW durable delta introduced by the CURRENT USER TURN, even when the visible answer is trivial.
+Examples:
+- "ALPHA has 24 GB RAM. How much RAM?" -> "ALPHA 24GB RAM"
+- "BETA has 16 GB RAM. What is 7+5?" -> "BETA 16GB RAM"
+- "The sky is blue. Why?" -> "-"
+- "VEGA has 48 GB, not 32." -> "CORR VEGA=48GB"
+Use "-" only when the current user turn adds no durable user state.
+Ignore old STATE, PENDING, RELEVANT OLD DATA, and older turns when deciding this field.
+For route FRONTIER, memory_note must be "-".
+"@
+
     $out = @(
         @{ role = 'system'; content = $systemText }
     )
