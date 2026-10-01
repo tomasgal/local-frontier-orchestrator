@@ -29,6 +29,10 @@
         NoteInputUserMaxChars = 800
         NoteInputAssistantMaxChars = 250
         Temperature = 0.05
+
+        # v9.4 L2 structured factual state. L0/L1 remain authoritative for
+        # evidence and conversational continuity.
+        StructuredEnabled = $true
     }
 
     ResearchLogging = @{
