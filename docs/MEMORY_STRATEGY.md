@@ -182,7 +182,7 @@ The initial development thresholds are:
 ```text
 4 pending notes
 OR
-120 pending characters
+108 pending characters
 ```
 
 whichever comes first.
@@ -208,9 +208,268 @@ A future high-density-turn design should therefore consider:
 
 This is a separate problem from compaction scheduling.
 
-## Future direction: keyed memory operations
+## Memory layers: L0–L3
 
-The strongest candidate for eliminating LLM-based compaction is to make memory updates more structured.
+LFO memory should evolve as **complementary layers with different semantics**, not as repeated replacements of one storage format by another.
+
+### L0 — authoritative raw history
+
+L0 is the append-only conversation/research history already stored in JSONL.
+
+Properties:
+
+- authoritative record of what was actually said and observed;
+- lossless relative to the captured conversation event;
+- never replaced by compacted or structured state;
+- source for exact historical retrieval and provenance;
+- potentially large, but not injected wholesale into the model context.
+
+L0 answers the question: **"What exactly happened?"**
+
+### L1 — semantic conversational working memory
+
+L1 is the current v9.3 memory path:
+
+- same-pass bounded micro-notes;
+- pending-note pressure buffer;
+- pressure-triggered semantic compaction;
+- bounded rolling working state;
+- recent-turn context and selective exact retrieval from L0.
+
+L1 is intentionally lossy. Its purpose is orientation and continuity, not database-grade state representation.
+
+L1 answers: **"What should the conversation keep actively in mind?"**
+
+### L2 — structured factual state
+
+**v9.4 is the L2 milestone.**
+
+L2 represents durable facts and relations that benefit from deterministic update/query semantics. The logical model is a small typed fact store rather than a nested JSON dictionary tied to one schema.
+
+Canonical forms are conceptually:
+
+```text
+(subject, predicate, object-entity)
+(subject, predicate, typed-literal)
+```
+
+Examples:
+
+```text
+Core     type       computer
+Core     has_gpu    GTX1050
+GTX1050  vendor     NVIDIA
+Core     ram_gb     32
+ORION    os         Ubuntu 24.04
+```
+
+The goal is to stabilize the **logical contract** early so the physical backend can change later without rewriting LFO memory semantics.
+
+L2 answers: **"What structured state is currently known, and how is it related?"**
+
+### L3 — optional associative/semantic retrieval layer
+
+L3 is **not a committed v9.4 feature** and is not another authoritative store.
+
+If real use demonstrates that lexical retrieval and explicit entity/predicate matching are insufficient, L3 may later add:
+
+- embeddings for semantic candidate retrieval;
+- entity linking and alias matching;
+- reranking;
+- similarity-based discovery across L0/L1/L2.
+
+L3 must not decide exact replacement semantics. For example, semantic similarity must not determine whether `Debian 12` was superseded by `Ubuntu 24.04`; that remains an L2 state/provenance operation.
+
+L3 answers: **"What potentially relevant memory should be considered?"**
+
+The intended authority ordering is therefore:
+
+```text
+L0 raw history        authoritative evidence/provenance
+L1 working memory     lossy conversational orientation
+L2 structured state   deterministic current factual state
+L3 semantic index     optional candidate-finding layer
+```
+
+L3 may be added only if measured retrieval failures justify its extra complexity.
+
+## v9.4 milestone — L2 structured memory
+
+### Why v9.4 exists
+
+v9.3 solves the latency and scheduling problems of conversational memory, but its side channel still has a deliberate information-capacity limit: one short semantic micro-note per turn.
+
+That is sufficient for many conversations, but a single information-dense turn may contain several independent durable facts:
+
+```text
+ORION uses Ubuntu 24.04,
+PostgreSQL 16,
+64 GB RAM,
+and nightly backups.
+```
+
+A single 40-character micro-note cannot reliably preserve all four facts in active memory. L0 still preserves the original turn, but L1 may omit part of the durable state and later depend on successful raw-history retrieval.
+
+Similarly, textual correction/deduplication remains probabilistic even after the v9.3 hardening. A structured state such as:
+
+```text
+ORION.os = Ubuntu 24.04
+```
+
+can be updated and queried deterministically once the extraction step has produced the correct operation.
+
+v9.4 therefore targets the **representation and execution gap between semantic working memory and authoritative raw history**.
+
+### Goals
+
+v9.4 should:
+
+1. **Capture multiple durable deltas from one turn.**
+   A single answer/synthesis inference may emit several structured memory operations instead of being limited to one representative micro-note.
+
+2. **Represent both attributes and relations.**
+   The logical model must support typed literals such as `ram_gb = 32` and entity relations such as `Core has_gpu GTX1050`.
+
+3. **Provide deterministic current-state updates.**
+   Once an operation is accepted, simple state changes must not require an LLM compaction call to decide how to merge them.
+
+4. **Preserve provenance and history.**
+   Structured current state must retain a link to the source turn and must not erase L0 history. Superseded values should remain reconstructible.
+
+5. **Support relational-style queries without exposing SQL to Qwen.**
+   Selection, projection, joins, and simple aggregation should be possible through a small MemoryStore API. Qwen produces/consumes structured memory intents, not raw SQL.
+
+6. **Keep the storage abstraction stable.**
+   LFO code above the MemoryStore boundary should depend on the fact/operation model, not on SQLite-specific details.
+
+7. **Keep latency off the Qwen critical path where possible.**
+   Structured reads needed to construct the Qwen prompt are critical-path operations; unrelated persistence/logging should not delay generation unnecessarily. Reads from L0, L1 and L2 may be fanned out in parallel before context assembly.
+
+8. **Remain install-light on Windows.**
+   The preferred first backend is the Windows-provided SQLite engine (`winsqlite3.dll`) accessed through a deliberately thin PowerShell interop layer. The interop layer is a pipe, not an ORM or business-logic wrapper.
+
+### Preferred physical design
+
+The preferred v9.4 backend is a local SQLite database such as:
+
+```text
+%LOCALAPPDATA%\LocalFrontierOrchestrator\state\memory.db
+```
+
+The logical schema should be capable of representing:
+
+- entities;
+- predicates;
+- entity-to-entity relations;
+- typed scalar values;
+- current validity;
+- source turn / provenance;
+- historical supersession.
+
+The physical schema is an implementation detail and may evolve without changing the logical MemoryStore contract.
+
+For performance and concurrency, the initial implementation should prefer:
+
+- long-lived database connection(s), not open/close per lookup;
+- prepared statements for common operations;
+- WAL mode where supported;
+- separate read and serialized write paths;
+- small atomic transactions for multi-delta turns;
+- indexes on the access paths actually used by LFO;
+- no materialized Cartesian products when a selective join/query plan can be used.
+
+The SQLite native interop should expose only the small ABI surface needed by the store (open/close, prepare/bind/step/finalize, column reads, errors/exec). Memory semantics stay in PowerShell above that pipe.
+
+### Critical-path behavior
+
+The intended turn topology is:
+
+```text
+                     +-- L0 exact/raw retrieval --+
+User prompt ----------+-- L1 working memory -------+--> context assembly --> Qwen
+                     +-- L2 structured query -----+
+                     +-- hard deterministic gates -+
+
+Qwen result
+   |
+   +--> user-facing answer
+   |
+   +--> structured memory operations --> serialized L2 transaction
+   +--> unstructured durable delta  --> existing L1 pressure path
+```
+
+For an **explicit memory request**, LFO should not claim successful persistence until the required memory transaction has committed.
+
+For ordinary implicit memory, implementation may minimize visible post-answer latency while preserving ordering and durability invariants.
+
+### Non-goals for v9.4
+
+v9.4 is **not** intended to:
+
+- replace L0 raw history;
+- replace L1 semantic working memory;
+- store every sentence or assistant answer as structured state;
+- build a universal ontology or knowledge graph;
+- require Neo4j, RDF/SPARQL, OLAP cubes, or a database server;
+- expose SQL generation to Qwen;
+- introduce a vector database by default;
+- use embeddings to decide exact corrections;
+- guarantee that an LLM-extracted fact is objectively true;
+- optimize for millions of enterprise records before LFO has such a workload;
+- implement a full Datalog/WCOJ engine merely for theoretical elegance.
+
+### Main threats and failure modes
+
+1. **Wrong extraction becomes hard state.**
+   A model may attach a value to the wrong entity or predicate. Deterministic storage makes a wrong extraction consistently wrong, so structured writes must be conservative and observable.
+
+2. **Predicate fragmentation.**
+   `db`, `database`, and `database_engine` can become separate predicates unless canonicalization rules are introduced carefully.
+
+3. **Overwriting valid state.**
+   A mistaken `set` operation can replace a correct current value. Provenance and historical validity are therefore part of the model from the beginning.
+
+4. **Schema side-channel overload.**
+   Asking a small local model to emit too many independent control fields can degrade answer quality. v9.4 should keep the structured output narrow and measured.
+
+5. **Premature ontology work.**
+   The project should stabilize generic fact semantics, not attempt to predefine every possible entity type or predicate.
+
+6. **Storage abstraction leakage.**
+   SQLite-specific SQL or row layouts must not spread through QwenChat and higher-level memory logic.
+
+### What happens if L2 is never implemented?
+
+Nothing catastrophic. v9.3 remains a valid architecture:
+
+- L0 retains complete raw history;
+- L1 provides bounded conversational continuity;
+- exact retrieval can recover facts that were omitted from rolling state.
+
+The cost is that information-dense turns remain lossy at the active-memory layer, corrections/deduplication remain partly semantic, and more future queries depend on successful retrieval from raw history.
+
+L2 is therefore an **efficiency, precision, and state-management improvement**, not a prerequisite for LFO to function.
+
+### v9.4 acceptance direction
+
+The first v9.4 development build should demonstrate at least:
+
+- multiple durable facts extracted from one turn;
+- two different entities updated in one turn;
+- typed scalar and entity-relation facts;
+- deterministic replacement of one current attribute;
+- duplicate structured fact suppression;
+- provenance back to the source turn;
+- persistence across restart;
+- a multi-relation query such as "which computers have an NVIDIA GPU?";
+- coexistence with an unstructured L1 micro-note;
+- no SQL exposed to Qwen;
+- no regression of the validated v9.3 memory path;
+- measured structured-memory overhead far below local-model inference latency on the reference hosts.
+
+## Structured memory design rationale
+
+The strongest candidate for eliminating unnecessary LLM-based compaction for simple factual state is to make those memory updates structured.
 
 Instead of only:
 
