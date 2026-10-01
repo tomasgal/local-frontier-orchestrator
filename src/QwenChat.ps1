@@ -64,6 +64,12 @@ if (-not (Test-Path -LiteralPath $structuredMemoryModule)) {
 }
 . $structuredMemoryModule
 
+$memoryStoreModule = Join-Path $PSScriptRoot 'LfoMemoryStore.ps1'
+if (-not (Test-Path -LiteralPath $memoryStoreModule)) {
+    throw "L2 memory store module not found: $memoryStoreModule"
+}
+. $memoryStoreModule
+
 $memoryModule = Join-Path $PSScriptRoot 'QwenMemory.ps1'
 if (-not (Test-Path -LiteralPath $memoryModule)) {
     throw "Qwen memory module not found: $memoryModule"
@@ -664,6 +670,10 @@ function Invoke-Qwen([string]$Prompt) {
     $finalContent = $null
     $localRaw = $null
     $inlineMemoryNote = $null
+    $inlineMemoryOps = [pscustomobject]@{
+        Valid = @()
+        Rejected = @()
+    }
     $answerRecoveryUsed = $false
     $answerRecoveryReason = $null
     $answerRecoverySuccess = $null
@@ -693,6 +703,7 @@ function Invoke-Qwen([string]$Prompt) {
                 Write-Host "`n[Qwen route -> LOCAL]" -ForegroundColor DarkGray
                 $finalContent = [string]$structured.Answer
                 $inlineMemoryNote = $structured.MemoryNote
+                $inlineMemoryOps = $structured.MemoryOps
                 if (Test-QwenInvalidFinalAnswer $finalContent) {
                     $answerRecoveryUsed = $true
                     $answerRecoveryReason = if ($finalContent -eq '-') {
@@ -777,10 +788,15 @@ $recentContext
                 Write-Host "`n[Qwen synthesis did not complete cleanly; showing the frontier result directly.]" -ForegroundColor Yellow
                 $finalContent = $frontierResult
                 $inlineMemoryNote = $null
+                $inlineMemoryOps = [pscustomobject]@{
+                    Valid = @()
+                    Rejected = @()
+                }
             } elseif ($invalidSynthesisAnswer) {
                 Write-Host "`n[Qwen synthesis answer invalid; showing the frontier result directly.]" -ForegroundColor Yellow
                 $finalContent = $frontierResult
                 $inlineMemoryNote = $structuredSynthesis.MemoryNote
+                $inlineMemoryOps = $structuredSynthesis.MemoryOps
                 $answerRecoveryUsed = $true
                 $answerRecoveryReason = if ([string]$structuredSynthesis.Answer -eq '-') {
                     'synthesis-sentinel'
@@ -791,6 +807,7 @@ $recentContext
             } else {
                 $finalContent = [string]$structuredSynthesis.Answer
                 $inlineMemoryNote = $structuredSynthesis.MemoryNote
+                $inlineMemoryOps = $structuredSynthesis.MemoryOps
             }
         }
     }
@@ -877,6 +894,7 @@ $recentContext
             -Response $r `
             -AnswerSeconds $sw.Elapsed.TotalSeconds `
             -InlineMemoryNote $inlineMemoryNote `
+            -InlineMemoryOps $inlineMemoryOps `
             -AnswerRecoveryUsed $answerRecoveryUsed `
             -AnswerRecoveryReason $answerRecoveryReason `
             -AnswerRecoverySuccess $answerRecoverySuccess `
@@ -894,7 +912,7 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.3-dev1 (pressure-triggered compaction). Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "Qwen local chat v9.4-dev3 (L2 structured write integration). Commands: /exit, /clear, /paste, /think on, /think off"
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
