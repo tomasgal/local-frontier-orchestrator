@@ -20,7 +20,7 @@ $baseUri = [string]$config.BaseUri
 
 . (Join-Path $repoRoot 'src\LfoStructuredMemory.ps1')
 
-$policy = Get-Content -LiteralPath (Join-Path $repoRoot 'policy\l2-structured-memory.txt') -Raw -Encoding UTF8
+$policyTemplate = Get-Content -LiteralPath (Join-Path $repoRoot 'policy\l2-structured-memory.txt') -Raw -Encoding UTF8
 $schema = @{
     type = 'object'
     properties = @{
@@ -30,26 +30,52 @@ $schema = @{
     additionalProperties = $false
 }
 
+$localScope = @'
+This is a LOCAL pass. The evidence is only the CURRENT USER TURN.
+'@
+
+$synthesisScope = @'
+This is a post-frontier SYNTHESIS pass. The evidence is the ORIGINAL USER REQUEST plus the FRONTIER RESULT.
+Interpret both inputs and emit only durable factual state accepted after synthesis; do not mechanically copy every frontier detail.
+'@
+
 $cases = @(
     [pscustomobject]@{
         Name = 'multi-attribute'
+        EvidenceScope = $localScope
         Prompt = 'ORION runs Ubuntu 24.04, uses PostgreSQL 16, has 64 GB RAM, and nightly backups are enabled.'
     },
     [pscustomobject]@{
         Name = 'relation'
+        EvidenceScope = $localScope
         Prompt = 'Core has a GTX1050 graphics card. GTX1050 is NVIDIA. Core has 32 GB RAM.'
     },
     [pscustomobject]@{
         Name = 'correction'
+        EvidenceScope = $localScope
         Prompt = 'Correction: ORION now runs Debian 13 instead of Ubuntu 24.04.'
     },
     [pscustomobject]@{
         Name = 'no-l2'
+        EvidenceScope = $localScope
         Prompt = 'Prefer short technical answers and one CLI command per step.'
+    },
+    [pscustomobject]@{
+        Name = 'frontier-synthesis'
+        EvidenceScope = $synthesisScope
+        Prompt = @'
+ORIGINAL USER REQUEST:
+What are the durable hardware facts about Core from the checked inventory?
+
+FRONTIER RESULT:
+The checked inventory identifies Core as an i7-8700 computer with 32 GB RAM and an NVIDIA GTX1050 graphics card. The inventory page was last updated on Tuesday.
+'@
     }
 )
 
 foreach ($case in $cases) {
+    $policy = $policyTemplate.Replace('{{L2_EVIDENCE_SCOPE}}', ([string]$case.EvidenceScope).Trim())
+
     $bodyObj = @{
         model = $Model
         messages = @(
