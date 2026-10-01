@@ -79,6 +79,7 @@ foreach ($case in $cases) {
     Write-Host ("=== {0} ===" -f $case.Name)
     Write-Host ("Prompt: {0}" -f $case.Prompt)
     Write-Host ("Time: {0:n2}s; valid={1}; rejected={2}" -f $sw.Elapsed.TotalSeconds, @($parsed.Valid).Count, @($parsed.Rejected).Count)
+    Write-Host ("RawJSON: {0}" -f $content)
 
     if (@($parsed.Valid).Count -eq 0) {
         Write-Host "memory_ops: []"
