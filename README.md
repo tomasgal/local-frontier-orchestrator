@@ -1,6 +1,6 @@
 # Local Frontier Orchestrator
 
-**Status:** experimental / research prototype (`v0.1-alpha`) · **Main build:** `v9.3` (`pressure-compaction + explicit-memory recovery`)
+**Status:** experimental / research prototype (`v0.1-alpha`) · **Main build:** `v9.3` (`pressure-compaction + explicit-memory recovery`) · **Development build:** `v9.4-dev3` (`L2 structured write integration`)
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
@@ -15,6 +15,8 @@ This repository is intentionally experimental. Routing, synthesis policy, contex
 For the rationale behind the conversational-memory architecture, trade-offs against other memory systems, and the planned path from single-pass micro-memory to pressure-triggered and eventually keyed/deterministic memory updates, see [docs/MEMORY_STRATEGY.md](docs/MEMORY_STRATEGY.md).
 
 As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validation scope on the constrained reference hardware. It preserves v9.2 single-pass micro-memory as the normal path, adds pressure-triggered compaction at `>=4` pending notes or `>=108` pending-note characters, and uses at most one focused memory-only recovery when the user explicitly asks the system to remember something but the single-pass note is empty. Invalid final-answer sentinels are also recovered without regenerating memory, and correction-prefix normalization is hardened across `CORR`, `CORR:` and `CORR :` variants. Isolated end-to-end tests passed both count-pressure and char-pressure compaction, while ordinary implicit memory remains single-pass. Raw JSONL history remains authoritative; rolling memory remains a lossy orientation layer.
+
+As of **2026-10-02**, `v9.4-dev3` adds the first live L2 structured-write path beside L0/L1. The development branch uses a schema-v3 SQLite fact store with opaque `entity_id` identity, separate entity surface-name records, typed literals, entity relations, source-turn provenance, scope isolation, duplicate suppression, and reconstructible supersession history. LOCAL and post-FRONTIER synthesis share the same bounded `memory_ops[]` contract; the routing pass itself does not write L2. A production smoke test wrote a three-fact turn atomically and a subsequent scalar correction correctly closed the old value and opened the new one. L2 retrieval is **not yet injected into the model prompt**; current v9.4 work is therefore write/provenance validation, not a completed read path.
 
 ## Core architecture
 
@@ -263,7 +265,8 @@ local model -> ask_codex -> native Codex frontier -> local model
 
 Current work focuses on:
 
-- v9.4 L2 structured-memory work: typed facts/relations, multi-delta extraction, deterministic state updates and relational queries behind a stable MemoryStore abstraction;
+- **v9.4-dev3 L2 structured-memory integration:** typed facts/relations, multi-delta extraction, opaque entity identity plus surface-name resolution, deterministic current-state updates, atomic fail-closed turn writes, provenance/history, and relational queries behind a stable MemoryStore abstraction;
+- adding the L2 read/retrieval path to context assembly only after write-path validation is stable;
 - long-term routing quality;
 - faithful-but-useful frontier synthesis;
 - structured trace logging;
