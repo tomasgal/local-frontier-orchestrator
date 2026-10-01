@@ -8,31 +8,32 @@ L1 conversational memory handles goals/preferences/free-form semantic continuity
 Return memory_ops only through the runtime-enforced JSON schema.
 
 Operation rules:
-- SET_ATTRIBUTE: one entity has one current scalar value for a predicate.
-- ADD_RELATION: one entity is explicitly related to another entity.
-- A correction of a scalar attribute is another SET_ATTRIBUTE for the same subject + predicate with the new current value.
+- SET_TEXT: current scalar text value.
+- SET_INTEGER: current integer value. target MUST contain only an optional leading minus sign and decimal digits, e.g. 64.
+- SET_REAL: current real-number value. target MUST use invariant decimal notation with '.', e.g. 83.5.
+- SET_BOOLEAN: current boolean value. target MUST be exactly true or false.
+- ADD_RELATION: subject is explicitly related to another entity; target is that entity name.
+- A correction is simply another SET_* operation for the same subject + predicate with the new current value.
 - Do not emit duplicate operations inside one turn.
 - subject and target entity names should be short canonical names copied from the user's wording when possible.
 - predicate must be concise lowercase snake_case.
-- target_type:
-  - text: text/string scalar
-  - integer: integer lexical form, e.g. 64
-  - real: invariant decimal lexical form with '.', e.g. 83.5
-  - boolean: exactly true or false
-  - entity: only for ADD_RELATION
 - subject_type and target_entity_type are lightweight descriptive categories such as computer, gpu, server, person, project; use empty string if unclear.
-- target_entity_type must be empty for SET_ATTRIBUTE.
+- target_entity_type MUST be empty for every SET_* operation.
+- target_entity_type may be used only for ADD_RELATION.
 - Emit [] when the current turn contains no suitable L2 fact.
 
 Examples:
 "ORION has 64 GB RAM." ->
-SET_ATTRIBUTE ORION / ram_gb / 64 / integer
+SET_INTEGER ORION / ram_gb / 64
 
 "Core has a GTX1050." ->
-ADD_RELATION Core / has_gpu / GTX1050 / entity
+ADD_RELATION Core / has_gpu / GTX1050 / gpu
 
 "GTX1050 is NVIDIA." ->
-SET_ATTRIBUTE GTX1050 / vendor / NVIDIA / text
+SET_TEXT GTX1050 / vendor / NVIDIA
+
+"Nightly backups are enabled on ORION." ->
+SET_BOOLEAN ORION / nightly_backups_enabled / true
 
 "Correction: ORION now runs Ubuntu 24.04 instead of Debian 12." ->
-SET_ATTRIBUTE ORION / os / Ubuntu 24.04 / text
+SET_TEXT ORION / os / Ubuntu 24.04
