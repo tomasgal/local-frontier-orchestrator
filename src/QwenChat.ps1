@@ -562,8 +562,8 @@ function Invoke-Qwen([string]$Prompt) {
         $route = 'FRONTIER'
         Write-Host ("`n[policy -> FRONTIER; reason={0}]" -f $policyReason) -ForegroundColor DarkCyan
     } else {
-        # No Ollama tool schema is exposed here. Qwen decides with a plain-text
-        # route marker and, on LOCAL, the same generation is already the answer.
+        # Qwen routes and answers in one schema-constrained generation. On
+        # LOCAL the same generation also carries the bounded memory micro-note.
         $r = Invoke-QwenLocalApi
         Show-QwenThinking $r
         $candidate = Get-CleanQwenContent $r
