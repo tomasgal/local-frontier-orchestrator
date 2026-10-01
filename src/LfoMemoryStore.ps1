@@ -330,12 +330,27 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 
 CREATE TABLE IF NOT EXISTS entities (
-    id             INTEGER PRIMARY KEY,
-    canonical_name TEXT NOT NULL COLLATE NOCASE UNIQUE,
-    entity_type    TEXT NULL,
-    created_turn   INTEGER NULL,
-    created_at     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id           INTEGER PRIMARY KEY,
+    entity_type  TEXT NULL,
+    created_turn INTEGER NULL,
+    created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS entity_names (
+    id              INTEGER PRIMARY KEY,
+    entity_id       INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    name            TEXT NOT NULL,
+    normalized_name TEXT NOT NULL,
+    source_turn     INTEGER NULL,
+    created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(entity_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS ix_entity_names_normalized
+ON entity_names(normalized_name);
+
+CREATE INDEX IF NOT EXISTS ix_entity_names_entity
+ON entity_names(entity_id);
 
 CREATE TABLE IF NOT EXISTS facts (
     id                INTEGER PRIMARY KEY,
@@ -384,7 +399,7 @@ FROM facts
 WHERE valid_to_turn IS NULL;
 
 INSERT INTO meta(key, value)
-VALUES ('schema_version', '2')
+VALUES ('schema_version', '3')
 ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 '@
 }
@@ -417,35 +432,100 @@ function Undo-LfoMemoryTransaction($Connection) {
 # These functions define the stable fact-operation contract above SQLite.
 # They deliberately avoid exposing SQL or row-layout details to QwenChat.
 
-function Get-LfoMemoryEntityId(
+function ConvertTo-LfoEntityNameKey([string]$Name) {
+    if ([string]::IsNullOrWhiteSpace($Name)) { return '' }
+
+    $formD = $Name.Trim().ToLowerInvariant().Normalize([Text.NormalizationForm]::FormD)
+    $sb = New-Object Text.StringBuilder
+    foreach ($ch in $formD.ToCharArray()) {
+        $cat = [Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch)
+        if ($cat -eq [Globalization.UnicodeCategory]::NonSpacingMark) { continue }
+        if ([char]::IsLetterOrDigit($ch)) {
+            [void]$sb.Append($ch)
+        }
+    }
+    return $sb.ToString()
+}
+
+function Resolve-LfoMemoryEntityId(
     $Connection,
-    [string]$CanonicalName,
+    [string]$Mention,
     [string]$EntityType = $null,
     [Nullable[int64]]$SourceTurn = $null
 ) {
-    if ([string]::IsNullOrWhiteSpace($CanonicalName)) {
-        throw 'CanonicalName must not be empty.'
+    if ([string]::IsNullOrWhiteSpace($Mention)) {
+        throw 'Entity mention must not be empty.'
+    }
+
+    $surface = $Mention.Trim()
+    $key = ConvertTo-LfoEntityNameKey $surface
+    if ([string]::IsNullOrWhiteSpace($key)) {
+        throw "Entity mention has no searchable characters: $Mention"
+    }
+
+    $candidates = @(Invoke-LfoSqliteQuery $Connection @'
+SELECT DISTINCT e.id, e.entity_type
+FROM entity_names n
+JOIN entities e ON e.id = n.entity_id
+WHERE n.normalized_name = ?1
+ORDER BY e.id;
+'@ @($key))
+
+    $chosen = $null
+    if ($candidates.Count -eq 1) {
+        $chosen = $candidates[0]
+    } elseif ($candidates.Count -gt 1 -and -not [string]::IsNullOrWhiteSpace($EntityType)) {
+        $typed = @($candidates | Where-Object {
+            -not [string]::IsNullOrWhiteSpace([string]$_.entity_type) -and
+            ([string]$_.entity_type).Equals($EntityType, [StringComparison]::OrdinalIgnoreCase)
+        })
+        if ($typed.Count -eq 1) {
+            $chosen = $typed[0]
+        }
+    }
+
+    if ($null -eq $chosen -and $candidates.Count -gt 0) {
+        throw "Ambiguous entity mention '$Mention' ($($candidates.Count) candidates)."
+    }
+
+    if ($null -eq $chosen) {
+        Invoke-LfoSqliteNonQuery $Connection @'
+INSERT INTO entities(entity_type, created_turn)
+VALUES (?1, ?2);
+'@ @($EntityType, $SourceTurn)
+
+        $row = @(Invoke-LfoSqliteQuery $Connection 'SELECT last_insert_rowid() AS id;')[0]
+        $entityId = [int64]$row.id
+    } else {
+        $entityId = [int64]$chosen.id
+        if (-not [string]::IsNullOrWhiteSpace($EntityType) -and
+            [string]::IsNullOrWhiteSpace([string]$chosen.entity_type)) {
+            Invoke-LfoSqliteNonQuery $Connection @'
+UPDATE entities
+SET entity_type = ?2
+WHERE id = ?1 AND entity_type IS NULL;
+'@ @($entityId, $EntityType)
+        }
     }
 
     Invoke-LfoSqliteNonQuery $Connection @'
-INSERT INTO entities(canonical_name, entity_type, created_turn)
-VALUES (?1, ?2, ?3)
-ON CONFLICT(canonical_name) DO UPDATE SET
-    entity_type = COALESCE(entities.entity_type, excluded.entity_type);
-'@ @($CanonicalName.Trim(), $EntityType, $SourceTurn)
+INSERT INTO entity_names(entity_id, name, normalized_name, source_turn)
+VALUES (?1, ?2, ?3, ?4)
+ON CONFLICT(entity_id, name) DO NOTHING;
+'@ @($entityId, $surface, $key, $SourceTurn)
 
-    $row = @(Invoke-LfoSqliteQuery $Connection @'
-SELECT id
-FROM entities
-WHERE canonical_name = ?1
-LIMIT 1;
-'@ @($CanonicalName.Trim()))
+    return $entityId
+}
 
-    if ($row.Count -ne 1) {
-        throw "Entity lookup failed after upsert: $CanonicalName"
-    }
-
-    return [int64]$row[0].id
+function Get-LfoMemoryEntityId(
+    $Connection,
+    [string]$Mention,
+    [string]$EntityType = $null,
+    [Nullable[int64]]$SourceTurn = $null
+) {
+    # Compatibility name for callers: identity is the opaque entity_id.
+    # The supplied string is only a mention/surface form, never a canonical key.
+    return Resolve-LfoMemoryEntityId $Connection $Mention $EntityType $SourceTurn
 }
 
 function ConvertTo-LfoMemoryLiteral($Value) {
@@ -661,9 +741,10 @@ function Get-LfoMemoryCurrentAttribute(
     [string]$Predicate,
     [string]$ScopeId = 'default'
 ) {
+    $subjectId = Resolve-LfoMemoryEntityId $Connection $Subject
+
     $rows = @(Invoke-LfoSqliteQuery $Connection @'
 SELECT
-    e.canonical_name AS subject,
     f.predicate,
     f.literal_type,
     f.value_text,
@@ -672,13 +753,12 @@ SELECT
     f.valid_from_turn,
     f.source_turn
 FROM current_facts f
-JOIN entities e ON e.id = f.subject_entity_id
 WHERE f.scope_id = ?3
-  AND e.canonical_name = ?1
+  AND f.subject_entity_id = ?1
   AND f.predicate = ?2
   AND f.literal_type IS NOT NULL
 ORDER BY f.id DESC;
-'@ @($Subject, $Predicate, $ScopeId))
+'@ @($subjectId, $Predicate, $ScopeId))
 
     foreach ($row in $rows) {
         $value = switch ([string]$row.literal_type) {
@@ -689,7 +769,7 @@ ORDER BY f.id DESC;
         }
 
         [pscustomobject]@{
-            Subject = [string]$row.subject
+            Subject = $Subject
             Predicate = [string]$row.predicate
             ValueType = [string]$row.literal_type
             Value = $value
