@@ -56,6 +56,13 @@ $script:SynthesisSystemTemplate    = Read-PolicyTemplate 'synthesis-system.txt'
 $script:FrontierSubagentTemplate   = Read-PolicyTemplate 'frontier-subagent.txt'
 $script:MemoryNoteTemplate          = Read-PolicyTemplate 'memory-note-system.txt'
 $script:MemoryCompactionTemplate    = Read-PolicyTemplate 'memory-compaction-system.txt'
+$script:L2StructuredMemoryTemplate   = Read-PolicyTemplate 'l2-structured-memory.txt'
+
+$structuredMemoryModule = Join-Path $PSScriptRoot 'LfoStructuredMemory.ps1'
+if (-not (Test-Path -LiteralPath $structuredMemoryModule)) {
+    throw "L2 structured memory module not found: $structuredMemoryModule"
+}
+. $structuredMemoryModule
 
 $memoryModule = Join-Path $PSScriptRoot 'QwenMemory.ps1'
 if (-not (Test-Path -LiteralPath $memoryModule)) {
@@ -324,8 +331,9 @@ function Get-QwenLocalOutputFormat {
                 maxLength = $script:MemoryNoteMaxChars
                 description = 'New durable delta from the current user turn only; max 40 chars; use - when empty. Use CORR only for an explicit correction/replacement of an earlier value, never for a first mention; include target/key plus the new value.'
             }
+            memory_ops = Get-LfoStructuredMemoryOperationSchema 6
         }
-        required = @('route', 'answer', 'memory_note')
+        required = @('route', 'answer', 'memory_note', 'memory_ops')
         additionalProperties = $false
     }
 }
@@ -341,10 +349,11 @@ function Get-QwenSynthesisOutputFormat {
             memory_note = @{
                 type = 'string'
                 maxLength = $script:MemoryNoteMaxChars
-                description = 'New durable delta from ORIGINAL USER REQUEST only; max 40 chars; use - when empty. Use CORR only for an explicit correction/replacement of an earlier value, never for a first mention; include target/key plus the new value.'
+                description = 'New durable conversational delta; max 40 chars; use - when empty. L1 remains primarily about the user request; L2 memory_ops separately captures durable factual state accepted during synthesis.'
             }
+            memory_ops = Get-LfoStructuredMemoryOperationSchema 6
         }
-        required = @('answer', 'memory_note')
+        required = @('answer', 'memory_note', 'memory_ops')
         additionalProperties = $false
     }
 }
@@ -398,6 +407,10 @@ function ConvertFrom-QwenStructuredContent(
                 Text = ''
                 ParseStatus = 'structured-missing'
             }
+            MemoryOps = [pscustomobject]@{
+                Valid = @()
+                Rejected = @()
+            }
         }
     }
 
@@ -406,6 +419,7 @@ function ConvertFrom-QwenStructuredContent(
         $answer = [string]$obj.answer
         $rawNote = [string]$obj.memory_note
         $note = Clean-MicroText $rawNote $script:MemoryNoteMaxChars
+        $ops = ConvertFrom-LfoStructuredMemoryOps $obj.memory_ops 6
 
         $route = if ($ExpectRoute) { ([string]$obj.route).ToUpperInvariant() } else { 'LOCAL' }
         if ($ExpectRoute -and $route -notin @('LOCAL', 'FRONTIER')) {
@@ -416,6 +430,10 @@ function ConvertFrom-QwenStructuredContent(
             # The routing pass must not create conversational memory; the final
             # post-frontier synthesis owns the note for this user turn.
             $note = ''
+            $ops = [pscustomobject]@{
+                Valid = @()
+                Rejected = @()
+            }
         }
 
         return [pscustomobject]@{
@@ -431,6 +449,7 @@ function ConvertFrom-QwenStructuredContent(
                     'structured-complete'
                 })
             }
+            MemoryOps = $ops
         }
     } catch {
         return [pscustomobject]@{
@@ -441,6 +460,10 @@ function ConvertFrom-QwenStructuredContent(
                 Raw = $Content
                 Text = ''
                 ParseStatus = 'structured-malformed'
+            }
+            MemoryOps = [pscustomobject]@{
+                Valid = @()
+                Rejected = @()
             }
         }
     }
@@ -508,6 +531,13 @@ function Invoke-QwenAnswerRecovery([string]$Prompt) {
 
 function Invoke-QwenSynthesis([string]$OriginalPrompt, [string]$FrontierResult) {
     $synthesisSystem = Expand-RuntimePolicy $script:SynthesisSystemTemplate
+    $l2EvidenceScope = @'
+The evidence for L2 is the ORIGINAL USER REQUEST plus the FRONTIER RESULT supplied to this synthesis pass.
+Treat the frontier as an external brain/input: interpret it, reconcile it with the request, and emit only durable factual state that you accept after synthesis.
+Do not behave as a passive pipe and do not mechanically store every frontier detail.
+'@
+    $synthesisSystem += [Environment]::NewLine + [Environment]::NewLine +
+        $script:L2StructuredMemoryTemplate.Replace('{{L2_EVIDENCE_SCOPE}}', $l2EvidenceScope.Trim())
     $memoryBlock = Get-MemoryContextBlock $OriginalPrompt
     $recentConversation = Get-RecentConversationText -ExcludeLastUser
 
