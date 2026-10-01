@@ -36,8 +36,21 @@ function Initialize-QwenMemoryConfiguration(
         [int]$script:Config.Memory.RetrievalMaxItems
     }
 
-    $script:MemoryCompactionEvery = [int]$script:Config.Memory.CompactionEvery
     $script:MemoryNoteMaxChars = [int]$script:Config.Memory.NoteMaxChars
+    $script:MemoryCompactionMaxPendingNotes = if (
+        $script:Config.Memory.ContainsKey('CompactionMaxPendingNotes')
+    ) {
+        [int]$script:Config.Memory.CompactionMaxPendingNotes
+    } else {
+        4
+    }
+    $script:MemoryCompactionMaxPendingChars = if (
+        $script:Config.Memory.ContainsKey('CompactionMaxPendingChars')
+    ) {
+        [int]$script:Config.Memory.CompactionMaxPendingChars
+    } else {
+        [Math]::Max(120, 3 * $script:MemoryNoteMaxChars)
+    }
     $script:MemoryStateMaxChars = [int]$script:Config.Memory.StateMaxChars
     $script:MemoryRetrievalScanMaxTurns = [int]$script:Config.Memory.RetrievalScanMaxTurns
     $script:ContextLengthHint = if ($null -ne $ContextLengthHint) { [int]$ContextLengthHint } else { 0 }
@@ -166,6 +179,72 @@ function Get-PendingNotesText {
         $parts += [string]$row.note
     }
     return ($parts -join ' | ')
+}
+
+function ConvertTo-MemoryFingerprint([string]$Text) {
+    if ([string]::IsNullOrWhiteSpace($Text)) { return '' }
+
+    $formD = $Text.ToLowerInvariant().Normalize([Text.NormalizationForm]::FormD)
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($ch in $formD.ToCharArray()) {
+        $cat = [Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch)
+        if ($cat -eq [Globalization.UnicodeCategory]::NonSpacingMark) { continue }
+        if ([char]::IsLetterOrDigit($ch)) {
+            [void]$sb.Append($ch)
+        }
+    }
+    return $sb.ToString()
+}
+
+function Test-MemoryNoteIsTrivialRepeat([string]$Note) {
+    if ([string]::IsNullOrWhiteSpace($Note)) { return $false }
+
+    # Explicit corrections are state-changing operations; never suppress them
+    # merely because their new value resembles existing state.
+    if ($Note -match '(?i)^\s*CORR\b') { return $false }
+
+    $fingerprint = ConvertTo-MemoryFingerprint $Note
+    if ($fingerprint.Length -lt 6) { return $false }
+
+    foreach ($row in @(Get-PendingNoteRecords)) {
+        if ((ConvertTo-MemoryFingerprint ([string]$row.note)) -eq $fingerprint) {
+            return $true
+        }
+    }
+
+    $state = Get-WorkingMemoryRaw
+    if (-not [string]::IsNullOrWhiteSpace($state)) {
+        $stateFingerprint = ConvertTo-MemoryFingerprint $state
+        if ($stateFingerprint.Contains($fingerprint)) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Get-PendingMemoryPressure {
+    $pending = @(Get-PendingNoteRecords)
+    $text = Get-PendingNotesText
+
+    return [pscustomobject]@{
+        Count = $pending.Count
+        Chars = if ([string]::IsNullOrEmpty($text)) { 0 } else { $text.Length }
+    }
+}
+
+function Get-MemoryCompactionTrigger($Pressure) {
+    $reasons = @()
+
+    if ([int]$Pressure.Count -ge $script:MemoryCompactionMaxPendingNotes) {
+        $reasons += 'note-count'
+    }
+    if ([int]$Pressure.Chars -ge $script:MemoryCompactionMaxPendingChars) {
+        $reasons += 'char-count'
+    }
+
+    if ($reasons.Count -eq 0) { return $null }
+    return ($reasons -join '+')
 }
 
 function Clear-PendingNotes {
@@ -691,36 +770,50 @@ function Persist-TurnAndMemory(
     $memoryNote = $InlineMemoryNote
     $memoryError = $null
     $compacted = $false
+    $memoryNoteAppended = $false
+    $memoryNoteSkipReason = $null
+    $memoryCompactionTrigger = $null
+    $memoryPressureBeforeCompaction = $null
+    $memoryPressureAfter = $null
     $memorySw = [System.Diagnostics.Stopwatch]::StartNew()
 
     if ($script:MemoryEnabled) {
         try {
-            if ($null -ne $memoryNote -and
-                -not [string]::IsNullOrWhiteSpace([string]$memoryNote.Text)) {
+            $noteText = if ($null -ne $memoryNote) {
+                [string]$memoryNote.Text
+            } else {
+                ''
+            }
+
+            if ([string]::IsNullOrWhiteSpace($noteText)) {
+                $memoryNoteSkipReason = 'empty'
+            } elseif (Test-MemoryNoteIsTrivialRepeat $noteText) {
+                $memoryNoteSkipReason = 'trivial-repeat'
+            } else {
                 Append-JsonLine $script:PendingNotesPath ([ordered]@{
                     turn_id = $turnId
                     timestamp = (Get-Date).ToString('o')
-                    note = [string]$memoryNote.Text
+                    note = $noteText
                 })
+                $memoryNoteAppended = $true
             }
 
-            # Preserve v9.1.3 cadence: every persisted turn advances the
-            # compaction counter, even when the current micro-note is empty.
-            $script:RuntimeState.completed_since_compaction =
-                [int]$script:RuntimeState.completed_since_compaction + 1
+            # v9.3: compaction is driven by semantic memory pressure, not by
+            # the number of user turns. Empty notes and trivial repeats do not
+            # move the cadence.
+            $memoryPressureBeforeCompaction = Get-PendingMemoryPressure
+            $memoryCompactionTrigger =
+                Get-MemoryCompactionTrigger $memoryPressureBeforeCompaction
 
-            if ([int]$script:RuntimeState.completed_since_compaction -ge
-                $script:MemoryCompactionEvery) {
+            if (-not [string]::IsNullOrWhiteSpace($memoryCompactionTrigger)) {
                 try {
                     $compacted = Invoke-MemoryCompaction
-                    if ($compacted) {
-                        $script:RuntimeState.completed_since_compaction = 0
-                    }
                 } catch {
                     $memoryError = "compaction failed: $($_.Exception.Message)"
                 }
             }
 
+            $memoryPressureAfter = Get-PendingMemoryPressure
             Save-RuntimeState
         } catch {
             $memoryError = "single-pass memory persistence failed: $($_.Exception.Message)"
@@ -759,6 +852,29 @@ function Persist-TurnAndMemory(
             answer_seconds = [Math]::Round($AnswerSeconds, 3)
             memory_seconds = [Math]::Round($memorySw.Elapsed.TotalSeconds, 3)
             memory_compacted = $compacted
+            memory_compaction_trigger = $memoryCompactionTrigger
+            memory_note_appended = $memoryNoteAppended
+            memory_note_skip_reason = $memoryNoteSkipReason
+            memory_pending_count_before_compaction = if ($null -ne $memoryPressureBeforeCompaction) {
+                [int]$memoryPressureBeforeCompaction.Count
+            } else {
+                0
+            }
+            memory_pending_chars_before_compaction = if ($null -ne $memoryPressureBeforeCompaction) {
+                [int]$memoryPressureBeforeCompaction.Chars
+            } else {
+                0
+            }
+            memory_pending_count_after = if ($null -ne $memoryPressureAfter) {
+                [int]$memoryPressureAfter.Count
+            } else {
+                0
+            }
+            memory_pending_chars_after = if ($null -ne $memoryPressureAfter) {
+                [int]$memoryPressureAfter.Chars
+            } else {
+                0
+            }
             memory_error = $memoryError
             policy_fingerprint = $script:PolicyFingerprint
             performance = $performance
@@ -793,12 +909,18 @@ function Persist-TurnAndMemory(
     }
 
     if ($script:MemoryEnabled) {
-        if ($compacted) {
-            $state = 'micro-note saved + compacted'
-        } elseif ($memoryError) {
+        if ($memoryError) {
             $state = $memoryError
-        } else {
+        } elseif ($memoryNoteAppended) {
             $state = 'micro-note saved'
+        } elseif ($memoryNoteSkipReason -eq 'trivial-repeat') {
+            $state = 'micro-note skipped (repeat)'
+        } else {
+            $state = 'no micro-note'
+        }
+
+        if ($compacted) {
+            $state += ' + compacted'
         }
 
         Write-Host (
