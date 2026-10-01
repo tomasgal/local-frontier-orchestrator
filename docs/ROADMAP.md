@@ -30,6 +30,41 @@ This roadmap describes engineering directions, not release commitments.
 - Use append-only traces for offline Local Epistemic Balancer replay and bias-analysis experiments.
 - Keep host/model profiles separate; do not transplant tuned context/GPU values between machines without measurement.
 
+## v9.4 milestone — L2 structured memory
+
+v9.4 is the next planned memory milestone after the validated v9.3 baseline.
+
+Purpose:
+
+- add an L2 typed fact store beside, not instead of, L0 raw history and L1 semantic working memory;
+- allow several durable memory deltas from one information-dense turn;
+- represent both entity attributes and entity-to-entity relations;
+- make simple current-state replacement, deduplication, provenance and relational queries deterministic after extraction;
+- keep Qwen isolated from SQL and filesystem/database APIs;
+- define a stable MemoryStore/fact-operation contract to minimize later refactoring.
+
+Preferred first backend:
+
+- local SQLite file under the LFO state directory;
+- Windows system SQLite (`winsqlite3.dll`) through a thin PowerShell P/Invoke/ABI pipe;
+- long-lived connections, prepared statements, WAL, indexed reads and serialized small write transactions;
+- parallel L0/L1/L2 retrieval where possible so structured memory adds negligible latency compared with local-model inference.
+
+v9.4 explicitly does **not** require a vector database, graph server, RDF/SPARQL, OLAP cube, universal ontology, or SQL generation by the model.
+
+The planned layer model is:
+
+```text
+L0  raw JSONL history          authoritative evidence/provenance
+L1  semantic working memory    v9.3 micro-notes + pressure compaction
+L2  structured factual state   v9.4 typed facts/relations + deterministic queries
+L3  optional semantic index    future embeddings/entity linking/reranking only if measured need justifies it
+```
+
+L3 is a possible future retrieval layer, not a v9.4 commitment and not an authoritative replacement mechanism.
+
+Initial acceptance targets include multi-delta extraction, typed values and relations, deterministic correction/deduplication, source-turn provenance, restart persistence, a simple multi-relation query, coexistence with L1, and no regression of the validated v9.3 path.
+
 ## Multi-host
 
 - Common orchestration code.
