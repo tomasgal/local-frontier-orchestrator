@@ -224,25 +224,34 @@ function ConvertTo-MemoryFingerprint([string]$Text) {
     return $sb.ToString()
 }
 
+function Get-MemoryComparisonFingerprint([string]$Text) {
+    if ([string]::IsNullOrWhiteSpace($Text)) { return '' }
+
+    # CORR is an operation marker, not part of the remembered fact identity.
+    # Ignore it when comparing a later ordinary mention against stored state.
+    $semanticText = [regex]::Replace($Text, '(?i)^\s*CORR\s+', '').Trim()
+    return ConvertTo-MemoryFingerprint $semanticText
+}
+
 function Test-MemoryNoteIsTrivialRepeat([string]$Note) {
     if ([string]::IsNullOrWhiteSpace($Note)) { return $false }
 
-    # Explicit corrections are state-changing operations; never suppress them
-    # merely because their new value resembles existing state.
+    # A current explicit correction is state-changing and must never be
+    # suppressed merely because its new value resembles existing state.
     if ($Note -match '(?i)^\s*CORR\b') { return $false }
 
-    $fingerprint = ConvertTo-MemoryFingerprint $Note
+    $fingerprint = Get-MemoryComparisonFingerprint $Note
     if ($fingerprint.Length -lt 6) { return $false }
 
     foreach ($row in @(Get-PendingNoteRecords)) {
-        if ((ConvertTo-MemoryFingerprint ([string]$row.note)) -eq $fingerprint) {
+        if ((Get-MemoryComparisonFingerprint ([string]$row.note)) -eq $fingerprint) {
             return $true
         }
     }
 
     $state = Get-WorkingMemoryRaw
     if (-not [string]::IsNullOrWhiteSpace($state)) {
-        $stateFingerprint = ConvertTo-MemoryFingerprint $state
+        $stateFingerprint = Get-MemoryComparisonFingerprint $state
         if ($stateFingerprint.Contains($fingerprint)) {
             return $true
         }
