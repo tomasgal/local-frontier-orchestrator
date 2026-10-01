@@ -181,7 +181,7 @@ function Normalize-MemoryNoteForPrompt([string]$Note, [string]$Prompt) {
     $clean = Clean-MicroText $Note $script:MemoryNoteMaxChars
     if ($clean -match '(?i)^\s*CORR\s+' -and
         -not (Test-ExplicitCorrectionPrompt $Prompt)) {
-        $clean = [regex]::Replace($clean, '(?i)^\s*CORR\s+', '').Trim()
+        $clean = [regex]::Replace($clean, '(?i)^\s*CORR\b\s*:?\s*', '').Trim()
     }
     return $clean
 }
@@ -248,7 +248,7 @@ function Get-MemoryComparisonFingerprint([string]$Text) {
 
     # CORR is an operation marker, not part of the remembered fact identity.
     # Ignore it when comparing a later ordinary mention against stored state.
-    $semanticText = [regex]::Replace($Text, '(?i)^\s*CORR\s+', '').Trim()
+    $semanticText = [regex]::Replace($Text, '(?i)^\s*CORR\b\s*:?\s*', '').Trim()
     return ConvertTo-MemoryFingerprint $semanticText
 }
 
