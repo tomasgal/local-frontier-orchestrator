@@ -685,23 +685,24 @@ function Persist-TurnAndMemory(
         Save-RuntimeState
     }
 
-    $memoryNote = $null
+    $memoryNote = $InlineMemoryNote
     $memoryError = $null
     $compacted = $false
     $memorySw = [System.Diagnostics.Stopwatch]::StartNew()
 
     if ($script:MemoryEnabled) {
         try {
-            $memoryNote = Invoke-QwenMemoryNote $turnId $Prompt $FinalContent $Route
-
-            if (-not [string]::IsNullOrWhiteSpace($memoryNote.Text)) {
+            if ($null -ne $memoryNote -and
+                -not [string]::IsNullOrWhiteSpace([string]$memoryNote.Text)) {
                 Append-JsonLine $script:PendingNotesPath ([ordered]@{
                     turn_id = $turnId
                     timestamp = (Get-Date).ToString('o')
-                    note = $memoryNote.Text
+                    note = [string]$memoryNote.Text
                 })
             }
 
+            # Preserve v9.1.3 cadence: every persisted turn advances the
+            # compaction counter, even when the current micro-note is empty.
             $script:RuntimeState.completed_since_compaction =
                 [int]$script:RuntimeState.completed_since_compaction + 1
 
@@ -719,7 +720,7 @@ function Persist-TurnAndMemory(
 
             Save-RuntimeState
         } catch {
-            $memoryError = "memory note failed: $($_.Exception.Message)"
+            $memoryError = "single-pass memory persistence failed: $($_.Exception.Message)"
         }
     }
 
@@ -762,16 +763,10 @@ function Persist-TurnAndMemory(
             bias_signals = @()
         }
 
+        $trace['memory_note_source'] = 'single-pass'
         if ($null -ne $memoryNote) {
-            $trace['memory_note'] = $memoryNote.Text
-        }
-
-        # v9.2-dev shadow observation: parse the note emitted in the answer pass,
-        # but keep the separate v9.1.3 extractor authoritative until regression
-        # tests confirm equivalent semantics.
-        if ($null -ne $InlineMemoryNote) {
-            $trace['single_pass_note'] = [string]$InlineMemoryNote.Text
-            $trace['single_pass_note_parse_status'] = [string]$InlineMemoryNote.ParseStatus
+            $trace['memory_note'] = [string]$memoryNote.Text
+            $trace['memory_note_parse_status'] = [string]$memoryNote.ParseStatus
         }
 
         if ([bool]$script:Config.ResearchLogging.IncludeRawText) {
@@ -780,12 +775,7 @@ function Persist-TurnAndMemory(
             $trace['frontier_raw'] = $FrontierResult
             $trace['final_answer'] = $FinalContent
             $trace['memory_note_raw'] = if ($null -ne $memoryNote) {
-                $memoryNote.Raw
-            } else {
-                $null
-            }
-            $trace['single_pass_note_raw'] = if ($null -ne $InlineMemoryNote) {
-                [string]$InlineMemoryNote.Raw
+                [string]$memoryNote.Raw
             } else {
                 $null
             }
