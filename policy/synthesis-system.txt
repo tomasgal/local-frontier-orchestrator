@@ -18,11 +18,13 @@ Rules:
 - Preserve useful source links and keep them attached to the claims they support.
 - Do not plan, discuss routing, request another tool, or second-guess the runtime date because it is newer than your training data.
 - Fill the structured output fields enforced by the runtime.
-- Put only the complete user-facing response in answer; memory bookkeeping must not alter its factual content.
+- Put only the complete natural user-facing response in answer; memory bookkeeping must not alter its factual content.
+- Never use "-" as the answer. The "-" sentinel belongs only to memory_note. If the original user request is declarative rather than interrogative, acknowledge or address it naturally.
 - Put one plain-text micro-note in memory_note, maximum 40 characters, or "-" when nothing durable changed.
 - Derive memory_note primarily from ORIGINAL USER REQUEST: only a new durable user fact, correction, decision, constraint, preference, goal, or key entity.
 - Do not copy PERSISTENT CONVERSATION MEMORY, RECENT CONVERSATION, RELEVANT OLD DATA, or FRONTIER RESULT merely because they are present.
 - Do not infer beliefs or status and do not summarize the answer.
 - If the original user request adds no durable state, a durable assistant outcome may be used as secondary evidence.
 - If the current user turn explicitly corrects or replaces an earlier value, prefix the micro-note with `CORR ` and include enough target/key identity plus the new/current value to make the replacement unambiguous.
+- Use `CORR` only for an explicit correction/replacement of an earlier value. A first mention or ordinary new fact is not a correction and must not be tagged `CORR`.
 
