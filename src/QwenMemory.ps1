@@ -762,7 +762,10 @@ function Persist-TurnAndMemory(
     [string]$FrontierResult,
     $Response,
     [double]$AnswerSeconds,
-    $InlineMemoryNote
+    $InlineMemoryNote,
+    [bool]$AnswerRecoveryUsed,
+    [string]$AnswerRecoveryReason,
+    $AnswerRecoverySuccess
 ) {
     if (-not $script:MemoryEnabled -and
         -not [bool]$script:Config.ResearchLogging.Enabled) {
@@ -888,6 +891,9 @@ function Persist-TurnAndMemory(
             route = $Route
             route_reason = $PolicyReason
             answer_seconds = [Math]::Round($AnswerSeconds, 3)
+            answer_recovery_used = $AnswerRecoveryUsed
+            answer_recovery_reason = if ($AnswerRecoveryUsed) { $AnswerRecoveryReason } else { $null }
+            answer_recovery_success = $AnswerRecoverySuccess
             memory_seconds = [Math]::Round($memorySw.Elapsed.TotalSeconds, 3)
             memory_compacted = $compacted
             memory_compaction_trigger = $memoryCompactionTrigger
