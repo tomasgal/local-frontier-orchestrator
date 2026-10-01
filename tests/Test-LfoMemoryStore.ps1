@@ -4,6 +4,26 @@
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$syntaxFiles = @(
+    (Join-Path $repoRoot 'src\LfoStructuredMemory.ps1'),
+    (Join-Path $repoRoot 'src\LfoMemoryStore.ps1'),
+    (Join-Path $repoRoot 'src\QwenMemory.ps1'),
+    (Join-Path $repoRoot 'src\QwenChat.ps1')
+)
+foreach ($syntaxFile in $syntaxFiles) {
+    $tokens = $null
+    $errors = $null
+    [void][Management.Automation.Language.Parser]::ParseFile(
+        $syntaxFile,
+        [ref]$tokens,
+        [ref]$errors
+    )
+    if (@($errors).Count -gt 0) {
+        throw ("PowerShell syntax error in {0}: {1}" -f $syntaxFile, (($errors | ForEach-Object Message) -join '; '))
+    }
+}
+
+. (Join-Path $repoRoot 'src\LfoStructuredMemory.ps1')
 . (Join-Path $repoRoot 'src\LfoMemoryStore.ps1')
 
 $root = Join-Path $env:TEMP ('LFO-v9.4-l2-sqlite-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -176,6 +196,79 @@ ORDER BY id;
         throw "Expected surface-form history for GTX1050; got $($gpuNames.Count) names."
     }
 
+    # Runtime-equivalent structured apply: one dense turn, one transaction.
+    $applyParsed = ConvertFrom-LfoStructuredMemoryOps @(
+        [pscustomobject]@{
+            op = 'SET_INTEGER'
+            subject = 'Core'
+            subject_type = 'computer'
+            predicate = 'ram_gb'
+            target = '64'
+            target_entity_type = ''
+        },
+        [pscustomobject]@{
+            op = 'ADD_RELATION'
+            subject = 'Core'
+            subject_type = 'computer'
+            predicate = 'has_gpu'
+            target = 'GTX1050'
+            target_entity_type = 'gpu'
+        },
+        [pscustomobject]@{
+            op = 'SET_TEXT'
+            subject = 'GTX1050'
+            subject_type = 'gpu'
+            predicate = 'vendor'
+            target = 'NVIDIA'
+            target_entity_type = ''
+        }
+    ) 6
+    $applyResult = Apply-LfoStructuredMemoryOps $store $applyParsed 40 'conversation:3'
+    if ($applyResult.Status -ne 'applied' -or $applyResult.AppliedCount -ne 3) {
+        throw ('Structured apply failed: ' + ($applyResult | ConvertTo-Json -Depth 8 -Compress))
+    }
+    $appliedFacts = @(Invoke-LfoSqliteQuery $store @'
+SELECT id
+FROM facts
+WHERE scope_id = 'conversation:3'
+  AND valid_to_turn IS NULL;
+'@)
+    if ($appliedFacts.Count -ne 3) {
+        throw "Expected 3 current facts in structured apply scope; got $($appliedFacts.Count)."
+    }
+
+    # Fail closed: one rejected op prevents the valid sibling from being written.
+    $rejectParsed = ConvertFrom-LfoStructuredMemoryOps @(
+        [pscustomobject]@{
+            op = 'SET_TEXT'
+            subject = 'Core'
+            subject_type = 'computer'
+            predicate = 'os'
+            target = 'Windows 11'
+            target_entity_type = ''
+        },
+        [pscustomobject]@{
+            op = 'SET_INTEGER'
+            subject = 'Core'
+            subject_type = 'computer'
+            predicate = 'ram_gb'
+            target = 'not-a-number'
+            target_entity_type = ''
+        }
+    ) 6
+    $rejectResult = Apply-LfoStructuredMemoryOps $store $rejectParsed 41 'conversation:4'
+    if ($rejectResult.Status -ne 'rejected' -or $rejectResult.AppliedCount -ne 0 -or $rejectResult.RejectedCount -ne 1) {
+        throw ('Structured reject policy failed: ' + ($rejectResult | ConvertTo-Json -Depth 8 -Compress))
+    }
+    $rejectedScopeFacts = @(Invoke-LfoSqliteQuery $store @'
+SELECT id
+FROM facts
+WHERE scope_id = 'conversation:4';
+'@)
+    if ($rejectedScopeFacts.Count -ne 0) {
+        throw "Fail-closed structured set wrote $($rejectedScopeFacts.Count) facts."
+    }
+
     # Scope isolation: the same logical key can have independent current state.
     Start-LfoMemoryTransaction $store
     try {
@@ -215,6 +308,11 @@ ORDER BY id;
         ScopeB = $scopeBValue[0].Value
         AliasSameEntity = ($gpuAlias1 -eq $gpuAfterRestart -and $gpuAlias2 -eq $gpuAfterRestart)
         EntityNameRows = $gpuNames.Count
+        StructuredApply = $applyResult.Status
+        StructuredAppliedCount = $applyResult.AppliedCount
+        RejectedSet = $rejectResult.Status
+        RejectedScopeFacts = $rejectedScopeFacts.Count
+        SyntaxChecked = $true
         Database = $dbPath
         ProductionMemoryTouched = $false
     } | Format-List
