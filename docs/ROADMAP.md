@@ -18,8 +18,9 @@ This roadmap describes engineering directions, not release commitments.
 
 - Keep hard freshness/capability gates intentionally narrow.
 - v9.1.3 memory baseline is validated on the constrained CPU-only notebook: 0–40 char user-delta notes, five-step 0–160 char normalized compaction, restart continuity, and isolated exact historical retrieval all passed.
-- Start v9.2 performance work with **single-pass micro-memory**: produce the bounded micro-note inside the existing LOCAL answer or post-frontier synthesis inference and let the wrapper strip/store it, avoiding a second local-model call on every completed turn.
-- Preserve v9.1.3 memory semantics, raw-history authority, correction handling, and traceability while measuring the latency gain.
+- v9.2 single-pass micro-memory is validated on the constrained CPU-only notebook: the bounded note is produced inside the existing LOCAL answer or post-frontier synthesis inference, eliminating the separate per-turn memory-model call.
+- Ordinary memory persistence dropped from roughly 18–21 seconds in the v9.1.3 baseline to commonly about 0.01–0.05 seconds; five-turn compaction remains a separate inference at roughly 19 seconds.
+- Preserve raw-history authority, exact retrieval, restart continuity, correction handling, and append-only research traces while evaluating single-pass semantic quality over longer real use rather than tuning for perfect fixed-benchmark accuracy.
 - Benchmark host-capacity reductions separately from the semantic change (for example smaller context/recent/retrieval budgets on constrained CPU-only hosts).
 - Prevent internal retrieval turn markers such as `T34` from leaking into user-facing answers.
 - Evaluate routing and synthesis over longer-term real use rather than a tiny prompt set.
