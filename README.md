@@ -1,6 +1,8 @@
 # Local Frontier Orchestrator
 
-**Status:** experimental / research prototype (`v0.1-alpha`)
+**Status:** experimental / research prototype (`v0.1-alpha`) · **Build:** `main v9.1.3` · **Active dev:** `v9.3-dev1` (`pressure-compaction`)
+
+<!-- Build marker maintenance: update the line above whenever the runtime/project version advances (for example v9.x.x -> v9.x.x+1). For smaller meaningful changes that do not warrant a version bump, keep the current version and update or append a short 1–3 word descriptor in this line. Trivial edits do not require a marker change. -->
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
