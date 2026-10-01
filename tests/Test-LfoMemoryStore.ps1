@@ -60,7 +60,7 @@ WHERE c.entity_type = 'computer'
 
     $schema = @(Invoke-LfoSqliteQuery $store "SELECT value FROM meta WHERE key = 'schema_version';")[0]
 
-    if ($schema.value -ne '1') { throw "Unexpected schema version: $($schema.value)" }
+    if ($schema.value -ne '2') { throw "Unexpected schema version: $($schema.value)" }
     if ($result.Count -ne 1 -or $result[0].computer -ne 'Core') {
         throw ('Unexpected relational query result: ' + ($result | ConvertTo-Json -Compress))
     }
@@ -161,6 +161,24 @@ WHERE s.canonical_name = ?1
         throw ('Restart persistence failed for relation: ' + ($relationAfterRestart | ConvertTo-Json -Compress))
     }
 
+    # Scope isolation: the same logical key can have independent current state.
+    Start-LfoMemoryTransaction $store
+    try {
+        $scopeA = Set-LfoMemoryAttribute $store 'ORION' 'os' 'Ubuntu 24.04' 30 'server' 'conversation:1'
+        $scopeB = Set-LfoMemoryAttribute $store 'ORION' 'os' 'Debian 13' 1 'server' 'conversation:2'
+        Complete-LfoMemoryTransaction $store
+    } catch {
+        Undo-LfoMemoryTransaction $store
+        throw
+    }
+
+    $scopeAValue = @(Get-LfoMemoryCurrentAttribute $store 'ORION' 'os' 'conversation:1')
+    $scopeBValue = @(Get-LfoMemoryCurrentAttribute $store 'ORION' 'os' 'conversation:2')
+    if ($scopeAValue.Count -ne 1 -or $scopeAValue[0].Value -ne 'Ubuntu 24.04' -or
+        $scopeBValue.Count -ne 1 -or $scopeBValue[0].Value -ne 'Debian 13') {
+        throw 'L2 scope isolation failed.'
+    }
+
     [pscustomobject]@{
         PASS = $true
         SQLite = $version
@@ -178,6 +196,8 @@ WHERE s.canonical_name = ?1
         RelationDuplicate = $relationDuplicate.Status
         RestartAttribute = $afterRestart[0].Value
         RestartRelation = $relationAfterRestart[0].object
+        ScopeA = $scopeAValue[0].Value
+        ScopeB = $scopeBValue[0].Value
         Database = $dbPath
         ProductionMemoryTouched = $false
     } | Format-List
