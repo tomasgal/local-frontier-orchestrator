@@ -13,7 +13,7 @@ $syntaxFiles = @(
 foreach ($syntaxFile in $syntaxFiles) {
     $tokens = $null
     $errors = $null
-    [void][Management.Automation.Language.Parser]::ParseFile(
+    [void][System.Management.Automation.Language.Parser]::ParseFile(
         $syntaxFile,
         [ref]$tokens,
         [ref]$errors
