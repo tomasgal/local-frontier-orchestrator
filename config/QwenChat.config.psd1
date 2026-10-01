@@ -21,7 +21,7 @@
         # micro-notes fill the pending buffer. Compact when either threshold
         # is reached. Exact data remains authoritative in raw JSONL logs.
         CompactionMaxPendingNotes = 4
-        CompactionMaxPendingChars = 120
+        CompactionMaxPendingChars = 108
         NoteMaxChars = 40
         StateMaxChars = 160
         NoteNumPredict = 32
