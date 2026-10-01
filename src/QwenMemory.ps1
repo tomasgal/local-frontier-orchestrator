@@ -547,6 +547,14 @@ For route LOCAL:
 For route FRONTIER, answer must be empty and memory_note must be "-".
 "@
 
+    $l2EvidenceScope = @'
+For route LOCAL, the L2 evidence is the CURRENT USER TURN as interpreted by this Qwen pass.
+For route FRONTIER, emit memory_ops=[] because the post-frontier synthesis pass owns L2 memory for the turn.
+Do not derive L2 operations from old STATE, PENDING, RELEVANT OLD DATA, or older turns unless the current turn explicitly re-establishes the fact.
+'@
+    $systemText += [Environment]::NewLine + [Environment]::NewLine +
+        $script:L2StructuredMemoryTemplate.Replace('{{L2_EVIDENCE_SCOPE}}', $l2EvidenceScope.Trim())
+
     $out = @(
         @{ role = 'system'; content = $systemText }
     )
