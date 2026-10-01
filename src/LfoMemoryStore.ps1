@@ -778,3 +778,79 @@ ORDER BY f.id DESC;
         }
     }
 }
+
+function Apply-LfoStructuredMemoryOps(
+    $Connection,
+    $ParsedOps,
+    [int64]$SourceTurn,
+    [string]$ScopeId
+) {
+    if ($SourceTurn -le 0) {
+        throw 'L2 persistence requires a positive SourceTurn.'
+    }
+    if ([string]::IsNullOrWhiteSpace($ScopeId)) {
+        throw 'L2 persistence requires a non-empty ScopeId.'
+    }
+
+    $valid = if ($null -eq $ParsedOps) { @() } else { @($ParsedOps.Valid) }
+    $rejected = if ($null -eq $ParsedOps) { @() } else { @($ParsedOps.Rejected) }
+
+    # Fail closed for the whole turn. A partially interpreted dense turn is
+    # more dangerous than skipping L2 while L0 still retains the evidence.
+    if ($rejected.Count -gt 0) {
+        return [pscustomobject]@{
+            Status = 'rejected'
+            AppliedCount = 0
+            RejectedCount = $rejected.Count
+            Results = @()
+        }
+    }
+
+    if ($valid.Count -eq 0) {
+        return [pscustomobject]@{
+            Status = 'empty'
+            AppliedCount = 0
+            RejectedCount = 0
+            Results = @()
+        }
+    }
+
+    $results = @()
+    Start-LfoMemoryTransaction $Connection
+    try {
+        foreach ($op in $valid) {
+            switch ([string]$op.Op) {
+                'SET_TEXT' {
+                    $results += Set-LfoMemoryAttribute $Connection ([string]$op.Subject) ([string]$op.Predicate) ([string]$op.TypedValue) $SourceTurn ([string]$op.SubjectType) $ScopeId
+                }
+                'SET_INTEGER' {
+                    $results += Set-LfoMemoryAttribute $Connection ([string]$op.Subject) ([string]$op.Predicate) ([int64]$op.TypedValue) $SourceTurn ([string]$op.SubjectType) $ScopeId
+                }
+                'SET_REAL' {
+                    $results += Set-LfoMemoryAttribute $Connection ([string]$op.Subject) ([string]$op.Predicate) ([double]$op.TypedValue) $SourceTurn ([string]$op.SubjectType) $ScopeId
+                }
+                'SET_BOOLEAN' {
+                    $results += Set-LfoMemoryAttribute $Connection ([string]$op.Subject) ([string]$op.Predicate) ([bool]$op.TypedValue) $SourceTurn ([string]$op.SubjectType) $ScopeId
+                }
+                'ADD_RELATION' {
+                    $results += Add-LfoMemoryRelation $Connection ([string]$op.Subject) ([string]$op.Predicate) ([string]$op.Target) $SourceTurn ([string]$op.SubjectType) ([string]$op.TargetEntityType) $ScopeId
+                }
+                default {
+                    throw "Unsupported validated L2 op: $($op.Op)"
+                }
+            }
+        }
+
+        Complete-LfoMemoryTransaction $Connection
+    } catch {
+        try { Undo-LfoMemoryTransaction $Connection } catch {}
+        throw
+    }
+
+    return [pscustomobject]@{
+        Status = 'applied'
+        AppliedCount = $results.Count
+        RejectedCount = 0
+        Results = @($results)
+    }
+}
