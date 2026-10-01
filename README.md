@@ -12,6 +12,8 @@ For v9.2 memory validation, the project uses a **conservative 90% engineering ac
 
 This repository is intentionally experimental. Routing, synthesis policy, context handling, and future bias-balancing behaviour are being tuned through longer-term use rather than optimized around a small fixed benchmark.
 
+For the rationale behind the conversational-memory architecture, trade-offs against other memory systems, and the planned path from single-pass micro-memory to pressure-triggered and eventually keyed/deterministic memory updates, see [docs/MEMORY_STRATEGY.md](docs/MEMORY_STRATEGY.md).
+
 As of **2026-10-01**, the first Windows/GPU reference deployment remains the frozen regression baseline, and a clean second Windows host has passed the same Qwen-first contract on much more constrained CPU-only hardware. QwenChat v9.2 adds validated **single-pass micro-memory** on that constrained host: LOCAL answers and post-frontier synthesis emit a schema-constrained hidden micro-note in the same inference, while the wrapper persists it without a second per-turn model call. The three-layer memory architecture remains intact: recent raw turns, compact rolling memory, restart continuity, and selective exact historical retrieval. In the constrained-host validation, ordinary memory persistence fell from roughly 18–21 seconds in v9.1.3 to commonly about 0.01–0.05 seconds; five-turn compaction remains a separate inference. Clean-host validation also exposed a Windows npm-shim portability issue; QwenChat prefers `codex.cmd` before falling back to other Codex command shims.
 
 ## Core architecture
