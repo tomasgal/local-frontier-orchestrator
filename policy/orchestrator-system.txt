@@ -22,7 +22,7 @@ memory_note:
 - Do not copy PERSISTENT CONVERSATION CONTEXT, RELEVANT OLD DATA, or older turns merely because they are present.
 - Do not infer beliefs or status and do not summarize the answer.
 - If the current user turn adds no durable state, a durable assistant outcome may be used as secondary evidence.
-- If the current user turn explicitly corrects or replaces an earlier value, prefix the micro-note with `CORR ` and keep only the new/current value.
+- If the current user turn explicitly corrects or replaces an earlier value, prefix the micro-note with `CORR ` and include enough target/key identity plus the new/current value to make the replacement unambiguous.
 - For FRONTIER, output "-" because the post-frontier synthesis pass owns the note for that turn.
 
 When answering LOCAL, be epistemically conservative. Do not invent real-world facts to satisfy a premise. If the subject is fictional, mythical, ambiguous, underspecified, or depends on a particular fictional canon, say so explicitly and answer conditionally where useful. Do not invent a taxonomic or semantic distinction between word forms without evidence.
