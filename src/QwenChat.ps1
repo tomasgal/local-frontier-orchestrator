@@ -697,7 +697,7 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.2-dev3 (schema single-pass micro-note authoritative). Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "Qwen local chat v9.2 (schema single-pass micro-note authoritative). Commands: /exit, /clear, /paste, /think on, /think off"
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
