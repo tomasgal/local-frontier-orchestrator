@@ -21,6 +21,24 @@ $baseUri = [string]$config.BaseUri
 . (Join-Path $repoRoot 'src\LfoStructuredMemory.ps1')
 
 $policyTemplate = Get-Content -LiteralPath (Join-Path $repoRoot 'policy\l2-structured-memory.txt') -Raw -Encoding UTF8
+# Parser regression: the only tolerated malformed integer spelling is one
+# exact brace wrapper around an otherwise valid integer.
+$parserProbe = ConvertFrom-LfoStructuredMemoryOps @(
+    [pscustomobject]@{
+        op = 'SET_INTEGER'
+        subject = 'Core'
+        subject_type = 'computer'
+        predicate = 'ram_gb'
+        target = '{32}'
+        target_entity_type = ''
+    }
+) 6
+if (@($parserProbe.Valid).Count -ne 1 -or
+    [int64]$parserProbe.Valid[0].TypedValue -ne 32 -or
+    $parserProbe.Valid[0].Normalization -ne 'brace-wrapped-integer') {
+    throw 'Brace-wrapped integer parser regression failed.'
+}
+
 $schema = @{
     type = 'object'
     properties = @{
@@ -111,7 +129,7 @@ foreach ($case in $cases) {
         Write-Host "memory_ops: []"
     } else {
         $parsed.Valid |
-            Select-Object Op,Subject,SubjectType,Predicate,Target,TargetType,TargetEntityType |
+            Select-Object Op,Subject,SubjectType,Predicate,Target,TargetType,TargetEntityType,Normalization |
             Format-Table -AutoSize
     }
 
