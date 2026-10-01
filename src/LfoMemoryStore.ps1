@@ -792,16 +792,21 @@ function Apply-LfoStructuredMemoryOps(
         throw 'L2 persistence requires a non-empty ScopeId.'
     }
 
-    $valid = if ($null -eq $ParsedOps) { @() } else { @($ParsedOps.Valid) }
-    $rejected = if ($null -eq $ParsedOps) { @() } else { @($ParsedOps.Rejected) }
+    [object[]]$valid = @()
+    [object[]]$rejected = @()
+    if ($null -ne $ParsedOps) {
+        $valid = @($ParsedOps.Valid)
+        $rejected = @($ParsedOps.Rejected)
+    }
 
     # Fail closed for the whole turn. A partially interpreted dense turn is
     # more dangerous than skipping L2 while L0 still retains the evidence.
-    if ($rejected.Count -gt 0) {
+    # Keep Count checks array-stable under Windows PowerShell 5.1.
+    if (@($rejected).Count -gt 0) {
         return [pscustomobject]@{
             Status = 'rejected'
             AppliedCount = 0
-            RejectedCount = $rejected.Count
+            RejectedCount = @($rejected).Count
             Results = @()
         }
     }
