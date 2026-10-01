@@ -405,7 +405,7 @@ For route LOCAL:
 - Do not shorten, redirect, or reshape answer merely to make memory_note easier.
 - Use "-" when the current user turn adds no durable user state.
 - Ignore old STATE, PENDING, RELEVANT OLD DATA, and older turns when deciding memory_note.
-- Corrections store the new/current value.
+- If the current user turn explicitly corrects or replaces an earlier value, prefix memory_note with "CORR " and store only the new/current value.
 
 For route FRONTIER, answer must be empty and memory_note must be "-".
 "@
