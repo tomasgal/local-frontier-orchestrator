@@ -307,6 +307,145 @@ function Invoke-CodexReadOnly([string]$Prompt) {
     }
 }
 
+function Get-QwenLocalOutputFormat {
+    return @{
+        type = 'object'
+        properties = @{
+            route = @{
+                type = 'string'
+                enum = @('LOCAL', 'FRONTIER')
+            }
+            answer = @{
+                type = 'string'
+                description = 'For LOCAL: complete natural user-facing response; never use the - sentinel. For a declarative user fact, acknowledge naturally. For FRONTIER: empty.'
+            }
+            memory_note = @{
+                type = 'string'
+                maxLength = $script:MemoryNoteMaxChars
+                description = 'New durable delta from the current user turn only; max 40 chars; use - when empty. Use CORR only for an explicit correction/replacement of an earlier value, never for a first mention; include target/key plus the new value.'
+            }
+        }
+        required = @('route', 'answer', 'memory_note')
+        additionalProperties = $false
+    }
+}
+
+function Get-QwenSynthesisOutputFormat {
+    return @{
+        type = 'object'
+        properties = @{
+            answer = @{
+                type = 'string'
+                description = 'Complete natural final user-facing answer; never use the - sentinel.'
+            }
+            memory_note = @{
+                type = 'string'
+                maxLength = $script:MemoryNoteMaxChars
+                description = 'New durable delta from ORIGINAL USER REQUEST only; max 40 chars; use - when empty. Use CORR only for an explicit correction/replacement of an earlier value, never for a first mention; include target/key plus the new value.'
+            }
+        }
+        required = @('answer', 'memory_note')
+        additionalProperties = $false
+    }
+}
+
+function Test-QwenInvalidFinalAnswer([AllowNull()][string]$Answer) {
+    return ([string]::IsNullOrWhiteSpace($Answer) -or $Answer.Trim() -eq '-')
+}
+
+function Get-QwenAnswerRecoveryOutputFormat {
+    return @{
+        type = 'object'
+        properties = @{
+            answer = @{
+                type = 'string'
+                description = 'Complete natural user-facing answer.'
+            }
+        }
+        required = @('answer')
+        additionalProperties = $false
+    }
+}
+
+function Get-QwenRecoveredAnswer([string]$Content) {
+    if ([string]::IsNullOrWhiteSpace($Content)) { return '' }
+    try {
+        $obj = $Content | ConvertFrom-Json -ErrorAction Stop
+        $names = @($obj.PSObject.Properties.Name)
+        if ($names.Count -ne 1 -or $names[0] -ne 'answer' -or
+            $obj.answer -isnot [string]) {
+            return ''
+        }
+        $answer = [string]$obj.answer
+        if (Test-QwenInvalidFinalAnswer $answer) { return '' }
+        return $answer.Trim()
+    } catch {
+        return ''
+    }
+}
+
+function ConvertFrom-QwenStructuredContent(
+    [string]$Content,
+    [switch]$ExpectRoute
+) {
+    if ([string]::IsNullOrWhiteSpace($Content)) {
+        return [pscustomobject]@{
+            Success = $false
+            Route = 'UNKNOWN'
+            Answer = ''
+            MemoryNote = [pscustomobject]@{
+                Raw = ''
+                Text = ''
+                ParseStatus = 'structured-missing'
+            }
+        }
+    }
+
+    try {
+        $obj = $Content | ConvertFrom-Json -ErrorAction Stop
+        $answer = [string]$obj.answer
+        $rawNote = [string]$obj.memory_note
+        $note = Clean-MicroText $rawNote $script:MemoryNoteMaxChars
+
+        $route = if ($ExpectRoute) { ([string]$obj.route).ToUpperInvariant() } else { 'LOCAL' }
+        if ($ExpectRoute -and $route -notin @('LOCAL', 'FRONTIER')) {
+            throw "Invalid structured route '$route'."
+        }
+
+        if ($route -eq 'FRONTIER') {
+            # The routing pass must not create conversational memory; the final
+            # post-frontier synthesis owns the note for this user turn.
+            $note = ''
+        }
+
+        return [pscustomobject]@{
+            Success = $true
+            Route = $route
+            Answer = $answer.Trim()
+            MemoryNote = [pscustomobject]@{
+                Raw = $rawNote
+                Text = $note
+                ParseStatus = $(if ([string]::IsNullOrWhiteSpace($note)) {
+                    'structured-empty'
+                } else {
+                    'structured-complete'
+                })
+            }
+        }
+    } catch {
+        return [pscustomobject]@{
+            Success = $false
+            Route = 'UNKNOWN'
+            Answer = ''
+            MemoryNote = [pscustomobject]@{
+                Raw = $Content
+                Text = ''
+                ParseStatus = 'structured-malformed'
+            }
+        }
+    }
+}
+
 function Invoke-QwenLocalApi {
     $bodyObj = @{
         model      = $Model
@@ -314,6 +453,7 @@ function Invoke-QwenLocalApi {
         think      = $script:ThinkEnabled
         stream     = $false
         keep_alive = '5m'
+        format     = (Get-QwenLocalOutputFormat)
         # Hardware/runtime placement (GPU/CPU, context length, threads) belongs
         # to the selected Ollama model profile. Keep only per-request generation
         # controls here so QwenChat does not override host-specific profiles.
@@ -330,6 +470,40 @@ function Invoke-QwenLocalApi {
     $body = $bodyObj | ConvertTo-Json -Depth 12 -Compress
     return Invoke-RestMethod -Uri "$BaseUri/api/chat" -Method Post `
         -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 600
+}
+
+function Invoke-QwenAnswerRecovery([string]$Prompt) {
+    # A rare answer-only retry. The first pass remains the sole source of
+    # memory_note, and this call cannot route or invoke Codex.
+    $systemText = 'Provide a complete user-facing answer to the most recent user message. Return only the answer field. If uncertain, say so plainly.'
+    $memoryBlock = Get-MemoryContextBlock $Prompt
+    if (-not [string]::IsNullOrWhiteSpace($memoryBlock)) {
+        $systemText += [Environment]::NewLine + [Environment]::NewLine +
+            'PERSISTENT CONVERSATION CONTEXT:' + [Environment]::NewLine + $memoryBlock
+    }
+    $recentMessages = @(Get-RecentConversationMessages)
+    if ($recentMessages.Count -eq 0 -or [string]$recentMessages[-1].role -ne 'user') {
+        $recentMessages += @{ role = 'user'; content = $Prompt }
+    }
+    $messages = @(@{ role = 'system'; content = $systemText }) + $recentMessages
+    $bodyObj = @{
+        model      = $Model
+        messages   = $messages
+        think      = $script:ThinkEnabled
+        stream     = $false
+        keep_alive = '5m'
+        format     = (Get-QwenAnswerRecoveryOutputFormat)
+        options    = @{
+            num_predict = $(if ($script:ThinkEnabled) {
+                [int]$script:Config.LocalGeneration.NumPredictThink
+            } else {
+                [int]$script:Config.LocalGeneration.NumPredictNormal
+            })
+            temperature = [double]$script:Config.LocalGeneration.Temperature
+        }
+    }
+    $body = $bodyObj | ConvertTo-Json -Depth 12 -Compress
+    return Invoke-RestMethod -Uri "$BaseUri/api/chat" -Method Post -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 600
 }
 
 function Invoke-QwenSynthesis([string]$OriginalPrompt, [string]$FrontierResult) {
@@ -360,6 +534,7 @@ $FrontierResult
         think      = $script:ThinkEnabled
         stream     = $false
         keep_alive = '5m'
+        format     = (Get-QwenSynthesisOutputFormat)
         options    = @{
             num_predict = $(if ($script:ThinkEnabled) {
                 [int]$script:Config.SynthesisGeneration.NumPredictThink
@@ -458,30 +633,68 @@ function Invoke-Qwen([string]$Prompt) {
     $frontierResult = $null
     $finalContent = $null
     $localRaw = $null
+    $inlineMemoryNote = $null
+    $answerRecoveryUsed = $false
+    $answerRecoveryReason = $null
+    $answerRecoverySuccess = $null
+    $explicitMemoryIntent = Test-ExplicitMemoryIntentPrompt $Prompt
+    $memoryRecoveryUsed = $false
+    $memoryRecoveryReason = $null
+    $memoryRecoverySuccess = $null
+    $memoryNoteSource = 'single-pass'
 
     if (-not [string]::IsNullOrWhiteSpace($policyReason)) {
         $route = 'FRONTIER'
         Write-Host ("`n[policy -> FRONTIER; reason={0}]" -f $policyReason) -ForegroundColor DarkCyan
     } else {
-        # No Ollama tool schema is exposed here. Qwen decides with a plain-text
-        # route marker and, on LOCAL, the same generation is already the answer.
+        # Qwen routes and answers in one schema-constrained generation. On
+        # LOCAL the same generation also carries the bounded memory micro-note.
         $r = Invoke-QwenLocalApi
         Show-QwenThinking $r
         $candidate = Get-CleanQwenContent $r
         $localRaw = $candidate
-        $route = Get-QwenRoute $candidate
+        $structured = ConvertFrom-QwenStructuredContent $candidate -ExpectRoute
 
-        if ($route -eq 'FRONTIER') {
-            Write-Host "`n[Qwen route -> FRONTIER]" -ForegroundColor DarkCyan
-        } elseif ($route -eq 'LOCAL') {
-            Write-Host "`n[Qwen route -> LOCAL]" -ForegroundColor DarkGray
-            $finalContent = Remove-QwenRouteMarker $candidate
+        if ($structured.Success) {
+            $route = [string]$structured.Route
+            if ($route -eq 'FRONTIER') {
+                Write-Host "`n[Qwen route -> FRONTIER]" -ForegroundColor DarkCyan
+            } else {
+                Write-Host "`n[Qwen route -> LOCAL]" -ForegroundColor DarkGray
+                $finalContent = [string]$structured.Answer
+                $inlineMemoryNote = $structured.MemoryNote
+                if (Test-QwenInvalidFinalAnswer $finalContent) {
+                    $answerRecoveryUsed = $true
+                    $answerRecoveryReason = if ($finalContent -eq '-') {
+                        'local-sentinel'
+                    } else {
+                        'local-empty'
+                    }
+                    $answerRecoverySuccess = $false
+                    Write-Host "[Qwen answer invalid; trying one LOCAL answer-only recovery.]" -ForegroundColor Yellow
+                    try {
+                        $recoveryResponse = Invoke-QwenAnswerRecovery $Prompt
+                        Show-QwenThinking $recoveryResponse
+                        $recoveredAnswer = Get-QwenRecoveredAnswer (Get-CleanQwenContent $recoveryResponse)
+                        if ([string]$recoveryResponse.done_reason -ne 'length' -and
+                            -not (Test-QwenInvalidFinalAnswer $recoveredAnswer)) {
+                            $finalContent = $recoveredAnswer
+                            $answerRecoverySuccess = $true
+                        }
+                    } catch {
+                        Write-Host "[Qwen answer recovery failed.]" -ForegroundColor Yellow
+                    }
+                    if (-not $answerRecoverySuccess) {
+                        $finalContent = 'The local model could not produce a usable answer. Please try again.'
+                    }
+                }
+            }
         } else {
-            # Fail closed on cost/escalation: malformed routing never triggers
-            # frontier automatically. Treat the generation as a local answer.
-            Write-Host "`n[Qwen route marker missing; fail-closed -> LOCAL]" -ForegroundColor Yellow
+            # Structured output failure must never trigger a frontier call.
+            Write-Host "`n[Qwen structured output malformed; fail-closed -> LOCAL]" -ForegroundColor Yellow
             $route = 'LOCAL'
-            $finalContent = Remove-QwenRouteMarker $candidate
+            $finalContent = $candidate
+            $inlineMemoryNote = $structured.MemoryNote
         }
     }
 
@@ -523,14 +736,75 @@ $recentContext
             $r = Invoke-QwenSynthesis $Prompt $frontierResult
             Show-QwenThinking $r
             $candidate = Get-CleanQwenContent $r
+            $structuredSynthesis = ConvertFrom-QwenStructuredContent $candidate
 
-            if (Test-UnfinishedSynthesis $r $candidate) {
-                Write-Host "`n[Qwen synthesis did not complete; showing the frontier result directly.]" -ForegroundColor Yellow
+            $invalidSynthesisAnswer = $structuredSynthesis.Success -and
+                (Test-QwenInvalidFinalAnswer ([string]$structuredSynthesis.Answer))
+            if (-not $structuredSynthesis.Success -or
+                [string]$r.done_reason -eq 'length' -or
+                (-not $invalidSynthesisAnswer -and
+                    (Test-UnfinishedSynthesis $r ([string]$structuredSynthesis.Answer)))) {
+                Write-Host "`n[Qwen synthesis did not complete cleanly; showing the frontier result directly.]" -ForegroundColor Yellow
                 $finalContent = $frontierResult
+                $inlineMemoryNote = $null
+            } elseif ($invalidSynthesisAnswer) {
+                Write-Host "`n[Qwen synthesis answer invalid; showing the frontier result directly.]" -ForegroundColor Yellow
+                $finalContent = $frontierResult
+                $inlineMemoryNote = $structuredSynthesis.MemoryNote
+                $answerRecoveryUsed = $true
+                $answerRecoveryReason = if ([string]$structuredSynthesis.Answer -eq '-') {
+                    'synthesis-sentinel'
+                } else {
+                    'synthesis-empty'
+                }
+                $answerRecoverySuccess = $true
             } else {
-                $finalContent = $candidate
+                $finalContent = [string]$structuredSynthesis.Answer
+                $inlineMemoryNote = $structuredSynthesis.MemoryNote
             }
         }
+    }
+
+    # Explicit storage requests are a wrapper-level invariant. Normal implicit
+    # memory remains single-pass; only an explicit request with an empty note
+    # gets one bounded memory-only extraction retry.
+    if ($script:MemoryEnabled -and $explicitMemoryIntent -and
+        ($null -eq $inlineMemoryNote -or
+            [string]::IsNullOrWhiteSpace([string]$inlineMemoryNote.Text))) {
+        $memoryRecoveryUsed = $true
+        $memoryRecoveryReason = 'explicit-intent-empty'
+        $memoryRecoverySuccess = $false
+        Write-Host "[Explicit memory intent; trying one memory-only recovery.]" -ForegroundColor Yellow
+
+        try {
+            $recoveredMemoryNote = Invoke-QwenMemoryNote `
+                -TurnId 0 `
+                -Prompt $Prompt `
+                -FinalContent ([string]$finalContent) `
+                -Route ([string]$route)
+
+            $inlineMemoryNote = $recoveredMemoryNote
+            $memoryNoteSource = 'explicit-intent-recovery'
+            if (-not [string]::IsNullOrWhiteSpace([string]$recoveredMemoryNote.Text)) {
+                $memoryRecoverySuccess = $true
+            }
+        } catch {
+            Write-Host "[Qwen memory recovery failed.]" -ForegroundColor Yellow
+        }
+
+        if (-not $memoryRecoverySuccess) {
+            $finalContent = 'The explicit memory request could not be persisted reliably. Please try again.'
+        }
+    }
+
+    # The malformed-output fallback can also be a raw "-". Never expose or
+    # persist it as an assistant answer.
+    if (-not [string]::IsNullOrWhiteSpace($finalContent) -and
+        $finalContent.Trim() -eq '-') {
+        $answerRecoveryUsed = $true
+        $answerRecoveryReason = 'raw-sentinel'
+        $answerRecoverySuccess = $false
+        $finalContent = 'The model did not produce a usable answer. Please try again.'
     }
 
     $sw.Stop()
@@ -571,7 +845,16 @@ $recentContext
             -LocalRaw $localRaw `
             -FrontierResult $frontierResult `
             -Response $r `
-            -AnswerSeconds $sw.Elapsed.TotalSeconds
+            -AnswerSeconds $sw.Elapsed.TotalSeconds `
+            -InlineMemoryNote $inlineMemoryNote `
+            -AnswerRecoveryUsed $answerRecoveryUsed `
+            -AnswerRecoveryReason $answerRecoveryReason `
+            -AnswerRecoverySuccess $answerRecoverySuccess `
+            -ExplicitMemoryIntent $explicitMemoryIntent `
+            -MemoryRecoveryUsed $memoryRecoveryUsed `
+            -MemoryRecoveryReason $memoryRecoveryReason `
+            -MemoryRecoverySuccess $memoryRecoverySuccess `
+            -MemoryNoteSource $memoryNoteSource
     }
 }
 
@@ -581,13 +864,13 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.1.3 (clean compaction + exact-data retrieval + research logging). Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "Qwen local chat v9.3-dev1 (pressure-triggered compaction). Commands: /exit, /clear, /paste, /think on, /think off"
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
 if ($script:MemoryEnabled) {
-    Write-Host ("Persistent memory: ON; recent turns={0}; compact every={1}; note<={2} chars; state<={3} chars" -f `
-        $script:MemoryRecentTurns, $script:MemoryCompactionEvery, $script:MemoryNoteMaxChars, $script:MemoryStateMaxChars)
+    Write-Host ("Persistent memory: ON; recent turns={0}; compact at pending>={1} notes or >={2} chars; note<={3} chars; state<={4} chars" -f `
+        $script:MemoryRecentTurns, $script:MemoryCompactionMaxPendingNotes, $script:MemoryCompactionMaxPendingChars, $script:MemoryNoteMaxChars, $script:MemoryStateMaxChars)
     Write-Host ("Exact-data retrieval: max {0} items / {1} chars" -f `
         $script:MemoryRetrievalMaxItems, $script:MemoryRetrievalMaxChars)
     Write-Host ("Memory/log path: {0}" -f $script:DataRoot)

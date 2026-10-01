@@ -1,8 +1,10 @@
 # Persistent conversation memory and research logging
 
+For design rationale, trade-offs, comparison with other memory approaches, and future direction, see [MEMORY_STRATEGY.md](MEMORY_STRATEGY.md).
+
 ## Goals
 
-QwenChat v9.1.3 treats the terminal as one continuing conversation rather than a set of disposable process sessions.
+QwenChat v9.2 treats the terminal as one continuing conversation rather than a set of disposable process sessions.
 
 - `/exit` stops the process and preserves memory.
 - restarting QwenChat restores bounded recent raw turns plus persistent memory.
@@ -43,15 +45,15 @@ The rolling state answers "what are we doing?" while the raw store answers "what
 
 ## Per-turn micro-memory
 
-The post-turn memory call receives only bounded portions of:
+v9.2 removes the separate post-turn local-model inference used by v9.1.3. The bounded micro-note is now emitted inside the **existing answer pass**:
 
-- the **new user turn as primary evidence**;
-- a shorter assistant outcome as secondary evidence;
-- the route marker.
+- LOCAL turns return a schema-constrained object containing `route`, the user-facing `answer`, and `memory_note`;
+- FRONTIER turns leave the routing-pass note empty, and the post-frontier synthesis pass returns the final `answer` plus `memory_note`;
+- the wrapper strips the structured envelope, displays only `answer`, and persists the cleaned 0–40 character note.
 
-It does not receive the whole previous memory or frontier payload. The extractor records the **new conversational delta**, not a summary of the full turn. In v9.1.2 the same user-delta-first semantics are expressed with a shorter policy prompt to reduce repeated prompt-evaluation cost on slow CPU hosts. Output is plain text rather than JSON and is hard-capped to 40 characters by the wrapper.
+The semantic contract remains user-delta-first: the note should primarily represent new durable user state rather than summarize the answer or copy older memory. Explicit replacements/corrections carry a `CORR ` marker plus enough target identity to let compaction supersede the obsolete value.
 
-This keeps maximum-quality per-turn semantic extraction while greatly reducing prompt and generation cost on slow CPU-only hosts.
+The output schema guarantees structure, not perfect semantic extraction. The note is still produced by a small stochastic model, so occasional misses or over-tagging are expected. Raw conversation JSONL remains authoritative, and exact historical retrieval remains the correctness backstop.
 
 ## Compaction
 
@@ -126,7 +128,23 @@ recent raw turns
 
 The test also exposed one presentation issue rather than a retrieval failure: internal historical turn markers (for example `T34`) can be echoed in user-facing prose. v9.2 should suppress those internal identifiers.
 
-The next performance target is **single-pass micro-memory**. The current v9.1.3 baseline deliberately uses a second local-model inference after each answer to extract the micro-note; on constrained CPU-only hardware that extra call is operationally significant. v9.2 should attempt to emit a bounded hidden/structured note from the existing LOCAL answer or post-frontier synthesis pass, with the wrapper stripping it from the user-visible answer and persisting it without changing the three-layer memory semantics.
+## Validated v9.2 single-pass memory — 2026-10-01
+
+The v9.2 branch was validated on the same constrained CPU-only Windows notebook with `qwen3.5:4b-q4_K_M` at a 5120 context hint.
+
+Observed results:
+
+- the separate v9.1.3 per-turn memory inference was removed;
+- ordinary post-answer memory persistence commonly measured about **0.01–0.05 seconds** instead of roughly **18–21 seconds** for the former extractor, with occasional local I/O outliers around 1–2 seconds;
+- every fifth completed turn still performs a separate compaction inference, observed around **19 seconds** in the v9.2 tests;
+- LOCAL structured output produced clean user-facing answers while keeping the note hidden from the terminal;
+- FRONTIER synthesis also produced an authoritative single-pass note without adding a second memory inference;
+- explicit correction notes now preserve an unambiguous `CORR <target>: <new value>`-style signal for compaction;
+- restart continuity passed: a fact persisted before `/exit` was recalled correctly after a new QwenChat process loaded the same state;
+- internal pending-note turn IDs are retained in JSONL for auditability but are no longer fed to the semantic compactor, preventing artifacts such as `T2` from leaking into rolling state.
+
+This is a pragmatic conversational memory design, not a zero-error semantic extractor. The **90% figure is an engineering acceptance floor, not an estimate of the implementation's observed reliability**. The heterogeneous smoke suite performed materially better than that floor, while still exposing occasional semantic misses such as an omitted durable note or an unnecessary correction tag. The suite is intentionally too small and non-random to justify a statistical claim such as 99% reliability. The design therefore avoids prompt-tuning toward benchmark perfection while retaining authoritative raw history and exact retrieval as backstops for lossy micro-memory.
+
 
 ## Research trace
 
