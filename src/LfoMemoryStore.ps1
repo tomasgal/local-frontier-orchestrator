@@ -410,3 +410,278 @@ function Complete-LfoMemoryTransaction($Connection) {
 function Undo-LfoMemoryTransaction($Connection) {
     Invoke-LfoSqliteExec $Connection 'ROLLBACK;'
 }
+
+
+# Logical L2 operations -------------------------------------------------------
+# These functions define the stable fact-operation contract above SQLite.
+# They deliberately avoid exposing SQL or row-layout details to QwenChat.
+
+function Get-LfoMemoryEntityId(
+    $Connection,
+    [string]$CanonicalName,
+    [string]$EntityType = $null,
+    [Nullable[int64]]$SourceTurn = $null
+) {
+    if ([string]::IsNullOrWhiteSpace($CanonicalName)) {
+        throw 'CanonicalName must not be empty.'
+    }
+
+    Invoke-LfoSqliteNonQuery $Connection @'
+INSERT INTO entities(canonical_name, entity_type, created_turn)
+VALUES (?1, ?2, ?3)
+ON CONFLICT(canonical_name) DO UPDATE SET
+    entity_type = COALESCE(entities.entity_type, excluded.entity_type);
+'@ @($CanonicalName.Trim(), $EntityType, $SourceTurn)
+
+    $row = @(Invoke-LfoSqliteQuery $Connection @'
+SELECT id
+FROM entities
+WHERE canonical_name = ?1
+LIMIT 1;
+'@ @($CanonicalName.Trim()))
+
+    if ($row.Count -ne 1) {
+        throw "Entity lookup failed after upsert: $CanonicalName"
+    }
+
+    return [int64]$row[0].id
+}
+
+function ConvertTo-LfoMemoryLiteral($Value) {
+    if ($null -eq $Value) {
+        throw 'L2 literal values must not be null. Use a retract operation instead.'
+    }
+
+    if ($Value -is [bool]) {
+        return [pscustomobject]@{
+            Type = 'boolean'
+            Text = $null
+            Integer = $(if ($Value) { [int64]1 } else { [int64]0 })
+            Real = $null
+        }
+    }
+
+    if ($Value -is [byte] -or $Value -is [int16] -or $Value -is [int32] -or $Value -is [int64] -or
+        $Value -is [uint16] -or $Value -is [uint32]) {
+        return [pscustomobject]@{
+            Type = 'integer'
+            Text = $null
+            Integer = [int64]$Value
+            Real = $null
+        }
+    }
+
+    if ($Value -is [single] -or $Value -is [double] -or $Value -is [decimal]) {
+        return [pscustomobject]@{
+            Type = 'real'
+            Text = $null
+            Integer = $null
+            Real = [double]$Value
+        }
+    }
+
+    return [pscustomobject]@{
+        Type = 'text'
+        Text = [string]$Value
+        Integer = $null
+        Real = $null
+    }
+}
+
+function Test-LfoSameLiteralFact(
+    $Connection,
+    [int64]$SubjectEntityId,
+    [string]$Predicate,
+    $Literal
+) {
+    $rows = @(Invoke-LfoSqliteQuery $Connection @'
+SELECT id
+FROM current_facts
+WHERE subject_entity_id = ?1
+  AND predicate = ?2
+  AND literal_type = ?3
+  AND (
+       (?3 = 'text'    AND value_text = ?4) OR
+       (?3 = 'integer' AND value_integer = ?5) OR
+       (?3 = 'boolean' AND value_integer = ?5) OR
+       (?3 = 'real'    AND value_real = ?6)
+  )
+LIMIT 1;
+'@ @(
+        $SubjectEntityId,
+        $Predicate,
+        $Literal.Type,
+        $Literal.Text,
+        $Literal.Integer,
+        $Literal.Real
+    ))
+
+    return ($rows.Count -gt 0)
+}
+
+function Set-LfoMemoryAttribute(
+    $Connection,
+    [string]$Subject,
+    [string]$Predicate,
+    $Value,
+    [Nullable[int64]]$SourceTurn = $null,
+    [string]$EntityType = $null
+) {
+    if ([string]::IsNullOrWhiteSpace($Predicate)) {
+        throw 'Predicate must not be empty.'
+    }
+
+    $subjectId = Get-LfoMemoryEntityId $Connection $Subject $EntityType $SourceTurn
+    $literal = ConvertTo-LfoMemoryLiteral $Value
+    $turn = if ($null -eq $SourceTurn) { $null } else { [int64]$SourceTurn }
+
+    if (Test-LfoSameLiteralFact $Connection $subjectId $Predicate $literal) {
+        return [pscustomobject]@{
+            Operation = 'set_attribute'
+            Status = 'duplicate'
+            Subject = $Subject
+            Predicate = $Predicate
+            Value = $Value
+            SourceTurn = $turn
+        }
+    }
+
+    Invoke-LfoSqliteNonQuery $Connection @'
+UPDATE facts
+SET valid_to_turn = ?3
+WHERE subject_entity_id = ?1
+  AND predicate = ?2
+  AND valid_to_turn IS NULL;
+'@ @($subjectId, $Predicate, $turn)
+
+    Invoke-LfoSqliteNonQuery $Connection @'
+INSERT INTO facts(
+    subject_entity_id,
+    predicate,
+    literal_type,
+    value_text,
+    value_integer,
+    value_real,
+    valid_from_turn,
+    source_turn
+)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7);
+'@ @(
+        $subjectId,
+        $Predicate,
+        $literal.Type,
+        $literal.Text,
+        $literal.Integer,
+        $literal.Real,
+        $turn
+    )
+
+    return [pscustomobject]@{
+        Operation = 'set_attribute'
+        Status = 'written'
+        Subject = $Subject
+        Predicate = $Predicate
+        Value = $Value
+        SourceTurn = $turn
+    }
+}
+
+function Add-LfoMemoryRelation(
+    $Connection,
+    [string]$Subject,
+    [string]$Predicate,
+    [string]$Object,
+    [Nullable[int64]]$SourceTurn = $null,
+    [string]$SubjectType = $null,
+    [string]$ObjectType = $null
+) {
+    if ([string]::IsNullOrWhiteSpace($Predicate)) {
+        throw 'Predicate must not be empty.'
+    }
+
+    $subjectId = Get-LfoMemoryEntityId $Connection $Subject $SubjectType $SourceTurn
+    $objectId = Get-LfoMemoryEntityId $Connection $Object $ObjectType $SourceTurn
+    $turn = if ($null -eq $SourceTurn) { $null } else { [int64]$SourceTurn }
+
+    $existing = @(Invoke-LfoSqliteQuery $Connection @'
+SELECT id
+FROM current_facts
+WHERE subject_entity_id = ?1
+  AND predicate = ?2
+  AND object_entity_id = ?3
+LIMIT 1;
+'@ @($subjectId, $Predicate, $objectId))
+
+    if ($existing.Count -gt 0) {
+        return [pscustomobject]@{
+            Operation = 'add_relation'
+            Status = 'duplicate'
+            Subject = $Subject
+            Predicate = $Predicate
+            Object = $Object
+            SourceTurn = $turn
+        }
+    }
+
+    Invoke-LfoSqliteNonQuery $Connection @'
+INSERT INTO facts(
+    subject_entity_id,
+    predicate,
+    object_entity_id,
+    valid_from_turn,
+    source_turn
+)
+VALUES (?1, ?2, ?3, ?4, ?4);
+'@ @($subjectId, $Predicate, $objectId, $turn)
+
+    return [pscustomobject]@{
+        Operation = 'add_relation'
+        Status = 'written'
+        Subject = $Subject
+        Predicate = $Predicate
+        Object = $Object
+        SourceTurn = $turn
+    }
+}
+
+function Get-LfoMemoryCurrentAttribute(
+    $Connection,
+    [string]$Subject,
+    [string]$Predicate
+) {
+    $rows = @(Invoke-LfoSqliteQuery $Connection @'
+SELECT
+    e.canonical_name AS subject,
+    f.predicate,
+    f.literal_type,
+    f.value_text,
+    f.value_integer,
+    f.value_real,
+    f.valid_from_turn,
+    f.source_turn
+FROM current_facts f
+JOIN entities e ON e.id = f.subject_entity_id
+WHERE e.canonical_name = ?1
+  AND f.predicate = ?2
+  AND f.literal_type IS NOT NULL
+ORDER BY f.id DESC;
+'@ @($Subject, $Predicate))
+
+    foreach ($row in $rows) {
+        $value = switch ([string]$row.literal_type) {
+            'integer' { [int64]$row.value_integer }
+            'boolean' { ([int64]$row.value_integer -ne 0) }
+            'real'    { [double]$row.value_real }
+            default   { [string]$row.value_text }
+        }
+
+        [pscustomobject]@{
+            Subject = [string]$row.subject
+            Predicate = [string]$row.predicate
+            ValueType = [string]$row.literal_type
+            Value = $value
+            ValidFromTurn = $row.valid_from_turn
+            SourceTurn = $row.source_turn
+        }
+    }
+}
