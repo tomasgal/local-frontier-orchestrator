@@ -126,6 +126,34 @@ function Clean-MicroText([string]$Text, [int]$MaxChars) {
     return $clean
 }
 
+function Test-ExplicitCorrectionPrompt([string]$Prompt) {
+    if ([string]::IsNullOrWhiteSpace($Prompt)) { return $false }
+
+    $patterns = @(
+        '(?i)\b(oprava|opravujem|opravme|correction|correcting)\b',
+        '(?i)\b(namiesto|instead\s+of|rather\s+than)\b',
+        '(?i)\b(už\s+nie|uz\s+nie|no\s+longer)\b',
+        '(?i)\b(nie|not)\b.{0,80}\b(ale|but)\b',
+        '(?i)\b(zmen\p{L}*|switch(?:ed)?|replac\p{L}*)\b.{0,80}\b(na|to|with)\b'
+    )
+
+    foreach ($pattern in $patterns) {
+        if ($Prompt -match $pattern) { return $true }
+    }
+    return $false
+}
+
+function Normalize-MemoryNoteForPrompt([string]$Note, [string]$Prompt) {
+    if ([string]::IsNullOrWhiteSpace($Note)) { return '' }
+
+    $clean = Clean-MicroText $Note $script:MemoryNoteMaxChars
+    if ($clean -match '(?i)^\s*CORR\s+' -and
+        -not (Test-ExplicitCorrectionPrompt $Prompt)) {
+        $clean = [regex]::Replace($clean, '(?i)^\s*CORR\s+', '').Trim()
+    }
+    return $clean
+}
+
 function Get-WorkingMemoryRaw {
     if (-not (Test-Path -LiteralPath $script:WorkingMemoryPath)) { return '' }
     $raw = Get-Content -LiteralPath $script:WorkingMemoryPath -Raw -Encoding UTF8
@@ -695,12 +723,18 @@ function Persist-TurnAndMemory(
 
     if ($script:MemoryEnabled) {
         try {
-            if ($null -ne $memoryNote -and
-                -not [string]::IsNullOrWhiteSpace([string]$memoryNote.Text)) {
+            $modelNoteText = if ($null -ne $memoryNote) {
+                [string]$memoryNote.Text
+            } else {
+                ''
+            }
+            $noteText = Normalize-MemoryNoteForPrompt $modelNoteText $Prompt
+
+            if (-not [string]::IsNullOrWhiteSpace($noteText)) {
                 Append-JsonLine $script:PendingNotesPath ([ordered]@{
                     turn_id = $turnId
                     timestamp = (Get-Date).ToString('o')
-                    note = [string]$memoryNote.Text
+                    note = $noteText
                 })
             }
 
@@ -768,7 +802,8 @@ function Persist-TurnAndMemory(
 
         $trace['memory_note_source'] = 'single-pass'
         if ($null -ne $memoryNote) {
-            $trace['memory_note'] = [string]$memoryNote.Text
+            $trace['memory_note'] = $noteText
+            $trace['memory_note_model'] = [string]$memoryNote.Text
             $trace['memory_note_parse_status'] = [string]$memoryNote.ParseStatus
         }
 
