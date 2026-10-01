@@ -315,10 +315,14 @@ function Get-QwenLocalOutputFormat {
                 type = 'string'
                 enum = @('LOCAL', 'FRONTIER')
             }
-            answer = @{ type = 'string' }
+            answer = @{
+                type = 'string'
+                description = 'Complete user-facing answer for LOCAL; empty for FRONTIER.'
+            }
             memory_note = @{
                 type = 'string'
                 maxLength = $script:MemoryNoteMaxChars
+                description = 'New durable delta from the current user turn only; max 40 chars; use - only when there is no durable fact, correction, decision, constraint, preference, goal, or key entity.'
             }
         }
         required = @('route', 'answer', 'memory_note')
@@ -330,10 +334,14 @@ function Get-QwenSynthesisOutputFormat {
     return @{
         type = 'object'
         properties = @{
-            answer = @{ type = 'string' }
+            answer = @{
+                type = 'string'
+                description = 'Complete final user-facing answer.'
+            }
             memory_note = @{
                 type = 'string'
                 maxLength = $script:MemoryNoteMaxChars
+                description = 'New durable delta from ORIGINAL USER REQUEST only; max 40 chars; use - only when there is no durable fact, correction, decision, constraint, preference, goal, or key entity.'
             }
         }
         required = @('answer', 'memory_note')
