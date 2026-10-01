@@ -156,6 +156,25 @@ function Test-ExplicitCorrectionPrompt([string]$Prompt) {
     return $false
 }
 
+function Test-ExplicitMemoryIntentPrompt([string]$Prompt) {
+    if ([string]::IsNullOrWhiteSpace($Prompt)) { return $false }
+
+    # Conservative wrapper-level intent: explicit storage commands only.
+    # Broad implicit durability remains the responsibility of single-pass memory.
+    $patterns = @(
+        '(?i)^\s*(?:prosím[\s,:-]+)?(?:zapamätaj|zapamataj|pamätaj|pamataj|zapíš|zapis|ulož|uloz)\s+si\b',
+        '(?i)^\s*(?:prosím[\s,:-]+)?(?:ulož|uloz|zapíš|zapis)\b.{0,40}\b(?:do\s+)?pam(?:ä|a)te\b',
+        '(?i)^\s*(?:toto|to|nasledujúce|nasledujuce)\s+si\s+(?:zapamätaj|zapamataj|pamätaj|pamataj|zapíš|zapis|ulož|uloz)\b',
+        '(?i)^\s*(?:please[\s,:-]+)?remember(?:\s+(?:this|that|the\s+following)\b|\s*:)',
+        '(?i)^\s*(?:please[\s,:-]+)?(?:save|store)\b.{0,50}\b(?:to|in)\s+(?:the\s+)?memory\b'
+    )
+
+    foreach ($pattern in $patterns) {
+        if ($Prompt -match $pattern) { return $true }
+    }
+    return $false
+}
+
 function Normalize-MemoryNoteForPrompt([string]$Note, [string]$Prompt) {
     if ([string]::IsNullOrWhiteSpace($Note)) { return '' }
 
@@ -612,6 +631,11 @@ $answerText
     return [pscustomobject]@{
         Raw = $raw
         Text = $note
+        ParseStatus = $(if ([string]::IsNullOrWhiteSpace($note)) {
+            'recovery-empty'
+        } else {
+            'recovery-complete'
+        })
         EvalCount = $r.eval_count
         EvalDuration = $r.eval_duration
     }
@@ -765,7 +789,12 @@ function Persist-TurnAndMemory(
     $InlineMemoryNote,
     [bool]$AnswerRecoveryUsed,
     [string]$AnswerRecoveryReason,
-    $AnswerRecoverySuccess
+    $AnswerRecoverySuccess,
+    [bool]$ExplicitMemoryIntent,
+    [bool]$MemoryRecoveryUsed,
+    [string]$MemoryRecoveryReason,
+    $MemoryRecoverySuccess,
+    [string]$MemoryNoteSource
 ) {
     if (-not $script:MemoryEnabled -and
         -not [bool]$script:Config.ResearchLogging.Enabled) {
@@ -894,6 +923,10 @@ function Persist-TurnAndMemory(
             answer_recovery_used = $AnswerRecoveryUsed
             answer_recovery_reason = if ($AnswerRecoveryUsed) { $AnswerRecoveryReason } else { $null }
             answer_recovery_success = $AnswerRecoverySuccess
+            explicit_memory_intent = $ExplicitMemoryIntent
+            memory_recovery_used = $MemoryRecoveryUsed
+            memory_recovery_reason = if ($MemoryRecoveryUsed) { $MemoryRecoveryReason } else { $null }
+            memory_recovery_success = $MemoryRecoverySuccess
             memory_seconds = [Math]::Round($memorySw.Elapsed.TotalSeconds, 3)
             memory_compacted = $compacted
             memory_compaction_trigger = $memoryCompactionTrigger
@@ -926,7 +959,11 @@ function Persist-TurnAndMemory(
             bias_signals = @()
         }
 
-        $trace['memory_note_source'] = 'single-pass'
+        $trace['memory_note_source'] = $(if ([string]::IsNullOrWhiteSpace($MemoryNoteSource)) {
+            'single-pass'
+        } else {
+            $MemoryNoteSource
+        })
         if ($null -ne $memoryNote) {
             $trace['memory_note'] = $noteText
             $trace['memory_note_model'] = [string]$memoryNote.Text

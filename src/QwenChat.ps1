@@ -637,6 +637,11 @@ function Invoke-Qwen([string]$Prompt) {
     $answerRecoveryUsed = $false
     $answerRecoveryReason = $null
     $answerRecoverySuccess = $null
+    $explicitMemoryIntent = Test-ExplicitMemoryIntentPrompt $Prompt
+    $memoryRecoveryUsed = $false
+    $memoryRecoveryReason = $null
+    $memoryRecoverySuccess = $null
+    $memoryNoteSource = 'single-pass'
 
     if (-not [string]::IsNullOrWhiteSpace($policyReason)) {
         $route = 'FRONTIER'
@@ -760,6 +765,38 @@ $recentContext
         }
     }
 
+    # Explicit storage requests are a wrapper-level invariant. Normal implicit
+    # memory remains single-pass; only an explicit request with an empty note
+    # gets one bounded memory-only extraction retry.
+    if ($script:MemoryEnabled -and $explicitMemoryIntent -and
+        ($null -eq $inlineMemoryNote -or
+            [string]::IsNullOrWhiteSpace([string]$inlineMemoryNote.Text))) {
+        $memoryRecoveryUsed = $true
+        $memoryRecoveryReason = 'explicit-intent-empty'
+        $memoryRecoverySuccess = $false
+        Write-Host "[Explicit memory intent; trying one memory-only recovery.]" -ForegroundColor Yellow
+
+        try {
+            $recoveredMemoryNote = Invoke-QwenMemoryNote `
+                -TurnId 0 `
+                -Prompt $Prompt `
+                -FinalContent ([string]$finalContent) `
+                -Route ([string]$route)
+
+            $inlineMemoryNote = $recoveredMemoryNote
+            $memoryNoteSource = 'explicit-intent-recovery'
+            if (-not [string]::IsNullOrWhiteSpace([string]$recoveredMemoryNote.Text)) {
+                $memoryRecoverySuccess = $true
+            }
+        } catch {
+            Write-Host "[Qwen memory recovery failed.]" -ForegroundColor Yellow
+        }
+
+        if (-not $memoryRecoverySuccess) {
+            $finalContent = 'The explicit memory request could not be persisted reliably. Please try again.'
+        }
+    }
+
     # The malformed-output fallback can also be a raw "-". Never expose or
     # persist it as an assistant answer.
     if (-not [string]::IsNullOrWhiteSpace($finalContent) -and
@@ -812,7 +849,12 @@ $recentContext
             -InlineMemoryNote $inlineMemoryNote `
             -AnswerRecoveryUsed $answerRecoveryUsed `
             -AnswerRecoveryReason $answerRecoveryReason `
-            -AnswerRecoverySuccess $answerRecoverySuccess
+            -AnswerRecoverySuccess $answerRecoverySuccess `
+            -ExplicitMemoryIntent $explicitMemoryIntent `
+            -MemoryRecoveryUsed $memoryRecoveryUsed `
+            -MemoryRecoveryReason $memoryRecoveryReason `
+            -MemoryRecoverySuccess $memoryRecoverySuccess `
+            -MemoryNoteSource $memoryNoteSource
     }
 }
 
