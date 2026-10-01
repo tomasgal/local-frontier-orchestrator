@@ -1,5 +1,7 @@
 # Persistent conversation memory and research logging
 
+For design rationale, trade-offs, comparison with other memory approaches, and future direction, see [MEMORY_STRATEGY.md](MEMORY_STRATEGY.md).
+
 ## Goals
 
 QwenChat v9.2 treats the terminal as one continuing conversation rather than a set of disposable process sessions.
