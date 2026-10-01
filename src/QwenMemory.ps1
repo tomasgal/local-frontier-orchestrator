@@ -66,6 +66,10 @@ function Initialize-QwenMemoryConfiguration(
     $script:WorkingMemoryPath = Join-Path $script:StateDir 'working_memory.txt'
     $script:PendingNotesPath = Join-Path $script:StateDir 'pending_notes.jsonl'
     $script:RuntimeStatePath = Join-Path $script:StateDir 'runtime_state.json'
+    $script:StructuredMemoryEnabled = $script:MemoryEnabled -and
+        $script:Config.Memory.ContainsKey('StructuredEnabled') -and
+        [bool]$script:Config.Memory.StructuredEnabled
+    $script:StructuredMemoryPath = Join-Path $script:StateDir 'l2-memory.db'
     $script:Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 }
 
@@ -795,6 +799,7 @@ function Persist-TurnAndMemory(
     $Response,
     [double]$AnswerSeconds,
     $InlineMemoryNote,
+    $InlineMemoryOps,
     [bool]$AnswerRecoveryUsed,
     [string]$AnswerRecoveryReason,
     $AnswerRecoverySuccess,
@@ -843,6 +848,38 @@ function Persist-TurnAndMemory(
         $script:RuntimeState.next_turn_id = $turnId + 1
         Save-RuntimeState
     }
+
+    $l2Scope = "conversation:$epoch"
+    $l2Status = 'disabled'
+    $l2AppliedCount = 0
+    $l2RejectedCount = 0
+    $l2Error = $null
+    $l2Result = $null
+    $l2Sw = [System.Diagnostics.Stopwatch]::StartNew()
+
+    if ($script:StructuredMemoryEnabled) {
+        $l2Connection = $null
+        try {
+            $l2Connection = Open-LfoMemoryStore $script:StructuredMemoryPath
+            $l2Result = Apply-LfoStructuredMemoryOps $l2Connection $InlineMemoryOps $turnId $l2Scope
+            $l2Status = [string]$l2Result.Status
+            $l2AppliedCount = [int]$l2Result.AppliedCount
+            $l2RejectedCount = [int]$l2Result.RejectedCount
+        } catch {
+            $l2Status = 'failed'
+            $l2Error = $_.Exception.Message
+        } finally {
+            if ($null -ne $l2Connection) {
+                try { Close-LfoSqliteDatabase $l2Connection } catch {
+                    if ([string]::IsNullOrWhiteSpace($l2Error)) {
+                        $l2Error = "close failed: $($_.Exception.Message)"
+                        $l2Status = 'failed'
+                    }
+                }
+            }
+        }
+    }
+    $l2Sw.Stop()
 
     $memoryNote = $InlineMemoryNote
     $memoryError = $null
@@ -936,6 +973,12 @@ function Persist-TurnAndMemory(
             memory_recovery_reason = if ($MemoryRecoveryUsed) { $MemoryRecoveryReason } else { $null }
             memory_recovery_success = $MemoryRecoverySuccess
             memory_seconds = [Math]::Round($memorySw.Elapsed.TotalSeconds, 3)
+            l2_scope = $l2Scope
+            l2_status = $l2Status
+            l2_applied_count = $l2AppliedCount
+            l2_rejected_count = $l2RejectedCount
+            l2_seconds = [Math]::Round($l2Sw.Elapsed.TotalSeconds, 3)
+            l2_error = $l2Error
             memory_compacted = $compacted
             memory_compaction_trigger = $memoryCompactionTrigger
             memory_note_appended = $memoryNoteAppended
@@ -978,6 +1021,28 @@ function Persist-TurnAndMemory(
             $trace['memory_note_parse_status'] = [string]$memoryNote.ParseStatus
         }
 
+        if ($null -ne $InlineMemoryOps) {
+            $trace['l2_ops_valid'] = @($InlineMemoryOps.Valid | ForEach-Object {
+                [ordered]@{
+                    op = [string]$_.Op
+                    subject = [string]$_.Subject
+                    subject_type = [string]$_.SubjectType
+                    predicate = [string]$_.Predicate
+                    target = [string]$_.Target
+                    raw_target = [string]$_.RawTarget
+                    target_type = [string]$_.TargetType
+                    target_entity_type = [string]$_.TargetEntityType
+                    normalization = [string]$_.Normalization
+                }
+            })
+            $trace['l2_ops_rejected'] = @($InlineMemoryOps.Rejected | ForEach-Object {
+                [ordered]@{
+                    reason = [string]$_.Reason
+                    raw = $_.Raw
+                }
+            })
+        }
+
         if ([bool]$script:Config.ResearchLogging.IncludeRawText) {
             $trace['user'] = $Prompt
             $trace['local_raw'] = $LocalRaw
@@ -996,6 +1061,19 @@ function Persist-TurnAndMemory(
         }
 
         Append-JsonLine (Get-MonthlyLogPath 'trace') $trace
+    }
+
+    if ($script:StructuredMemoryEnabled) {
+        $l2State = switch ($l2Status) {
+            'applied'  { "applied $l2AppliedCount" }
+            'empty'    { 'no facts' }
+            'rejected' { "rejected set ($l2RejectedCount)" }
+            'failed'   { "failed: $l2Error" }
+            default    { $l2Status }
+        }
+        Write-Host (
+            "[l2: {0}; {1:n3}s; scope={2}]" -f $l2State, $l2Sw.Elapsed.TotalSeconds, $l2Scope
+        ) -ForegroundColor DarkGray
     }
 
     if ($script:MemoryEnabled) {
