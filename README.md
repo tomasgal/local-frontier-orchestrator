@@ -263,7 +263,7 @@ local model -> ask_codex -> native Codex frontier -> local model
 
 Current work focuses on:
 
-- post-v9.3 validation work: longer-term measurement of routing, synthesis, implicit memory quality, and pressure-compaction behaviour across additional hardware tiers;
+- v9.4 L2 structured-memory work: typed facts/relations, multi-delta extraction, deterministic state updates and relational queries behind a stable MemoryStore abstraction;
 - long-term routing quality;
 - faithful-but-useful frontier synthesis;
 - structured trace logging;
