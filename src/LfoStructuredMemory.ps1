@@ -1,5 +1,8 @@
 # v9.4 L2 structured-memory operation contract.
 # Storage-independent: Qwen emits operations; wrapper validates and later applies them.
+#
+# Small-model rule: scalar type is encoded directly in the operation name.
+# This intentionally avoids a second, potentially contradictory target_type field.
 
 function Get-LfoStructuredMemoryOperationSchema([int]$MaxOps = 6) {
     return @{
@@ -10,7 +13,13 @@ function Get-LfoStructuredMemoryOperationSchema([int]$MaxOps = 6) {
             properties = @{
                 op = @{
                     type = 'string'
-                    enum = @('SET_ATTRIBUTE', 'ADD_RELATION')
+                    enum = @(
+                        'SET_TEXT',
+                        'SET_INTEGER',
+                        'SET_REAL',
+                        'SET_BOOLEAN',
+                        'ADD_RELATION'
+                    )
                 }
                 subject = @{
                     type = 'string'
@@ -28,10 +37,6 @@ function Get-LfoStructuredMemoryOperationSchema([int]$MaxOps = 6) {
                     type = 'string'
                     maxLength = 160
                 }
-                target_type = @{
-                    type = 'string'
-                    enum = @('text', 'integer', 'real', 'boolean', 'entity')
-                }
                 target_entity_type = @{
                     type = 'string'
                     maxLength = 40
@@ -43,7 +48,6 @@ function Get-LfoStructuredMemoryOperationSchema([int]$MaxOps = 6) {
                 'subject_type',
                 'predicate',
                 'target',
-                'target_type',
                 'target_entity_type'
             )
             additionalProperties = $false
@@ -78,10 +82,15 @@ function ConvertFrom-LfoStructuredMemoryOps($RawOps, [int]$MaxOps = 6) {
             $subjectType = ([string]$item.subject_type).Trim().ToLowerInvariant()
             $predicate = ([string]$item.predicate).Trim().ToLowerInvariant()
             $target = ([string]$item.target).Trim()
-            $targetType = ([string]$item.target_type).Trim().ToLowerInvariant()
             $targetEntityType = ([string]$item.target_entity_type).Trim().ToLowerInvariant()
 
-            if ($op -notin @('SET_ATTRIBUTE', 'ADD_RELATION')) {
+            if ($op -notin @(
+                'SET_TEXT',
+                'SET_INTEGER',
+                'SET_REAL',
+                'SET_BOOLEAN',
+                'ADD_RELATION'
+            )) {
                 throw "unsupported op '$op'"
             }
             if ([string]::IsNullOrWhiteSpace($subject)) {
@@ -93,31 +102,39 @@ function ConvertFrom-LfoStructuredMemoryOps($RawOps, [int]$MaxOps = 6) {
             if ([string]::IsNullOrWhiteSpace($target)) {
                 throw 'empty target'
             }
-            if ($targetType -notin @('text', 'integer', 'real', 'boolean', 'entity')) {
-                throw "invalid target_type '$targetType'"
+
+            $targetType = switch ($op) {
+                'SET_TEXT'    { 'text' }
+                'SET_INTEGER' { 'integer' }
+                'SET_REAL'    { 'real' }
+                'SET_BOOLEAN' { 'boolean' }
+                'ADD_RELATION'{ 'entity' }
             }
 
-            if ($op -eq 'ADD_RELATION' -and $targetType -ne 'entity') {
-                throw 'ADD_RELATION requires target_type=entity'
-            }
-            if ($op -eq 'SET_ATTRIBUTE' -and $targetType -eq 'entity') {
-                throw 'SET_ATTRIBUTE cannot use target_type=entity'
+            if ($op -ne 'ADD_RELATION' -and -not [string]::IsNullOrWhiteSpace($targetEntityType)) {
+                throw "$op requires empty target_entity_type"
             }
 
             $typedValue = $target
-            switch ($targetType) {
-                'integer' {
+            switch ($op) {
+                'SET_INTEGER' {
+                    if ($target -notmatch '^-?\d+$') {
+                        throw "invalid integer lexical form '$target'"
+                    }
                     $parsed = [int64]0
                     if (-not [int64]::TryParse(
                         $target,
                         [Globalization.NumberStyles]::Integer,
                         [Globalization.CultureInfo]::InvariantCulture,
                         [ref]$parsed)) {
-                        throw "invalid integer '$target'"
+                        throw "integer out of range '$target'"
                     }
                     $typedValue = $parsed
                 }
-                'real' {
+                'SET_REAL' {
+                    if ($target -notmatch '^-?(?:\d+\.\d+|\d+|\.\d+)$') {
+                        throw "invalid real lexical form '$target'"
+                    }
                     $parsed = [double]0
                     if (-not [double]::TryParse(
                         $target,
@@ -128,13 +145,13 @@ function ConvertFrom-LfoStructuredMemoryOps($RawOps, [int]$MaxOps = 6) {
                     }
                     $typedValue = $parsed
                 }
-                'boolean' {
-                    if ($target -match '^(?i:true)$') {
+                'SET_BOOLEAN' {
+                    if ($target -ceq 'true') {
                         $typedValue = $true
-                    } elseif ($target -match '^(?i:false)$') {
+                    } elseif ($target -ceq 'false') {
                         $typedValue = $false
                     } else {
-                        throw "invalid boolean '$target'"
+                        throw "invalid boolean lexical form '$target'"
                     }
                 }
             }
