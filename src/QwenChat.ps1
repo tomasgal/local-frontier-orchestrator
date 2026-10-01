@@ -307,6 +307,102 @@ function Invoke-CodexReadOnly([string]$Prompt) {
     }
 }
 
+function Get-QwenLocalOutputFormat {
+    return @{
+        type = 'object'
+        properties = @{
+            route = @{
+                type = 'string'
+                enum = @('LOCAL', 'FRONTIER')
+            }
+            answer = @{ type = 'string' }
+            memory_note = @{
+                type = 'string'
+                maxLength = $script:MemoryNoteMaxChars
+            }
+        }
+        required = @('route', 'answer', 'memory_note')
+        additionalProperties = $false
+    }
+}
+
+function Get-QwenSynthesisOutputFormat {
+    return @{
+        type = 'object'
+        properties = @{
+            answer = @{ type = 'string' }
+            memory_note = @{
+                type = 'string'
+                maxLength = $script:MemoryNoteMaxChars
+            }
+        }
+        required = @('answer', 'memory_note')
+        additionalProperties = $false
+    }
+}
+
+function ConvertFrom-QwenStructuredContent(
+    [string]$Content,
+    [switch]$ExpectRoute
+) {
+    if ([string]::IsNullOrWhiteSpace($Content)) {
+        return [pscustomobject]@{
+            Success = $false
+            Route = 'UNKNOWN'
+            Answer = ''
+            MemoryNote = [pscustomobject]@{
+                Raw = ''
+                Text = ''
+                ParseStatus = 'structured-missing'
+            }
+        }
+    }
+
+    try {
+        $obj = $Content | ConvertFrom-Json -ErrorAction Stop
+        $answer = [string]$obj.answer
+        $rawNote = [string]$obj.memory_note
+        $note = Clean-MicroText $rawNote $script:MemoryNoteMaxChars
+
+        $route = if ($ExpectRoute) { ([string]$obj.route).ToUpperInvariant() } else { 'LOCAL' }
+        if ($ExpectRoute -and $route -notin @('LOCAL', 'FRONTIER')) {
+            throw "Invalid structured route '$route'."
+        }
+
+        if ($route -eq 'FRONTIER') {
+            # The routing pass must not create conversational memory; the final
+            # post-frontier synthesis owns the note for this user turn.
+            $note = ''
+        }
+
+        return [pscustomobject]@{
+            Success = $true
+            Route = $route
+            Answer = $answer.Trim()
+            MemoryNote = [pscustomobject]@{
+                Raw = $rawNote
+                Text = $note
+                ParseStatus = $(if ([string]::IsNullOrWhiteSpace($note)) {
+                    'structured-empty'
+                } else {
+                    'structured-complete'
+                })
+            }
+        }
+    } catch {
+        return [pscustomobject]@{
+            Success = $false
+            Route = 'UNKNOWN'
+            Answer = ''
+            MemoryNote = [pscustomobject]@{
+                Raw = $Content
+                Text = ''
+                ParseStatus = 'structured-malformed'
+            }
+        }
+    }
+}
+
 function Invoke-QwenLocalApi {
     $bodyObj = @{
         model      = $Model
@@ -314,6 +410,7 @@ function Invoke-QwenLocalApi {
         think      = $script:ThinkEnabled
         stream     = $false
         keep_alive = '5m'
+        format     = (Get-QwenLocalOutputFormat)
         # Hardware/runtime placement (GPU/CPU, context length, threads) belongs
         # to the selected Ollama model profile. Keep only per-request generation
         # controls here so QwenChat does not override host-specific profiles.
@@ -360,6 +457,7 @@ $FrontierResult
         think      = $script:ThinkEnabled
         stream     = $false
         keep_alive = '5m'
+        format     = (Get-QwenSynthesisOutputFormat)
         options    = @{
             num_predict = $(if ($script:ThinkEnabled) {
                 [int]$script:Config.SynthesisGeneration.NumPredictThink
@@ -470,23 +568,23 @@ function Invoke-Qwen([string]$Prompt) {
         Show-QwenThinking $r
         $candidate = Get-CleanQwenContent $r
         $localRaw = $candidate
-        $parsedCandidate = Split-InlineMemoryNote $candidate
-        $visibleCandidate = [string]$parsedCandidate.VisibleText
-        $route = Get-QwenRoute $visibleCandidate
+        $structured = ConvertFrom-QwenStructuredContent $candidate -ExpectRoute
 
-        if ($route -eq 'FRONTIER') {
-            Write-Host "`n[Qwen route -> FRONTIER]" -ForegroundColor DarkCyan
-        } elseif ($route -eq 'LOCAL') {
-            Write-Host "`n[Qwen route -> LOCAL]" -ForegroundColor DarkGray
-            $inlineMemoryNote = $parsedCandidate
-            $finalContent = Remove-QwenRouteMarker $visibleCandidate
+        if ($structured.Success) {
+            $route = [string]$structured.Route
+            if ($route -eq 'FRONTIER') {
+                Write-Host "`n[Qwen route -> FRONTIER]" -ForegroundColor DarkCyan
+            } else {
+                Write-Host "`n[Qwen route -> LOCAL]" -ForegroundColor DarkGray
+                $finalContent = [string]$structured.Answer
+                $inlineMemoryNote = $structured.MemoryNote
+            }
         } else {
-            # Fail closed on cost/escalation: malformed routing never triggers
-            # frontier automatically. Treat the generation as a local answer.
-            Write-Host "`n[Qwen route marker missing; fail-closed -> LOCAL]" -ForegroundColor Yellow
+            # Structured output failure must never trigger a frontier call.
+            Write-Host "`n[Qwen structured output malformed; fail-closed -> LOCAL]" -ForegroundColor Yellow
             $route = 'LOCAL'
-            $inlineMemoryNote = $parsedCandidate
-            $finalContent = Remove-QwenRouteMarker $visibleCandidate
+            $finalContent = $candidate
+            $inlineMemoryNote = $structured.MemoryNote
         }
     }
 
@@ -528,16 +626,16 @@ $recentContext
             $r = Invoke-QwenSynthesis $Prompt $frontierResult
             Show-QwenThinking $r
             $candidate = Get-CleanQwenContent $r
-            $parsedSynthesis = Split-InlineMemoryNote $candidate
-            $visibleSynthesis = [string]$parsedSynthesis.VisibleText
+            $structuredSynthesis = ConvertFrom-QwenStructuredContent $candidate
 
-            if (Test-UnfinishedSynthesis $r $visibleSynthesis) {
-                Write-Host "`n[Qwen synthesis did not complete; showing the frontier result directly.]" -ForegroundColor Yellow
+            if (-not $structuredSynthesis.Success -or
+                (Test-UnfinishedSynthesis $r ([string]$structuredSynthesis.Answer))) {
+                Write-Host "`n[Qwen synthesis did not complete cleanly; showing the frontier result directly.]" -ForegroundColor Yellow
                 $finalContent = $frontierResult
-                $inlineMemoryNote = $null
+                $inlineMemoryNote = $structuredSynthesis.MemoryNote
             } else {
-                $finalContent = $visibleSynthesis
-                $inlineMemoryNote = $parsedSynthesis
+                $finalContent = [string]$structuredSynthesis.Answer
+                $inlineMemoryNote = $structuredSynthesis.MemoryNote
             }
         }
     }
@@ -591,7 +689,7 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.2-dev1 (single-pass micro-note shadow mode; v9.1.3 memory persistence). Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "Qwen local chat v9.2-dev2 (schema single-pass micro-note shadow mode; v9.1.3 memory persistence). Commands: /exit, /clear, /paste, /think on, /think off"
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
