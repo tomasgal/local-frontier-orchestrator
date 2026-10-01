@@ -238,7 +238,9 @@ WHERE scope_id = 'conversation:3'
     }
 
     # Fail closed: one rejected op prevents the valid sibling from being written.
-    $rejectParsed = ConvertFrom-LfoStructuredMemoryOps @(
+    # Keep the raw collection in a named variable and use named parameters so
+    # this test also rules out PowerShell command-argument enumeration quirks.
+    $rejectRawOps = @(
         [pscustomobject]@{
             op = 'SET_TEXT'
             subject = 'Core'
@@ -255,10 +257,24 @@ WHERE scope_id = 'conversation:3'
             target = 'not-a-number'
             target_entity_type = ''
         }
-    ) 6
-    $rejectResult = Apply-LfoStructuredMemoryOps $store $rejectParsed 41 'conversation:4'
+    )
+    if ($rejectRawOps.Count -ne 2) {
+        throw "Reject parser fixture expected 2 raw ops; got $($rejectRawOps.Count)."
+    }
+
+    $rejectParsed = ConvertFrom-LfoStructuredMemoryOps -RawOps $rejectRawOps -MaxOps 6
+    if (@($rejectParsed.Valid).Count -ne 1 -or @($rejectParsed.Rejected).Count -ne 1) {
+        throw ('Structured parser reject regression failed: ' + ([ordered]@{
+            raw_count = $rejectRawOps.Count
+            valid_count = @($rejectParsed.Valid).Count
+            rejected_count = @($rejectParsed.Rejected).Count
+            parsed = $rejectParsed
+        } | ConvertTo-Json -Depth 10 -Compress))
+    }
+
+    $rejectResult = Apply-LfoStructuredMemoryOps -Connection $store -ParsedOps $rejectParsed -SourceTurn 41 -ScopeId 'conversation:4'
     if ($rejectResult.Status -ne 'rejected' -or $rejectResult.AppliedCount -ne 0 -or $rejectResult.RejectedCount -ne 1) {
-        throw ('Structured reject policy failed: ' + ($rejectResult | ConvertTo-Json -Depth 8 -Compress))
+        throw ('Structured reject policy failed after parser PASS: ' + ($rejectResult | ConvertTo-Json -Depth 8 -Compress))
     }
     $rejectedScopeFacts = @(Invoke-LfoSqliteQuery $store @'
 SELECT id
