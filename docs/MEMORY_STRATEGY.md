@@ -246,7 +246,7 @@ L1 answers: **"What should the conversation keep actively in mind?"**
 
 L2 represents durable facts and relations that benefit from deterministic update/query semantics. The logical model is a small typed fact store rather than a nested JSON dictionary tied to one schema.
 
-Canonical forms are conceptually:
+Logical fact forms are conceptually:
 
 ```text
 (subject, predicate, object-entity)
@@ -353,12 +353,13 @@ v9.4 should:
 The preferred v9.4 backend is a local SQLite database such as:
 
 ```text
-%LOCALAPPDATA%\LocalFrontierOrchestrator\state\memory.db
+%LOCALAPPDATA%\LocalFrontierOrchestrator\state\l2-memory.db
 ```
 
 The logical schema should be capable of representing:
 
-- entities;
+- opaque entity identities independent of any supposedly canonical name;
+- one or more observed surface names / aliases for an entity;
 - predicates;
 - entity-to-entity relations;
 - typed scalar values;
@@ -401,6 +402,35 @@ Qwen result
 For an **explicit memory request**, LFO should not claim successful persistence until the required memory transaction has committed.
 
 For ordinary implicit memory, implementation may minimize visible post-answer latency while preserving ordering and durability invariants.
+
+### Why SQLite belongs specifically in L2
+
+SQLite is not being introduced as a replacement for conversational memory or as the authoritative record of the conversation. Each layer has a different job:
+
+- **L0 JSONL** preserves the raw evidence/provenance of what the user, local model, and frontier path actually produced;
+- **L1** keeps a small lossy semantic orientation state for conversational continuity;
+- **L2 SQLite** holds facts whose semantics benefit from typed values, relations, deterministic replacement, joins, indexes, atomic transactions, and reconstructible history;
+- **L3**, if later justified, may help resolve aliases, ambiguity, fuzzy mentions, or semantic candidates, but it must not silently redefine L2 state.
+
+The local model therefore never needs to know SQL and does not need to decide that a particular spelling is a "canonical name". It emits a semantic operation over surface mentions. The wrapper resolves those mentions to opaque entity IDs and applies accepted operations through the MemoryStore boundary. Post-FRONTIER synthesis follows the same rule: frontier output is an external information input to Qwen synthesis, and only the synthesis pass emits the L2 operations for that turn.
+
+This division is why an embedded relational engine is useful even at small scale: the value is not dataset size but deterministic state semantics, relational queries, provenance, and transactions without adding a database server or exposing storage machinery to the model.
+
+### v9.4-dev3 implementation checkpoint — 2026-10-02
+
+The current development implementation has reached the structured **write** boundary:
+
+- schema 3: `entities(id, entity_type, ...)` plus `entity_names(entity_id, name, normalized_name, source_turn, ...)`;
+- entity names are mentions/surface forms, not identity keys;
+- trivial normalization handles formatting variants; unresolved ambiguity is not guessed;
+- typed scalar and entity-relation writes use one atomic transaction per user turn;
+- source turn and conversation scope are persisted;
+- scalar replacement closes the previous current fact through `valid_to_turn` and inserts the new current value;
+- a mixed valid/rejected operation set is fail-closed for L2 rather than partially written;
+- LOCAL and synthesis structured outputs share one `memory_ops[]` contract;
+- production smoke tests confirmed three-fact atomic persistence and later supersession of one current value;
+- L2 reads are not yet supplied to prompt construction. That is the next major integration boundary after host validation.
+
 
 ### Non-goals for v9.4
 
