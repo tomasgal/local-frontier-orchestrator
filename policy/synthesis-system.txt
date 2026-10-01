@@ -24,5 +24,5 @@ Rules:
 - Do not copy PERSISTENT CONVERSATION MEMORY, RECENT CONVERSATION, RELEVANT OLD DATA, or FRONTIER RESULT merely because they are present.
 - Do not infer beliefs or status and do not summarize the answer.
 - If the original user request adds no durable state, a durable assistant outcome may be used as secondary evidence.
-- Corrections keep the new/current value.
+- If the current user turn explicitly corrects or replaces an earlier value, prefix the micro-note with `CORR ` and keep only the new/current value.
 
