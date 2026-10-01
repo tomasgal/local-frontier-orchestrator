@@ -400,16 +400,13 @@ STRUCTURED OUTPUT — FINAL RULES:
 Treat answer and memory_note as independent fields.
 
 For route LOCAL:
-- answer must fully answer the CURRENT USER REQUEST. Never replace or shorten the requested answer merely to emphasize what belongs in memory_note.
-- memory_note must capture the NEW durable delta introduced by the CURRENT USER TURN, even when that delta is not what the user is asking about.
-Example: "BETA has 16 GB RAM. What is 7+5?" -> answer must answer "12"; memory_note = "BETA 16GB RAM".
-Other memory_note examples:
-- "ALPHA has 24 GB RAM. How much RAM?" -> "ALPHA 24GB RAM"
-- "The sky is blue. Why?" -> "-"
-- "VEGA has 48 GB, not 32." -> "CORR VEGA=48GB"
+- answer must fully answer the CURRENT USER REQUEST in the normal way.
+- memory_note must capture only the NEW durable delta introduced by the CURRENT USER TURN, even when that delta is unrelated to the requested answer.
+- Do not shorten, redirect, or reshape answer merely to make memory_note easier.
+- Use "-" when the current user turn adds no durable user state.
+- Ignore old STATE, PENDING, RELEVANT OLD DATA, and older turns when deciding memory_note.
+- Corrections store the new/current value.
 
-Use "-" only when the current user turn adds no durable user state.
-Ignore old STATE, PENDING, RELEVANT OLD DATA, and older turns when deciding memory_note.
 For route FRONTIER, answer must be empty and memory_note must be "-".
 "@
 
