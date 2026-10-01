@@ -17,9 +17,11 @@
         RetrievalMaxItems = 3
         RetrievalScanMaxTurns = 500
 
-        # v9.1 micro-memory: one tiny orientation note per turn and a tiny
-        # rolling state every five turns. Exact data remains in raw JSONL logs.
-        CompactionEvery = 5
+        # v9.3 pressure-triggered compaction: only non-empty, non-duplicate
+        # micro-notes fill the pending buffer. Compact when either threshold
+        # is reached. Exact data remains authoritative in raw JSONL logs.
+        CompactionMaxPendingNotes = 4
+        CompactionMaxPendingChars = 120
         NoteMaxChars = 40
         StateMaxChars = 160
         NoteNumPredict = 32
