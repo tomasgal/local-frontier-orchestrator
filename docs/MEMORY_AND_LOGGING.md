@@ -141,7 +141,7 @@ Observed results:
 - restart continuity passed: a fact persisted before `/exit` was recalled correctly after a new QwenChat process loaded the same state;
 - internal pending-note turn IDs are retained in JSONL for auditability but are no longer fed to the semantic compactor, preventing artifacts such as `T2` from leaking into rolling state.
 
-This is a pragmatic conversational memory design, not a zero-error semantic extractor. During smoke testing the small model occasionally omitted a durable note or over-tagged a new fact as a correction. Those failures are accepted as part of the current approximately-90%-robust operating target rather than prompt-tuned around a fixed benchmark. The authoritative raw history and retrieval layer are intentionally preserved to limit the impact of lossy micro-memory.
+This is a pragmatic conversational memory design, not a zero-error semantic extractor. The **90% figure is an engineering acceptance floor, not an estimate of the implementation's observed reliability**. The heterogeneous smoke suite performed materially better than that floor, while still exposing occasional semantic misses such as an omitted durable note or an unnecessary correction tag. The suite is intentionally too small and non-random to justify a statistical claim such as 99% reliability. The design therefore avoids prompt-tuning toward benchmark perfection while retaining authoritative raw history and exact retrieval as backstops for lossy micro-memory.
 
 
 ## Research trace
