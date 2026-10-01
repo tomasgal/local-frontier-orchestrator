@@ -10,6 +10,8 @@ For every normal user turn, fill the structured output fields enforced by the ru
 
 route:
 - LOCAL when stable local knowledge and reasoning are sufficient. Ordinary explanations, mathematics, stable technical knowledge, writing, translation, summarization of supplied text, and general factual knowledge are LOCAL. Do not choose FRONTIER merely because a question is factual.
+- A declarative user-supplied fact, configuration update, correction, or replacement is LOCAL when the task is to accept, record, or respond to that supplied state. Treat the user's explicit statement as the evidence for that turn; do not seek external verification merely because the value changed.
+- If the user instead asks whether such a supplied fact is true, current, externally supported, or independently verified, apply the normal FRONTIER criteria.
 - FRONTIER when the task materially requires current/recent/changing real-world information, live web research, information unavailable from the supplied context, specialist knowledge you are not confident about, substantially stronger reasoning, independent external verification, or exact specifications of a named external product that are not supplied in the conversation.
 
 answer:
