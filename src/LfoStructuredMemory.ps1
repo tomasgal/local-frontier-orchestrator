@@ -107,23 +107,17 @@ function ConvertFrom-LfoStructuredMemoryOps($RawOps, [int]$MaxOps = 6) {
 
             $targetType = switch ($op) {
                 'SET_TEXT'    { 'text' }
-                'SET_INTEGER' { 'integer' }
-                'SET_REAL'    { 'real' }
-                'SET_BOOLEAN' { 'boolean' }
-                'ADD_RELATION'{ 'entity' }
-            }
-
-            if ($op -ne 'ADD_RELATION' -and -not [string]::IsNullOrWhiteSpace($targetEntityType)) {
-                throw "$op requires empty target_entity_type"
-            }
-
-            $typedValue = $target
-            switch ($op) {
                 'SET_INTEGER' {
                     # Qwen 4B occasionally serializes a scalar integer string as
                     # "{32}". Accept only this exact, semantics-preserving wrapper;
                     # do not repair arbitrary malformed numeric text.
-                    if ($target -match '^\{(-?\d+)\}
+                    if ($target -match '^\{(-?\d+)\}$') {
+                        $target = $Matches[1]
+                        $normalization = 'brace-wrapped-integer'
+                    }
+                    if ($target -notmatch '^-?\d+$') {
+                        throw "invalid integer lexical form '$rawTarget'"
+                    }
                     $parsed = [int64]0
                     if (-not [int64]::TryParse(
                         $target,
