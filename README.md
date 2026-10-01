@@ -73,6 +73,28 @@ Potential reasons to keep a local first-line model include:
 - a stable place to implement metacognitive and Human–AI bias-balancing experiments;
 - the ability to use different local hardware tiers without changing the user-facing interaction model.
 
+## Scalability of single-pass memory
+
+The v9.2 single-pass memory design is **not specific to the constrained CPU notebook used for validation**. The notebook makes the latency benefit unusually visible, but the architectural gain applies across hardware tiers.
+
+The key change is structural: the local model already performs the answer or post-frontier synthesis inference, and v9.2 asks that same inference to also emit a very small structured `memory_note`. The wrapper then persists that note without launching a second memory-model inference. This does not require a second copy of the model, a second concurrent KV cache, or meaningful additional VRAM. The incremental cost is limited to a small output schema and a short metadata field.
+
+Practical scaling expectations:
+
+| Hardware tier | Expected effect of v9.2 |
+| --- | --- |
+| CPU-only / constrained host | Largest absolute latency gain. On the validated notebook, ordinary post-answer memory work fell from roughly 18–21 s to commonly 0.01–0.05 s. |
+| ~6 GB VRAM | The removed second inference is already much faster than on CPU, but still consumes prompt evaluation, decode, scheduler, and runtime overhead. Single-pass therefore remains useful for latency and efficiency. |
+| ~16–17 GB VRAM | More VRAM can be spent on a larger model, higher-quality quantization, or more context without changing the single-pass memory architecture. A stronger local model may also improve semantic extraction quality. |
+| 24 GB+ / server-class GPU | The absolute latency saving per turn may become small, but removing one model request per conversational turn still improves throughput, concurrency, and energy efficiency. |
+| Multi-user service | The benefit compounds with request volume: v9.2 avoids one separate memory-note inference for each completed turn; only periodic compaction remains an additional model call. |
+
+This should be read as an **architectural scaling argument, not a completed benchmark matrix**. The large latency reduction is directly measured on the constrained CPU host. The same design is expected to remain efficient on 6 GB, ~17 GB, and larger GPUs because the memory side-channel adds negligible model-residency overhead, but those tiers should be benchmarked separately before making hardware-specific latency or throughput claims.
+
+The main scaling boundary is therefore not VRAM but **side-task complexity**. A small schema such as `route + answer + memory_note` is well suited to single-pass generation. If future versions add many independent classifiers, confidence signals, user-model updates, retrieval queries, or tool plans into the same response, those side tasks may eventually compete with answer quality and should then be split into dedicated or background components.
+
+Periodic compaction is intentionally still separate in v9.2. It occurs every five completed memory steps by default and remains the next obvious optimization target if deployment scale makes that cost material.
+
 ## Hardware scope
 
 The public architecture is deliberately hardware-agnostic. Personal hostnames, network details, local paths, and machine-specific sizing are not part of this repository.
