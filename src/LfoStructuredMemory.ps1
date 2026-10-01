@@ -106,7 +106,19 @@ function ConvertFrom-LfoStructuredMemoryOps($RawOps, [int]$MaxOps = 6) {
             }
 
             $targetType = switch ($op) {
-                'SET_TEXT'    { 'text' }
+                'SET_TEXT'     { 'text' }
+                'SET_INTEGER'  { 'integer' }
+                'SET_REAL'     { 'real' }
+                'SET_BOOLEAN'  { 'boolean' }
+                'ADD_RELATION' { 'entity' }
+            }
+
+            if ($op -ne 'ADD_RELATION' -and -not [string]::IsNullOrWhiteSpace($targetEntityType)) {
+                throw "$op requires empty target_entity_type"
+            }
+
+            $typedValue = $target
+            switch ($op) {
                 'SET_INTEGER' {
                     # Qwen 4B occasionally serializes a scalar integer string as
                     # "{32}". Accept only this exact, semantics-preserving wrapper;
@@ -164,130 +176,6 @@ function ConvertFrom-LfoStructuredMemoryOps($RawOps, [int]$MaxOps = 6) {
                 TargetEntityType = $targetEntityType
                 TypedValue = $typedValue
                 Normalization = $normalization
-            }
-        } catch {
-            $rejected += [pscustomobject]@{
-                Reason = $_.Exception.Message
-                Raw = $item
-            }
-        }
-    }
-
-    return [pscustomobject]@{
-        Valid = @($valid)
-        Rejected = @($rejected)
-    }
-}
-) {
-                        $target = $Matches[1]
-                        $normalization = 'brace-wrapped-integer'
-                    }
-                    if ($target -notmatch '^-?\d+
-                    $parsed = [int64]0
-                    if (-not [int64]::TryParse(
-                        $target,
-                        [Globalization.NumberStyles]::Integer,
-                        [Globalization.CultureInfo]::InvariantCulture,
-                        [ref]$parsed)) {
-                        throw "integer out of range '$target'"
-                    }
-                    $typedValue = $parsed
-                }
-                'SET_REAL' {
-                    if ($target -notmatch '^-?(?:\d+\.\d+|\d+|\.\d+)$') {
-                        throw "invalid real lexical form '$target'"
-                    }
-                    $parsed = [double]0
-                    if (-not [double]::TryParse(
-                        $target,
-                        [Globalization.NumberStyles]::Float,
-                        [Globalization.CultureInfo]::InvariantCulture,
-                        [ref]$parsed)) {
-                        throw "invalid real '$target'"
-                    }
-                    $typedValue = $parsed
-                }
-                'SET_BOOLEAN' {
-                    if ($target -ceq 'true') {
-                        $typedValue = $true
-                    } elseif ($target -ceq 'false') {
-                        $typedValue = $false
-                    } else {
-                        throw "invalid boolean lexical form '$target'"
-                    }
-                }
-            }
-
-            $valid += [pscustomobject]@{
-                Op = $op
-                Subject = $subject
-                SubjectType = $subjectType
-                Predicate = $predicate
-                Target = $target
-                TargetType = $targetType
-                TargetEntityType = $targetEntityType
-                TypedValue = $typedValue
-            }
-        } catch {
-            $rejected += [pscustomobject]@{
-                Reason = $_.Exception.Message
-                Raw = $item
-            }
-        }
-    }
-
-    return [pscustomobject]@{
-        Valid = @($valid)
-        Rejected = @($rejected)
-    }
-}
-) {
-                        throw "invalid integer lexical form '$rawTarget'"
-                    }
-                    $parsed = [int64]0
-                    if (-not [int64]::TryParse(
-                        $target,
-                        [Globalization.NumberStyles]::Integer,
-                        [Globalization.CultureInfo]::InvariantCulture,
-                        [ref]$parsed)) {
-                        throw "integer out of range '$target'"
-                    }
-                    $typedValue = $parsed
-                }
-                'SET_REAL' {
-                    if ($target -notmatch '^-?(?:\d+\.\d+|\d+|\.\d+)$') {
-                        throw "invalid real lexical form '$target'"
-                    }
-                    $parsed = [double]0
-                    if (-not [double]::TryParse(
-                        $target,
-                        [Globalization.NumberStyles]::Float,
-                        [Globalization.CultureInfo]::InvariantCulture,
-                        [ref]$parsed)) {
-                        throw "invalid real '$target'"
-                    }
-                    $typedValue = $parsed
-                }
-                'SET_BOOLEAN' {
-                    if ($target -ceq 'true') {
-                        $typedValue = $true
-                    } elseif ($target -ceq 'false') {
-                        $typedValue = $false
-                    } else {
-                        throw "invalid boolean lexical form '$target'"
-                    }
-                }
-            }
-
-            $valid += [pscustomobject]@{
-                Op = $op
-                Subject = $subject
-                SubjectType = $subjectType
-                Predicate = $predicate
-                Target = $target
-                TargetType = $targetType
-                TargetEntityType = $targetEntityType
-                TypedValue = $typedValue
             }
         } catch {
             $rejected += [pscustomobject]@{
