@@ -1,6 +1,6 @@
 # Local Frontier Orchestrator
 
-**Status:** experimental / research prototype (`v0.1-alpha`) · **Validated build:** `v9.3` (`pressure-compaction + explicit-memory recovery`)
+**Status:** experimental / research prototype (`v0.1-alpha`) · **Main build:** `v9.3` (`pressure-compaction + explicit-memory recovery`)
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
@@ -237,7 +237,7 @@ launch\QwenChat.bat -Model "your-local-model:tag"
 
 The local model profile should carry hardware/runtime placement settings appropriate for that machine. The chat client intentionally avoids overriding GPU/CPU placement, context length, or thread count per request.
 
-QwenChat v9.2 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. Each completed turn produces a **0–40 character user-delta-first micro-memory note**; every five turns those notes are compacted into a **0–160 character rolling state**. Exact historical data is not compressed away: the wrapper keeps full conversation JSONL and injects a bounded set of lexically relevant older raw snippets when needed. Complete conversation and research traces remain append-only. The model receives no filesystem tool: PowerShell owns persistence and retrieval deterministically.
+QwenChat v9.3 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. Ordinary memory remains **single-pass**: the LOCAL answer or post-frontier synthesis may emit a bounded 0–40 character user-delta micro-note without a separate per-turn memory inference. Pending notes are compacted into a 0–160 character rolling state when semantic pressure reaches **4 notes or 108 pending-note characters**. If the user explicitly asks the system to remember something and the single-pass note is empty, the wrapper permits at most one focused memory-only recovery call. Exact historical data is not compressed away: full conversation JSONL remains authoritative and bounded relevant raw snippets can be retrieved when needed.
 
 For a clean Windows host bootstrap, see [`docs/NOTEBOOK_SETUP.md`](docs/NOTEBOOK_SETUP.md). Do not copy a tuned context/GPU profile from another machine before measuring the new host.
 
@@ -263,7 +263,7 @@ local model -> ask_codex -> native Codex frontier -> local model
 
 Current work focuses on:
 
-- v9.2 performance work, starting with **single-pass micro-memory** so the bounded note is produced in the existing answer/synthesis pass instead of a second local-model inference;
+- post-v9.3 validation work: longer-term measurement of routing, synthesis, implicit memory quality, and pressure-compaction behaviour across additional hardware tiers;
 - long-term routing quality;
 - faithful-but-useful frontier synthesis;
 - structured trace logging;
