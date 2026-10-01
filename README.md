@@ -1,6 +1,6 @@
 # Local Frontier Orchestrator
 
-**Status:** experimental / research prototype (`v0.1-alpha`) · **Build:** `main v9.1.3` · **Active dev:** `v9.3-dev1` (`pressure-compaction`)
+**Status:** experimental / research prototype (`v0.1-alpha`) · **Main:** `v9.1.3` · **Validated:** `v9.3` (`pressure-compaction + explicit-memory recovery`)
 
 <!-- Build marker maintenance: update the line above whenever the runtime/project version advances (for example v9.x.x -> v9.x.x+1). For smaller meaningful changes that do not warrant a version bump, keep the current version and update or append a short 1–3 word descriptor in this line. Trivial edits do not require a marker change. -->
 
@@ -12,7 +12,7 @@ The current reference implementation uses **Qwen via Ollama** as the local conve
 
 This repository is intentionally experimental. Routing, synthesis policy, context handling, and future bias-balancing behaviour are being tuned through longer-term use rather than optimized around a small fixed benchmark.
 
-As of **2026-09-30**, the first Windows/GPU reference deployment is frozen as a regression baseline, and a clean second Windows host has also passed the same Qwen-first contract on much more constrained CPU-only hardware. The second-host result is a proof-of-concept capacity and portability validation rather than a performance target. QwenChat v9.1.3 now has a validated three-layer persistent-memory baseline on that constrained host: recent raw turns, user-delta micro-memory with normalized compaction, restart continuity, and isolated exact historical retrieval all passed. Clean-host validation also exposed a Windows npm-shim portability issue; QwenChat now prefers `codex.cmd` before falling back to other Codex command shims. The next performance branch targets eliminating the separate post-turn micro-memory inference by generating the micro-note in the existing answer/synthesis pass.
+As of **2026-10-01**, `main` remains the frozen v9.1.3 regression baseline while the v9.3 development line has passed its defined memory-path validation scope. v9.2 validated single-pass micro-memory, eliminating the separate per-turn memory-model call from the normal persistence path. v9.3 adds pressure-triggered compaction (`>=4` pending notes or `>=108` pending-note characters), bounded recovery for explicit memory intent when the single-pass note is empty, invalid-answer sentinel recovery, and hardened correction normalization. Both count-pressure and char-pressure compaction paths passed end-to-end isolated runtime tests; explicit-memory persistence passed with a mix of direct single-pass notes and one bounded memory-only recovery where needed. These are engineering validation results for the tested reference paths, not a statistical reliability claim.
 
 ## Core architecture
 
