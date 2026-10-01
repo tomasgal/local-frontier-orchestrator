@@ -16,26 +16,23 @@ try {
 
     Start-LfoMemoryTransaction $store
     try {
-        Invoke-LfoSqliteNonQuery $store 'INSERT INTO entities(canonical_name, entity_type, created_turn) VALUES (?1, ?2, ?3);' @('Core', 'computer', 1)
-        Invoke-LfoSqliteNonQuery $store 'INSERT INTO entities(canonical_name, entity_type, created_turn) VALUES (?1, ?2, ?3);' @('GTX1050', 'gpu', 1)
-
-        $core = @(Invoke-LfoSqliteQuery $store 'SELECT id FROM entities WHERE canonical_name = ?1;' @('Core'))[0]
-        $gpu  = @(Invoke-LfoSqliteQuery $store 'SELECT id FROM entities WHERE canonical_name = ?1;' @('GTX1050'))[0]
+        $coreId = Resolve-LfoMemoryEntityId $store 'Core' 'computer' 1
+        $gpuId  = Resolve-LfoMemoryEntityId $store 'GTX1050' 'gpu' 1
 
         Invoke-LfoSqliteNonQuery $store @'
 INSERT INTO facts(subject_entity_id, predicate, object_entity_id, valid_from_turn, source_turn)
 VALUES (?1, ?2, ?3, ?4, ?5);
-'@ @([int64]$core.id, 'has_gpu', [int64]$gpu.id, 1, 1)
+'@ @($coreId, 'has_gpu', $gpuId, 1, 1)
 
         Invoke-LfoSqliteNonQuery $store @'
 INSERT INTO facts(subject_entity_id, predicate, literal_type, value_text, valid_from_turn, source_turn)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6);
-'@ @([int64]$gpu.id, 'vendor', 'text', 'NVIDIA', 1, 1)
+'@ @($gpuId, 'vendor', 'text', 'NVIDIA', 1, 1)
 
         Invoke-LfoSqliteNonQuery $store @'
 INSERT INTO facts(subject_entity_id, predicate, literal_type, value_integer, valid_from_turn, source_turn)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6);
-'@ @([int64]$core.id, 'ram_gb', 'integer', 32, 1, 1)
+'@ @($coreId, 'ram_gb', 'integer', 32, 1, 1)
 
         Complete-LfoMemoryTransaction $store
     } catch {
@@ -44,7 +41,8 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6);
     }
 
     $result = @(Invoke-LfoSqliteQuery $store @'
-SELECT c.canonical_name AS computer
+SELECT
+    (SELECT n.name FROM entity_names n WHERE n.entity_id = c.id ORDER BY n.id LIMIT 1) AS computer
 FROM entities c
 JOIN current_facts cg
   ON cg.subject_entity_id = c.id
@@ -60,7 +58,7 @@ WHERE c.entity_type = 'computer'
 
     $schema = @(Invoke-LfoSqliteQuery $store "SELECT value FROM meta WHERE key = 'schema_version';")[0]
 
-    if ($schema.value -ne '2') { throw "Unexpected schema version: $($schema.value)" }
+    if ($schema.value -ne '3') { throw "Unexpected schema version: $($schema.value)" }
     if ($result.Count -ne 1 -or $result[0].computer -ne 'Core') {
         throw ('Unexpected relational query result: ' + ($result | ConvertTo-Json -Compress))
     }
@@ -79,6 +77,7 @@ WHERE c.entity_type = 'computer'
     }
 
     $current = @(Get-LfoMemoryCurrentAttribute $store 'ORION' 'os')
+    $orionId = Resolve-LfoMemoryEntityId $store 'ORION'
     $history = @(Invoke-LfoSqliteQuery $store @'
 SELECT
     f.value_text,
@@ -86,11 +85,10 @@ SELECT
     f.valid_to_turn,
     f.source_turn
 FROM facts f
-JOIN entities e ON e.id = f.subject_entity_id
-WHERE e.canonical_name = 'ORION'
+WHERE f.subject_entity_id = ?1
   AND f.predicate = 'os'
 ORDER BY f.id;
-'@)
+'@ @($orionId))
 
     if ($first.Status -ne 'written') { throw "First SET was not written: $($first.Status)" }
     if ($duplicate.Status -ne 'duplicate') { throw "Duplicate SET was not suppressed: $($duplicate.Status)" }
@@ -144,21 +142,38 @@ ORDER BY f.id;
     $store = Open-LfoMemoryStore $dbPath
 
     $afterRestart = @(Get-LfoMemoryCurrentAttribute $store 'ORION' 'os')
+    $coreAfterRestart = Resolve-LfoMemoryEntityId $store 'Core'
+    $gpuAfterRestart = Resolve-LfoMemoryEntityId $store 'GTX1050'
     $relationAfterRestart = @(Invoke-LfoSqliteQuery $store @'
-SELECT s.canonical_name AS subject, f.predicate, o.canonical_name AS object, f.source_turn
+SELECT f.predicate, f.source_turn
 FROM current_facts f
-JOIN entities s ON s.id = f.subject_entity_id
-JOIN entities o ON o.id = f.object_entity_id
-WHERE s.canonical_name = ?1
+WHERE f.subject_entity_id = ?1
   AND f.predicate = ?2
-  AND o.canonical_name = ?3;
-'@ @('Core', 'has_gpu', 'GTX1050'))
+  AND f.object_entity_id = ?3;
+'@ @($coreAfterRestart, 'has_gpu', $gpuAfterRestart))
 
     if ($afterRestart.Count -ne 1 -or $afterRestart[0].Value -ne 'Ubuntu 24.04') {
         throw ('Restart persistence failed for attribute: ' + ($afterRestart | ConvertTo-Json -Compress))
     }
     if ($relationAfterRestart.Count -ne 1) {
         throw ('Restart persistence failed for relation: ' + ($relationAfterRestart | ConvertTo-Json -Compress))
+    }
+
+    # Surface names are mentions, not identity. Deterministic normalization may
+    # resolve obvious formatting variants to the same opaque entity_id.
+    $gpuAlias1 = Resolve-LfoMemoryEntityId $store 'GTX 1050' 'gpu' 22
+    $gpuAlias2 = Resolve-LfoMemoryEntityId $store 'gtx-1050' 'gpu' 23
+    if ($gpuAlias1 -ne $gpuAfterRestart -or $gpuAlias2 -ne $gpuAfterRestart) {
+        throw 'Entity mention normalization created duplicate identities.'
+    }
+    $gpuNames = @(Invoke-LfoSqliteQuery $store @'
+SELECT name, normalized_name
+FROM entity_names
+WHERE entity_id = ?1
+ORDER BY id;
+'@ @($gpuAfterRestart))
+    if ($gpuNames.Count -lt 3) {
+        throw "Expected surface-form history for GTX1050; got $($gpuNames.Count) names."
     }
 
     # Scope isolation: the same logical key can have independent current state.
@@ -195,9 +210,11 @@ WHERE s.canonical_name = ?1
         RealValue = $tempNow[0].Value
         RelationDuplicate = $relationDuplicate.Status
         RestartAttribute = $afterRestart[0].Value
-        RestartRelation = $relationAfterRestart[0].object
+        RestartRelation = 'GTX1050'
         ScopeA = $scopeAValue[0].Value
         ScopeB = $scopeBValue[0].Value
+        AliasSameEntity = ($gpuAlias1 -eq $gpuAfterRestart -and $gpuAlias2 -eq $gpuAfterRestart)
+        EntityNameRows = $gpuNames.Count
         Database = $dbPath
         ProductionMemoryTouched = $false
     } | Format-List
