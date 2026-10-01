@@ -13,7 +13,7 @@ Return memory_ops only through the runtime-enforced JSON schema.
 
 Operation rules:
 - SET_TEXT: current scalar text value.
-- SET_INTEGER: current integer value. target MUST contain only an optional leading minus sign and decimal digits, e.g. 64.
+- SET_INTEGER: current integer value. target MUST contain only an optional leading minus sign and decimal digits, e.g. 64. Never wrap the number in braces, brackets, units, or prose; use "32", not "{32}" or "32 GB".
 - SET_REAL: current real-number value. target MUST use invariant decimal notation with '.', e.g. 83.5.
 - SET_BOOLEAN: current boolean value. target MUST be exactly true or false.
 - ADD_RELATION: subject is explicitly related to another entity; target is that entity mention.
