@@ -1,6 +1,6 @@
 # Local Frontier Orchestrator
 
-**Status:** experimental / research prototype (`v0.1-alpha`)
+**Status:** experimental / research prototype (`v0.1-alpha`) · **Validated build:** `v9.3` (`pressure-compaction + explicit-memory recovery`)
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
@@ -14,7 +14,7 @@ This repository is intentionally experimental. Routing, synthesis policy, contex
 
 For the rationale behind the conversational-memory architecture, trade-offs against other memory systems, and the planned path from single-pass micro-memory to pressure-triggered and eventually keyed/deterministic memory updates, see [docs/MEMORY_STRATEGY.md](docs/MEMORY_STRATEGY.md).
 
-As of **2026-10-01**, the first Windows/GPU reference deployment remains the frozen regression baseline, and a clean second Windows host has passed the same Qwen-first contract on much more constrained CPU-only hardware. QwenChat v9.2 adds validated **single-pass micro-memory** on that constrained host: LOCAL answers and post-frontier synthesis emit a schema-constrained hidden micro-note in the same inference, while the wrapper persists it without a second per-turn model call. The three-layer memory architecture remains intact: recent raw turns, compact rolling memory, restart continuity, and selective exact historical retrieval. In the constrained-host validation, ordinary memory persistence fell from roughly 18–21 seconds in v9.1.3 to commonly about 0.01–0.05 seconds; five-turn compaction remains a separate inference. Clean-host validation also exposed a Windows npm-shim portability issue; QwenChat prefers `codex.cmd` before falling back to other Codex command shims.
+As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validation scope on the constrained reference hardware. It preserves v9.2 single-pass micro-memory as the normal path, adds pressure-triggered compaction at `>=4` pending notes or `>=108` pending-note characters, and uses at most one focused memory-only recovery when the user explicitly asks the system to remember something but the single-pass note is empty. Invalid final-answer sentinels are also recovered without regenerating memory, and correction-prefix normalization is hardened across `CORR`, `CORR:` and `CORR :` variants. Isolated end-to-end tests passed both count-pressure and char-pressure compaction, while ordinary implicit memory remains single-pass. Raw JSONL history remains authoritative; rolling memory remains a lossy orientation layer.
 
 ## Core architecture
 
