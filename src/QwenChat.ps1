@@ -317,7 +317,7 @@ function Get-QwenLocalOutputFormat {
             }
             answer = @{
                 type = 'string'
-                description = 'For LOCAL: fully answer the current user request; do not substitute the memory_note topic for the requested answer. For FRONTIER: empty.'
+                description = 'For LOCAL: fully answer the current user request in the normal way. For FRONTIER: empty.'
             }
             memory_note = @{
                 type = 'string'
