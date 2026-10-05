@@ -705,28 +705,39 @@ function Invoke-Qwen([string]$Prompt) {
                 $inlineMemoryNote = $structured.MemoryNote
                 $inlineMemoryOps = $structured.MemoryOps
                 if (Test-QwenInvalidFinalAnswer $finalContent) {
+                    $cleanDeclarativeL2 = (Test-DeclarativeStateUpdatePrompt $Prompt) -and
+                        @($inlineMemoryOps.Valid).Count -gt 0 -and
+                        @($inlineMemoryOps.Rejected).Count -eq 0
+
                     $answerRecoveryUsed = $true
-                    $answerRecoveryReason = if ($finalContent -eq '-') {
-                        'local-sentinel'
+                    if ($cleanDeclarativeL2) {
+                        $answerRecoveryReason = 'local-declarative-ack'
+                        $answerRecoverySuccess = $true
+                        $finalContent = 'OK.'
+                        Write-Host "[Qwen answer invalid; using deterministic declarative acknowledgement.]" -ForegroundColor DarkGray
                     } else {
-                        'local-empty'
-                    }
-                    $answerRecoverySuccess = $false
-                    Write-Host "[Qwen answer invalid; trying one LOCAL answer-only recovery.]" -ForegroundColor Yellow
-                    try {
-                        $recoveryResponse = Invoke-QwenAnswerRecovery $Prompt
-                        Show-QwenThinking $recoveryResponse
-                        $recoveredAnswer = Get-QwenRecoveredAnswer (Get-CleanQwenContent $recoveryResponse)
-                        if ([string]$recoveryResponse.done_reason -ne 'length' -and
-                            -not (Test-QwenInvalidFinalAnswer $recoveredAnswer)) {
-                            $finalContent = $recoveredAnswer
-                            $answerRecoverySuccess = $true
+                        $answerRecoveryReason = if ($finalContent -eq '-') {
+                            'local-sentinel'
+                        } else {
+                            'local-empty'
                         }
-                    } catch {
-                        Write-Host "[Qwen answer recovery failed.]" -ForegroundColor Yellow
-                    }
-                    if (-not $answerRecoverySuccess) {
-                        $finalContent = 'The local model could not produce a usable answer. Please try again.'
+                        $answerRecoverySuccess = $false
+                        Write-Host "[Qwen answer invalid; trying one LOCAL answer-only recovery.]" -ForegroundColor Yellow
+                        try {
+                            $recoveryResponse = Invoke-QwenAnswerRecovery $Prompt
+                            Show-QwenThinking $recoveryResponse
+                            $recoveredAnswer = Get-QwenRecoveredAnswer (Get-CleanQwenContent $recoveryResponse)
+                            if ([string]$recoveryResponse.done_reason -ne 'length' -and
+                                -not (Test-QwenInvalidFinalAnswer $recoveredAnswer)) {
+                                $finalContent = $recoveredAnswer
+                                $answerRecoverySuccess = $true
+                            }
+                        } catch {
+                            Write-Host "[Qwen answer recovery failed.]" -ForegroundColor Yellow
+                        }
+                        if (-not $answerRecoverySuccess) {
+                            $finalContent = 'The local model could not produce a usable answer. Please try again.'
+                        }
                     }
                 }
             }
