@@ -65,17 +65,20 @@ L3 is a possible future retrieval layer, not a v9.4 commitment and not an author
 
 Initial acceptance targets include multi-delta extraction, typed values and relations, deterministic correction/deduplication, source-turn provenance, restart persistence, a simple multi-relation query, coexistence with L1, and no regression of the validated v9.3 path.
 
-Current v9.4-dev3 status (2026-10-02):
+Current v9.4-dev3 status (2026-10-05):
 
 - schema 3 uses opaque integer entity identity; names are surface forms in a separate `entity_names` table rather than canonical identifiers;
 - deterministic normalization resolves trivial spelling-format variants such as spacing/hyphen differences, while ambiguous identity is intentionally left for a future resolver/L3 rather than silently guessed;
 - the model-side operation schema uses `SET_TEXT`, `SET_INTEGER`, `SET_REAL`, `SET_BOOLEAN`, and `ADD_RELATION`; scalar type is encoded in the op name to reduce cross-field inconsistency on small local models;
 - LOCAL and post-FRONTIER synthesis use the same `memory_ops[]` contract; FRONTIER results are interpreted by the local synthesis model as an external information input, not piped directly into SQLite;
 - multi-op writes are atomic per turn; any genuinely rejected operation causes the whole L2 turn-set to be skipped while L0 retains the raw evidence;
-- isolated TEMP tests pass schema, typed values, relations, restart persistence, alias normalization, scope isolation, atomic apply, and fail-closed rejection;
-- live write validation passed for a three-fact turn, and a later scalar correction produced correct historical supersession with source-turn provenance;
-- L2 write overhead was measured far below local-model inference latency in the live smoke test;
-- L2 retrieval into Qwen context remains pending, so v9.4-dev3 is not yet a full read/write structured-memory release.
+- isolated store tests pass schema, typed values, relations, restart persistence, alias normalization, scope isolation, atomic apply, and fail-closed rejection on both tested Windows host classes;
+- the constrained CPU-only notebook independently reproduced the extraction battery: dense four-fact turn `4/0`, relation turn `3/0`, correction `1/0`, preference-only `0/0`, post-FRONTIER synthesis `3/0` (valid/rejected);
+- the same notebook confirmed a real 5120-token Ollama runtime context and a live four-fact L2 write followed by a LOCAL correction whose old scalar value was closed with `valid_to_turn` and replaced by the new current value;
+- SQLite work remains negligible relative to local inference: measured live L2 writes were roughly hundredths of a second to about one second, while constrained-host local turns take tens to hundreds of seconds;
+- a post-dev3 optimization candidate is committed but not yet runtime-validated: LOCAL temperature `0.20 -> 0.10`, L2 policy `2414 -> 917` characters, removal of an additional 871-character duplicated LOCAL rule block, and a narrow deterministic acknowledgement path that skips an answer-only retry for pure declarative updates with a valid L2 set;
+- the optimization candidate includes an offline deterministic regression test, but it must still pass that test, the L2 extraction battery, and a live same-fixture benchmark on the next available host before it becomes a validated checkpoint;
+- L2 retrieval into Qwen context remains pending. The next architectural step is still the read/retrieval path, but only after the prompt/policy optimization boundary is validated.
 
 
 ## Multi-host
