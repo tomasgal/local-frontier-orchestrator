@@ -416,9 +416,9 @@ The local model therefore never needs to know SQL and does not need to decide th
 
 This division is why an embedded relational engine is useful even at small scale: the value is not dataset size but deterministic state semantics, relational queries, provenance, and transactions without adding a database server or exposing storage machinery to the model.
 
-### v9.4-dev3 implementation checkpoint — 2026-10-02
+### v9.4-dev3 implementation checkpoint — updated 2026-10-05
 
-The current development implementation has reached the structured **write** boundary:
+The structured **write** boundary is now validated across two materially different Windows host classes:
 
 - schema 3: `entities(id, entity_type, ...)` plus `entity_names(entity_id, name, normalized_name, source_turn, ...)`;
 - entity names are mentions/surface forms, not identity keys;
@@ -428,8 +428,20 @@ The current development implementation has reached the structured **write** boun
 - scalar replacement closes the previous current fact through `valid_to_turn` and inserts the new current value;
 - a mixed valid/rejected operation set is fail-closed for L2 rather than partially written;
 - LOCAL and synthesis structured outputs share one `memory_ops[]` contract;
-- production smoke tests confirmed three-fact atomic persistence and later supersession of one current value;
-- L2 reads are not yet supplied to prompt construction. That is the next major integration boundary after host validation.
+- the desktop reference host validated live atomic persistence and scalar supersession;
+- a constrained CPU-only 8 GB notebook independently passed the complete store regression and reproduced the L2 extraction battery with no rejected operations, then live-wrote four facts and correctly superseded one scalar value on a LOCAL correction;
+- the notebook also reproduced the narrow Qwen integer serialization quirk (`"{32}"`) already seen on the desktop host, and the deterministic brace-wrapped-integer normalization handled it as designed;
+- measured SQLite write time remains negligible compared with local-model inference, so current optimization work targets prompt/model overhead rather than storage.
+
+A **post-dev3 optimization candidate** is implemented on the development branch but is not yet a validated checkpoint:
+
+- LOCAL generation temperature is reduced from `0.20` to `0.10`;
+- the L2 extraction policy is compressed deterministically from 2,414 to 917 characters while retaining the operation and type contract;
+- an additional 871-character duplicated LOCAL structured-output instruction block is removed;
+- a conservative wrapper detector permits a deterministic acknowledgement instead of a second full local inference only when a pure declarative state update already produced a non-empty, fully valid L2 operation set;
+- an offline regression script checks syntax, the compact policy contract, temperature, and positive/negative declarative-fallback fixtures.
+
+The optimization candidate must still pass the offline regression, the unchanged extraction battery, and a same-fixture live benchmark on a host before promotion. L2 reads are not yet supplied to prompt construction; read/retrieval remains the next major architectural integration boundary after this tuning pass.
 
 
 ### Non-goals for v9.4
@@ -553,9 +565,11 @@ LFO is not the first system to explore persistent or same-call memory. The relev
 
 | System | Public memory pattern | LFO relationship |
 | --- | --- | --- |
-| **LangMem / LangGraph** | Supports memory formation in the hot path or in background reflection. Its documentation explicitly notes the latency trade-off of hot-path formation. | LFO keeps immediate memory formation but avoids a second hot-path inference by piggybacking the micro-note on the answer/synthesis generation. |
-| **Mem0** | Uses extracted memories plus retrieval; its 2026 memory pipeline describes single-pass ADD-only extraction, entity linking, and multi-signal retrieval. | LFO currently uses a much smaller local pipeline: single-pass answer-side extraction, tiny rolling state, and lexical exact-history retrieval. Entity/key structure is a plausible future convergence point. |
-| **Letta** | Uses persistent memory blocks that remain in context, plus archival/vector-backed memory. | LFO uses a much smaller always-present rolling state because constrained local context is a primary design target; detailed history is retrieved only when needed. |
+| **[Memori](https://memorilabs.ai/docs/memori-byodb/concepts/architecture/)** | SQL-native BYODB memory over SQLite/PostgreSQL/MySQL and other databases. It captures raw interactions, asynchronously extracts facts and semantic triples, builds a knowledge graph, generates local embeddings, and injects recalled memories on later calls. | This is the closest public analogue to LFO's SQL direction. Memori is a general memory middleware with semantic/vector recall and asynchronous augmentation; LFO is intentionally narrower for a small local model: same-pass bounded extraction, typed current-state operations, explicit supersession/provenance, and no embeddings by default. |
+| **[LangGraph SQLite Store / Checkpointer](https://github.com/langchain-ai/langgraph/tree/main/libs/checkpoint-sqlite)** | SQLite can persist graph checkpoints and application-defined key/value JSON; the store can optionally add vector search. It is deliberately generic rather than prescribing semantic fact extraction. | LFO shares the embedded/local persistence philosophy but places a stronger domain contract above SQLite: entities, typed facts, relations, current validity, provenance and fail-closed turn transactions. |
+| **[Open WebUI Memory](https://docs.openwebui.com/features/chat-conversations/memory/)** | Local per-user memory snippets are managed through add/update/replace/delete/search tools and can be injected into system context under explicit character budgets. Its documentation warns that very small local models may struggle with autonomous memory selection. | LFO avoids relying on autonomous memory tools for the 4B reference model. The wrapper owns persistence and bounded extraction, while the model emits a narrow schema-constrained side channel. |
+| **[Letta](https://docs.letta.com/v1-sdk/memory/memory-blocks)** | Persistent memory blocks are pinned into the context window and can be edited or shared across agents; older messages remain retrievable outside the active context. | LFO's L1 is analogous to a much smaller working-memory block, while L0 raw history and the emerging L2 fact store are kept explicitly separate to conserve constrained context. |
+| **Mem0** | Uses extracted memories plus retrieval and entity-oriented memory management. | LFO currently uses a smaller local pipeline and treats semantic retrieval as optional L3 rather than a prerequisite for exact current-state replacement. |
 | **Sonzai** | Documents a dual-output pattern where the same LLM call emits a reply plus a hidden `[MEMORY: ...]` line; deeper extraction can run asynchronously. | LFO uses the same broad no-second-roundtrip idea, but moved the hidden channel to schema-constrained JSON after text-marker reliability proved insufficient on the tested small local model. |
 
 These systems solve overlapping but not identical problems. LFO intentionally favors a minimal, inspectable architecture that can run locally and can be measured on weak hardware.
