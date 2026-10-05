@@ -179,6 +179,30 @@ function Test-ExplicitMemoryIntentPrompt([string]$Prompt) {
     return $false
 }
 
+function Test-DeclarativeStateUpdatePrompt([string]$Prompt) {
+    if ([string]::IsNullOrWhiteSpace($Prompt)) { return $false }
+
+    if ((Test-ExplicitCorrectionPrompt $Prompt) -or
+        (Test-ExplicitMemoryIntentPrompt $Prompt)) {
+        return $true
+    }
+
+    $text = $Prompt.Trim()
+    if ($text -match '\?\s*$') { return $false }
+
+    $requestPatterns = @(
+        '(?i)^\s*(?:prosím[\s,:-]+)?(?:zhrň|zhrn|sumarizuj|vysvetli|analyzuj|prelož|preloz|porovnaj|napíš|napis|vytvor|nájdi|najdi|povedz|ukáž|ukaz|skontroluj|over|vyhodnoť|vyhodnot|sprav|daj|pozri)\b',
+        '(?i)^\s*(?:please[\s,:-]+)?(?:summari[sz]e|explain|analy[sz]e|translate|compare|write|draft|create|find|tell|show|check|verify|evaluate|review|give|look\s+up)\b',
+        '(?i)^\s*(?:what|why|how|when|where|who|which|can|could|would|should|is|are|do|does|did)\b',
+        '(?i)^\s*(?:čo|co|prečo|preco|ako|kedy|kde|kto|ktor\p{L}*|vieš|vies|môžeš|mozes|mám|mam)\b'
+    )
+
+    foreach ($pattern in $requestPatterns) {
+        if ($text -match $pattern) { return $false }
+    }
+    return $true
+}
+
 function Normalize-MemoryNoteForPrompt([string]$Note, [string]$Prompt) {
     if ([string]::IsNullOrWhiteSpace($Note)) { return '' }
 
@@ -534,22 +558,6 @@ Use them to resolve references and preserve continuity. Repetition increases rel
 When historical values conflict, prefer explicit later corrections and state uncertainty if needed.
 "@
     }
-
-    $systemText += @"
-
-STRUCTURED OUTPUT — FINAL RULES:
-Treat answer and memory_note as independent fields.
-
-For route LOCAL:
-- answer must fully answer the CURRENT USER REQUEST in the normal way.
-- memory_note must capture only the NEW durable delta introduced by the CURRENT USER TURN, even when that delta is unrelated to the requested answer.
-- Do not shorten, redirect, or reshape answer merely to make memory_note easier.
-- Use "-" when the current user turn adds no durable user state.
-- Ignore old STATE, PENDING, RELEVANT OLD DATA, and older turns when deciding memory_note.
-- If the current user turn explicitly corrects or replaces an earlier value, prefix memory_note with "CORR " and include enough target/key identity plus the new/current value to make the replacement unambiguous.
-
-For route FRONTIER, answer must be empty and memory_note must be "-".
-"@
 
     $l2EvidenceScope = @'
 For route LOCAL, the L2 evidence is the CURRENT USER TURN as interpreted by this Qwen pass.
