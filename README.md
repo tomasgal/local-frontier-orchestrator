@@ -120,6 +120,8 @@ The local model is a replaceable executor. Qwen is the current reference impleme
 
 This project was partly motivated by experiments with [Codex Router](https://github.com/duolahypercho/codex-router).
 
+The relationship is not purely downstream: **contributed local Ollama context and timeout support to Codex Router; merged upstream in [PR #925](https://github.com/duolahypercho/codex-router/pull/925).**
+
 A separate experimental path successfully demonstrated the inverse topology:
 
 ```text
