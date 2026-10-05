@@ -1,6 +1,6 @@
 # Local Frontier Orchestrator
 
-**Status:** experimental / research prototype (`v0.1-alpha`) · **Main build:** `v9.3` (`pressure-compaction + explicit-memory recovery`)
+**Status:** experimental / research prototype (`v0.1-alpha`) · **Main build:** `v9.3` (`pressure-compaction + explicit-memory recovery`) · **Active development:** `v9.4` L2 structured memory (`v9.4-dev3` write-side validated on two host classes; post-dev3 prompt/policy tuning pending validation)
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
@@ -265,7 +265,7 @@ local model -> ask_codex -> native Codex frontier -> local model
 
 Current work focuses on:
 
-- v9.4 L2 structured-memory work: typed facts/relations, multi-delta extraction, deterministic state updates and relational queries behind a stable MemoryStore abstraction;
+- v9.4 L2 structured-memory work on branch `v9.4-l2-structured-memory`: `v9.4-dev3` write-side semantics are validated across two host classes; a post-dev3 prompt/policy optimization candidate is implemented but not yet runtime-validated; L2 read/retrieval integration remains the next architectural boundary;
 - long-term routing quality;
 - faithful-but-useful frontier synthesis;
 - structured trace logging;
