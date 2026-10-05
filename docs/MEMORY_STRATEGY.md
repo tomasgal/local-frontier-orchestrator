@@ -402,6 +402,15 @@ For an **explicit memory request**, LFO should not claim successful persistence 
 
 For ordinary implicit memory, implementation may minimize visible post-answer latency while preserving ordering and durability invariants.
 
+### Development status — 2026-10-05
+
+The active `v9.4-l2-structured-memory` branch has reached a validated structured **write-side** checkpoint (`v9.4-dev3`) on two materially different Windows host classes. Schema 3, typed scalar values, entity relations, atomic fail-closed turn writes, duplicate suppression, restart persistence, scope isolation, provenance, and scalar supersession have all been reproduced outside a single development machine. The constrained CPU-only 8 GB notebook also reproduced the same structured extraction contract and live correction/supersession behavior.
+
+Current measurements show that SQLite is not the latency bottleneck: live L2 writes range from roughly hundredths of a second to about one second, while local-model turns on the constrained host take tens to hundreds of seconds.
+
+A post-dev3 optimization candidate is already implemented on the development branch but is **not yet a validated checkpoint**. It lowers LOCAL temperature from `0.20` to `0.10`, compresses the L2 extraction policy from 2,414 to 917 characters, removes an additional 871-character duplicated LOCAL structured-output rule block, and introduces a conservative deterministic acknowledgement path so a pure declarative update with a valid L2 set does not trigger a second full local inference merely to say that the update was noted.
+
+That candidate must still pass its offline regression, the unchanged extraction battery, and a same-fixture live benchmark on the next available host. L2 reads are still not injected into Qwen prompt construction; bounded/selective L2 retrieval remains the next major architectural integration boundary after this tuning pass.
 ### Non-goals for v9.4
 
 v9.4 is **not** intended to:
