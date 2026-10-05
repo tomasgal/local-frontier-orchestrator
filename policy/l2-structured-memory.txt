@@ -1,44 +1,21 @@
-You extract L2 structured factual memory operations for Local Frontier Orchestrator.
+L2 STRUCTURED MEMORY
 
-EVIDENCE SCOPE FOR THIS PASS:
+Evidence:
 {{L2_EVIDENCE_SCOPE}}
 
-Use only durable factual state established within that evidence scope and accepted by the current Qwen pass.
-Do not mechanically copy every fact merely because it appears in an input.
-Do not extract facts only from older conversational context unless this turn re-establishes them.
-Do not infer hidden facts, beliefs, motives, preferences, or uncertain claims.
-L1 conversational memory handles goals/preferences/free-form semantic continuity; L2 is for factual state and explicit relations.
+Emit memory_ops only for durable factual state or explicit relations established by this evidence and accepted by the current Qwen pass. Do not infer hidden facts, preferences, motives, or uncertain claims. Ignore older context unless this turn re-establishes the fact. Return [] if none.
 
-Return memory_ops only through the runtime-enforced JSON schema.
+Ops:
+- SET_TEXT: text scalar.
+- SET_INTEGER: /^-?\d+$/ only; no braces, units, or prose.
+- SET_REAL: invariant decimal with ".", e.g. 83.5.
+- SET_BOOLEAN: exactly true or false.
+- ADD_RELATION: explicit relation to another entity.
+- Correction: SET_* with the new value.
 
-Operation rules:
-- SET_TEXT: current scalar text value.
-- SET_INTEGER: current integer value. target MUST contain only an optional leading minus sign and decimal digits, e.g. 64. Never wrap the number in braces, brackets, units, or prose; use "32", not "{32}" or "32 GB".
-- SET_REAL: current real-number value. target MUST use invariant decimal notation with '.', e.g. 83.5.
-- SET_BOOLEAN: current boolean value. target MUST be exactly true or false.
-- ADD_RELATION: subject is explicitly related to another entity; target is that entity mention.
-- A correction is simply another SET_* operation for the same subject + predicate with the new current value.
-- Do not emit duplicate operations inside one turn.
-- subject and target are surface mentions, not canonical identifiers. Preserve a short useful form from the evidence; the wrapper resolves entity identity.
-- Do not invent aliases or rewrite a mention merely to make it look canonical.
-- predicate must be concise lowercase snake_case.
-- subject_type and target_entity_type are lightweight descriptive hints such as computer, gpu, server, person, project; they are not entity identity.
-- target_entity_type MUST be empty for every SET_* operation.
-- target_entity_type may be used only for ADD_RELATION.
-- Emit [] when this pass establishes no suitable L2 fact.
-
-Examples:
-"ORION has 64 GB RAM." ->
-SET_INTEGER ORION / ram_gb / 64
-
-"Core has a GTX1050." ->
-ADD_RELATION Core / has_gpu / GTX1050 / gpu
-
-"GTX1050 is NVIDIA." ->
-SET_TEXT GTX1050 / vendor / NVIDIA
-
-"Nightly backups are enabled on ORION." ->
-SET_BOOLEAN ORION / nightly_backups_enabled / true
-
-"Correction: ORION now runs Ubuntu 24.04 instead of Debian 12." ->
-SET_TEXT ORION / os / Ubuntu 24.04
+Rules:
+- subject/target are short surface mentions, not canonical IDs.
+- predicate is concise lowercase snake_case.
+- subject_type/target_entity_type are descriptive hints only.
+- target_entity_type must be empty for SET_*; use it only for ADD_RELATION.
+- do not invent aliases or emit duplicate ops
