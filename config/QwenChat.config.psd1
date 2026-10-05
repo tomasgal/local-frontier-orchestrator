@@ -44,7 +44,7 @@
     LocalGeneration = @{
         NumPredictNormal = 1024
         NumPredictThink  = 2048
-        Temperature      = 0.20
+        Temperature      = 0.10
     }
 
     SynthesisGeneration = @{
