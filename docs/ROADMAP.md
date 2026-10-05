@@ -32,7 +32,7 @@ This roadmap describes engineering directions, not release commitments.
 
 ## v9.4 milestone — L2 structured memory
 
-v9.4 is the next planned memory milestone after the validated v9.3 baseline.
+v9.4 is the active memory-development milestone after the validated v9.3 baseline. The implementation remains on branch `v9.4-l2-structured-memory`; `main` stays on the validated v9.3 runtime until the v9.4 boundary is ready for promotion.
 
 Purpose:
 
@@ -64,6 +64,15 @@ L3  optional semantic index    future embeddings/entity linking/reranking only i
 L3 is a possible future retrieval layer, not a v9.4 commitment and not an authoritative replacement mechanism.
 
 Initial acceptance targets include multi-delta extraction, typed values and relations, deterministic correction/deduplication, source-turn provenance, restart persistence, a simple multi-relation query, coexistence with L1, and no regression of the validated v9.3 path.
+
+Current development status (2026-10-05):
+
+- **v9.4-dev3 write-side validation is complete across two host classes**: a desktop reference host and a constrained CPU-only 8 GB notebook independently passed the schema-3 store path, typed values/relations, duplicate suppression, restart persistence, scope isolation, atomic fail-closed multi-op application, source-turn provenance, and scalar supersession;
+- the constrained notebook also reproduced the structured extraction battery with no rejected operations and confirmed a real 5120-token Ollama runtime context;
+- measured L2 SQLite writes remain negligible relative to local-model inference (roughly hundredths of a second to about one second versus local turns taking tens to hundreds of seconds);
+- a **post-dev3 prompt/policy optimization candidate is implemented but not yet runtime-validated**: LOCAL temperature `0.20 -> 0.10`, L2 extraction policy `2414 -> 917` characters, removal of an additional 871-character duplicated LOCAL rule block, and a narrow deterministic acknowledgement path that avoids a second local inference for pure declarative updates that already produced a fully valid L2 operation set;
+- before beginning the L2 read path, the optimization candidate must pass its offline regression, the unchanged extraction battery, and a same-fixture live benchmark on the next available host;
+- **L2 read/retrieval injection into Qwen context remains pending** and is the next architectural boundary after this tuning pass.
 
 ## Multi-host
 
