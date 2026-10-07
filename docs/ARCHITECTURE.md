@@ -125,6 +125,22 @@ Runtime/model profiles own:
 
 This supports heterogeneous deployments: a modern GPU host, an older CPU-oriented host, or an edge/SBC accelerator can all present the same orchestration contract.
 
+
+### Hardware portability and optimization rule
+
+Performance work in the shared LFO architecture is **architecture-first, not host-first**.
+
+The primary expected gains should come from reducing or reorganizing work that exists on every supported host: fewer model passes, smaller and better-bounded prompts, deduplicated retrieval/context assembly, selective memory reads, better phase scheduling, and avoiding unnecessary serialization or blocking. v9.4-dev4 and v9.4-dev5 should be judged primarily on these general mechanisms.
+
+Host-specific tuning remains useful, but secondary:
+
+- thread counts, affinity, accelerator placement, context capacity, driver/runtime knobs, and similar settings belong in runtime/model profiles;
+- a host-specific knob may improve one deployment, but it must not become a dependency of the common orchestration architecture;
+- common optimizations should have a plausible hardware-independent mechanism and should be checked across materially different host classes when practical;
+- an optimization that wins only because it is narrowly fitted to one CPU/GPU/memory configuration should stay an optional host profile rather than a project-wide default.
+
+The project therefore prefers **portable reductions in total work and contention** over extracting the last few percent from one reference machine.
+
 ## 6. Policy and configuration boundary
 
 The Windows reference implementation keeps process-control logic separate from behavioural policy:
