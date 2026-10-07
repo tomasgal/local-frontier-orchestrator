@@ -14,6 +14,8 @@ This repository is intentionally experimental. Routing, synthesis policy, contex
 
 For the rationale behind the conversational-memory architecture, trade-offs against other memory systems, and the planned path from single-pass micro-memory to pressure-triggered and eventually keyed/deterministic memory updates, see [docs/MEMORY_STRATEGY.md](docs/MEMORY_STRATEGY.md).
 
+For an optional external-knowledge integration pattern using a human-curated DokuWiki, deterministic graph/section structure, and a compact lexical rescue index, see [docs/DOKUWIKI_SEARCH_SUBSYSTEM.md](docs/DOKUWIKI_SEARCH_SUBSYSTEM.md). This is intentionally separate from LFO's internal L0-L3 memory hierarchy.
+
 As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validation scope on the constrained reference hardware. It preserves v9.2 single-pass micro-memory as the normal path, adds pressure-triggered compaction at `>=4` pending notes or `>=108` pending-note characters, and uses at most one focused memory-only recovery when the user explicitly asks the system to remember something but the single-pass note is empty. Invalid final-answer sentinels are also recovered without regenerating memory, and correction-prefix normalization is hardened across `CORR`, `CORR:` and `CORR :` variants. Isolated end-to-end tests passed both count-pressure and char-pressure compaction, while ordinary implicit memory remains single-pass. Raw JSONL history remains authoritative; rolling memory remains a lossy orientation layer.
 
 ## Core architecture
