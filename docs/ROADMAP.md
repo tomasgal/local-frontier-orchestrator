@@ -121,6 +121,7 @@ Method:
 - keep semantic/retrieval regression tests unchanged while measuring performance candidates;
 - reject platform-specific tuning that does not reproduce on the target host class;
 - promote only results that are repeatable and large enough to matter relative to run-to-run variance.
+- the steady-state dev5 runtime, **including any always-on observability overhead introduced by dev4**, must remain faster than the comparable dev3 baseline; diagnostic tracing may be more expensive only when explicitly enabled. Any dev4 overhead that remains enabled by default must be more than compensated by dev5's architectural savings.
 
 This sequence intentionally separates **dev3 correctness validation**, **dev4 observability/read-side context assembly**, and **dev5 optimization experiments** so performance gains remain causally interpretable.
 
