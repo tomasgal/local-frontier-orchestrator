@@ -4,7 +4,7 @@
 
 This document describes an **optional external knowledge-retrieval subsystem** that can be used alongside Local Frontier Orchestrator (LFO).
 
-It is not required by the LFO runtime, it is not part of the current L0-L3 conversational-memory hierarchy, and it should not be interpreted as a new authoritative memory layer.
+It is not required by the LFO runtime, it remains outside LFO's internal L0-L4 architecture, and it should not be interpreted as a new authoritative memory layer.
 
 The reference design was developed for a human-curated DokuWiki corpus mirrored to Git. Its purpose is to let an agent recover small, precise pieces of canonical wiki content without treating the wiki itself as model memory and without requiring a large vector/RAG stack.
 
@@ -264,42 +264,47 @@ cheap structural retrieval
 
 This is conceptually compatible with LFO's local-first and bounded-escalation philosophy.
 
-### Not L4 memory
+### External knowledge, L3 and L4
 
-It is tempting to call a large external wiki an additional LFO memory level, for example "L4".
+A DokuWiki corpus is **not L4**.
 
-The current design deliberately avoids doing that.
-
-LFO's memory hierarchy has different semantics:
+The current architectural terminology is:
 
 ```text
 L0  authoritative raw interaction history
 L1  lossy conversational working memory
 L2  structured current factual state
-L3  optional associative/semantic memory retrieval
+L3  retrieval & resolution fabric
+L4  research / epistemic analysis output
 ```
 
-A DokuWiki corpus is different.
+DokuWiki is different from all five layers. It is an independently authored and curated external corpus with its own source history and revision lifecycle.
 
-It is:
-
-- independently authored and curated;
-- useful outside a particular conversation;
-- governed by its own source and revision history;
-- not created by the LFO memory pipeline;
-- potentially shared across users, projects or agents;
-- able to contain knowledge that LFO has never encountered in conversation.
-
-The safer architectural interpretation is therefore:
+The useful connection is through **L3**:
 
 ```text
-LFO internal memory:        L0-L3
-External knowledge plane:   DokuWiki, documents, repositories, web, ...
+DokuWiki search subsystem
+          |
+          v
+L3 external-knowledge adapter
+          |
+          v
+selected canonical wiki segments
+          |
+          +--> ordinary LFO context when needed
+          |
+          +--> L4 research analysis
 ```
 
-A DokuWiki adapter may expose that external knowledge to LFO, but importing the source into the memory hierarchy is neither required nor implied.
+For L4, the search subsystem can retrieve conceptual or methodological context, previous project decisions, relevant definitions, or other canonical material needed to interpret an interaction event. The search result is input context for analysis; it is not itself an L4 observation.
 
-This distinction also prevents the memory layer from becoming a taxonomy of data sources (wiki = L4, GitHub = L5, web = L6, and so on).
+This distinction is deliberate:
+
+- **DokuWiki** stores curated external knowledge;
+- **L3** finds/resolves relevant evidence and context;
+- **L4** records derived research interpretations such as bias observations, interventions, outcomes or longitudinal hypotheses.
+
+Calling the wiki "L4 memory" would collapse an external source into a derived analytical layer and would again turn memory levels into a taxonomy of data sources.
 
 ## 11. Why this is not conventional RAG by default
 
@@ -365,6 +370,6 @@ Its main design choices are:
 - favor technical identifiers, secondary named entities and rare content words;
 - avoid duplicating occurrences already visible structurally;
 - retrieve the exact source segment before interpretation;
-- keep the subsystem outside LFO's L0-L3 internal memory hierarchy.
+- keep the subsystem outside LFO's L0-L4 internal architecture while exposing it through an optional L3 retrieval adapter.
 
 This makes the subsystem compatible with LFO's broader philosophy without turning a wiki into model memory or making external knowledge retrieval a mandatory dependency of the core orchestrator.

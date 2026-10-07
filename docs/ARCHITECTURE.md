@@ -178,6 +178,19 @@ Host-specific capacity remains separate from memory semantics. A constrained 5k-
 
 Research traces preserve raw intermediate/final text, retrieval context, timing/token metadata, memory changes, and policy fingerprints for later Local Epistemic Balancer replay. Bias labels are not automatically written into working memory.
 
+The longer-term memory/research boundary is:
+
+```text
+L0  raw evidence/history
+L1  semantic working memory
+L2  structured factual state
+L3  retrieval & resolution fabric
+L4  research / epistemic analysis output
+```
+
+L3 may retrieve from L0/L2 and optional external knowledge adapters. L4 is a derived analytical output layer for observations, hypotheses, interventions and outcomes. L4 records must preserve provenance and uncertainty and must not silently become L2 facts or hidden user attributes. The current v9.4 implementation milestone remains L2.
+
+
 Durable factual/project memory should not be conflated with opaque model weights.
 
 ## 8. Synthesis policy

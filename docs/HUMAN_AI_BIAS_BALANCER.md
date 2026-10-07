@@ -101,7 +101,58 @@ The mediator should **not** learn “what the user believes” as a preference t
 
 Persistent conversational memory is therefore distinct from the experimental user model. Conversation state may preserve task goals, corrections, constraints, and interaction continuity, while inferred bias or metacognitive labels should remain separate research variables rather than being fed back into active conversational memory by default.
 
-## 4. Primary research questions
+## 4. L4 research-analysis layer
+
+The planned LFO **L4** layer gives the Bias Balancer a place to persist explicit research interpretations without contaminating operational factual memory.
+
+The intended boundary is:
+
+```text
+L0  raw interaction evidence
+L1  conversational working memory
+L2  structured factual state
+L3  retrieval & resolution
+L4  research / epistemic analysis output
+```
+
+L4 is primarily an **output layer**. L3 may retrieve analogous historical events, relevant L2 state, and external conceptual context; L4 records the resulting analytical observation, intervention, outcome or longitudinal hypothesis.
+
+The DokuWiki search subsystem can be useful during this analysis through an L3 read-only adapter. For example, it may retrieve methodological notes, bias definitions, prior experimental decisions or related project context. A retrieved wiki segment is context/evidence for analysis, not itself a bias label.
+
+Bias should be represented at the interaction-event level. Prefer a reified observation such as:
+
+```text
+BiasObservation
+  event_ref = turn:918
+  actor = human
+  bias_type = confirmation_bias
+  confidence = 0.64
+  status = hypothesis
+  evidence = [...]
+```
+
+rather than a permanent relationship such as:
+
+```text
+User HAS_BIAS ConfirmationBias
+```
+
+The same structure can represent model-side observations such as possible sycophancy.
+
+For intervention research, the important chain is:
+
+```text
+event
+  -> observation
+  -> intervention
+  -> outcome
+```
+
+Repeated observations may later support a LongitudinalHypothesis, but such a hypothesis remains conditional, provenance-linked and revisable. It must not be silently promoted to L2 factual state or automatically injected into ordinary conversational memory.
+
+See [L4_RESEARCH_ANALYSIS.md](L4_RESEARCH_ANALYSIS.md).
+
+## 5. Primary research questions
 
 1. Does a local epistemic mediator improve **appropriate reliance** on frontier-model advice compared with direct interaction?
 2. Does personalization based on observable metacognitive behaviour improve outcomes beyond a generic non-personalized mediator?
@@ -109,7 +160,7 @@ Persistent conversational memory is therefore distinct from the experimental use
 4. Under what conditions does personalization itself become self-reinforcing?
 5. Can a mediator reduce model-side sycophancy while preserving useful adaptation to genuine individual differences in knowledge and calibration?
 
-## 5. Experimental comparison
+## 6. Experimental comparison
 
 A controlled longitudinal design can compare three conditions:
 
@@ -139,7 +190,7 @@ The same policy family is used, but intervention thresholds can adapt from prior
 
 A separate offline stress test can compare this epistemic personalization with a deliberately preference-oriented policy optimized for agreement or short-term satisfaction. The latter is useful as a test of **confirmation-machine failure**, not as the desired deployed behaviour.
 
-## 6. Outcome concept: appropriate reliance
+## 7. Outcome concept: appropriate reliance
 
 The objective is not to maximize trust in AI or distrust of AI.
 
@@ -159,7 +210,7 @@ Relevant behavioural measures can include:
 - resistance to incorrect AI advice;
 - persistence of AI-induced shifts on later unaided tasks.
 
-## 7. Why Local Frontier Orchestrator is a suitable platform
+## 8. Why Local Frontier Orchestrator is a suitable platform
 
 The architecture already contains the required intervention points:
 
@@ -186,7 +237,7 @@ It also separates:
 
 This makes it possible to alter mediator policy without retraining the frontier model.
 
-## 8. Confirmation-machine risk
+## 9. Confirmation-machine risk
 
 Debiasing is not automatically neutral.
 
@@ -204,7 +255,7 @@ user bias
 
 For this reason, personalization should initially remain interpretable and parameterized rather than hidden in weight-level fine-tuning.
 
-## 9. Study boundaries
+## 10. Study boundaries
 
 The first controlled study should prefer tasks with independent ground truth or defensible scoring criteria, for example:
 
@@ -217,7 +268,7 @@ The first controlled study should prefer tasks with independent ground truth or 
 
 Initial work should avoid making political persuasion, clinical advice, identity-sensitive persuasion, or broad personality profiling the primary experimental domain.
 
-## 10. Research status
+## 11. Research status
 
 This document is intentionally shorter than the full study design. The project is not yet a preregistered experiment and the implementation does not yet claim to provide validated debiasing.
 

@@ -208,9 +208,11 @@ A future high-density-turn design should therefore consider:
 
 This is a separate problem from compaction scheduling.
 
-## Memory layers: L0–L3
+## Memory layers: L0–L4
 
-LFO memory should evolve as **complementary layers with different semantics**, not as repeated replacements of one storage format by another.
+LFO should evolve as **complementary layers with different semantics**, not as repeated replacements of one storage format by another.
+
+The current implementation milestone is still **L2**. L3 and L4 are architectural boundaries for later work, not claims about already implemented features.
 
 ### L0 — authoritative raw history
 
@@ -224,7 +226,7 @@ Properties:
 - source for exact historical retrieval and provenance;
 - potentially large, but not injected wholesale into the model context.
 
-L0 answers the question: **"What exactly happened?"**
+L0 answers: **"What exactly happened?"**
 
 ### L1 — semantic conversational working memory
 
@@ -263,35 +265,92 @@ Core     ram_gb     32
 ORION    os         Ubuntu 24.04
 ```
 
-The goal is to stabilize the **logical contract** early so the physical backend can change later without rewriting LFO memory semantics.
+L2 owns deterministic current-state semantics, provenance and supersession.
 
 L2 answers: **"What structured state is currently known, and how is it related?"**
 
-### L3 — optional associative/semantic retrieval layer
+### L3 — retrieval & resolution fabric
 
-L3 is **not a committed v9.4 feature** and is not another authoritative store.
+L3 is **not another authoritative store** and is not committed as a v9.4 feature.
 
-If real use demonstrates that lexical retrieval and explicit entity/predicate matching are insufficient, L3 may later add:
+Its role is candidate finding and identity resolution across operational memory and optional external knowledge adapters.
 
-- embeddings for semantic candidate retrieval;
-- entity linking and alias matching;
+Possible mechanisms include:
+
+- exact lexical retrieval from L0;
+- selective L2 entity/predicate lookup;
+- alias matching;
+- fuzzy entity resolution;
+- entity linking;
 - reranking;
-- similarity-based discovery across L0/L1/L2.
+- similarity/embedding retrieval if real failures justify it;
+- bounded read-only adapters to external sources such as DokuWiki, documents, Git repositories or web retrieval.
 
 L3 must not decide exact replacement semantics. For example, semantic similarity must not determine whether `Debian 12` was superseded by `Ubuntu 24.04`; that remains an L2 state/provenance operation.
 
-L3 answers: **"What potentially relevant memory should be considered?"**
+External corpora remain external. A DokuWiki search adapter can participate in L3 retrieval without the wiki becoming L3 storage.
 
-The intended authority ordering is therefore:
+L3 answers: **"What evidence or context should be considered?"**
+
+### L4 — research / epistemic analysis output
+
+L4 is a planned **derived analytical layer** for the Human–AI Bias Balancer research.
+
+It is primarily an output of analysis over retrieved evidence and context, not another input memory store.
+
+Conceptually:
 
 ```text
-L0 raw history        authoritative evidence/provenance
-L1 working memory     lossy conversational orientation
-L2 structured state   deterministic current factual state
-L3 semantic index     optional candidate-finding layer
+L0 evidence -----------+
+L2 state --------------+--> L3 retrieval/resolution --> selected evidence
+external knowledge ----+                              |
+                                                       v
+                                             L4 research analysis
 ```
 
-L3 may be added only if measured retrieval failures justify its extra complexity.
+Candidate L4 objects include:
+
+- InteractionEvent;
+- Actor;
+- BiasObservation;
+- BiasType;
+- Intervention;
+- Outcome;
+- LongitudinalHypothesis.
+
+Bias should be represented as a reified, event-scoped observation with provenance and confidence rather than a permanent actor property. Prefer an observation equivalent to:
+
+```text
+event=turn:918
+actor=human
+candidate_bias=confirmation_bias
+confidence=0.64
+status=hypothesis
+```
+
+over a durable factual assertion such as:
+
+```text
+user has_bias confirmation_bias
+```
+
+L4 output must remain defeasible and must not silently promote itself into L2 factual state or ordinary L1 conversational memory.
+
+L4 answers: **"What analytical interpretation is being proposed from the evidence?"**
+
+The intended authority/role ordering is therefore:
+
+```text
+L0 raw history          authoritative evidence/provenance
+L1 working memory       lossy conversational orientation
+L2 structured state     deterministic current factual state
+L3 retrieval/resolution non-authoritative candidate/context finding
+L4 research analysis    derived observations/hypotheses/interventions/outcomes
+```
+
+The DokuWiki search subsystem is relevant here as an **optional L3 external-knowledge adapter**. It can supply canonical conceptual or methodological context to L4 analysis, but the wiki itself is neither L3 storage nor L4 output.
+
+See [L4_RESEARCH_ANALYSIS.md](L4_RESEARCH_ANALYSIS.md) and [DOKUWIKI_SEARCH_SUBSYSTEM.md](DOKUWIKI_SEARCH_SUBSYSTEM.md).
 
 ## v9.4 milestone — L2 structured memory
 
