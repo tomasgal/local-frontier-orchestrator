@@ -124,6 +124,8 @@ Method:
 
 This sequence intentionally separates **dev3 correctness validation**, **dev4 observability/read-side context assembly**, and **dev5 optimization experiments** so performance gains remain causally interpretable.
 
+**Project-wide optimization rule:** dev4/dev5 are expected to improve performance primarily through architecture-level reductions in work, context traffic, repeated retrieval/inference, and blocking—not through aggressive fitting to one hardware configuration. Host-specific thread, affinity, accelerator, driver, or capacity tuning remains secondary and belongs in runtime profiles; it must not be required for the common optimization path to be worthwhile.
+
 ## Multi-host
 
 - Common orchestration code.
