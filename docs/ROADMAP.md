@@ -125,6 +125,13 @@ Method:
 
 This sequence intentionally separates **dev3 correctness validation**, **dev4 observability/read-side context assembly**, and **dev5 optimization experiments** so performance gains remain causally interpretable.
 
+Post-dev5 dissemination:
+
+- prepare a short technical replication/transferability note summarizing the dev3 baseline, dev4 observability, dev5 end-to-end results, host classes, methodology, positive transfers, negative results, and observability overhead;
+- send the note to **Daniel Correa Villa**, author of *Pushing Four Raspberry Pis to the Memory Wall* (DOI: 10.5281/zenodo.20357376), via the verified public Hellomatik contact **administracion@hellomatik.com**;
+- if direct email routing is unclear or no reply arrives, use the author's public GitHub account **@danielcorrea-hellomatik** as a secondary contact path rather than guessing an unpublished personal email address.
+
+
 **Project-wide optimization rule:** dev4/dev5 are expected to improve performance primarily through architecture-level reductions in work, context traffic, repeated retrieval/inference, and blocking—not through aggressive fitting to one hardware configuration. Host-specific thread, affinity, accelerator, driver, or capacity tuning remains secondary and belongs in runtime profiles; it must not be required for the common optimization path to be worthwhile.
 
 ## Multi-host
