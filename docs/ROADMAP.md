@@ -80,6 +80,49 @@ Current v9.4-dev3 status (2026-10-05):
 - the optimization candidate includes an offline deterministic regression test, but it must still pass that test, the L2 extraction battery, and a live same-fixture benchmark on the next available host before it becomes a validated checkpoint;
 - L2 retrieval into Qwen context remains pending. The next architectural step is still the read/retrieval path, but only after the prompt/policy optimization boundary is validated.
 
+### Planned v9.4 development sequence after dev3
+
+The existing **v9.4-dev3** boundary is completed first. The already committed post-dev3 prompt/policy optimization candidate must pass its deterministic regression, the unchanged L2 extraction battery, and a live same-fixture benchmark before the project advances. Do not mix additional performance changes into that validation boundary.
+
+#### v9.4-dev4 — performance observability and context assembly
+
+Purpose:
+
+- make local inference cost attributable by phase before further tuning;
+- add explicit phase-level performance tracing for LOCAL generation, prompt evaluation/prefill, decode, FRONTIER handoff, post-FRONTIER synthesis, answer recovery, memory compaction, and L2 work where applicable;
+- introduce a turn-scoped context/retrieval assembly object so L0/L1/L2 retrieval results can be computed once, bounded, deduplicated, measured, and reused by the components that need them;
+- record context cost by layer, including selected item count, characters/tokens where available, retrieval latency, and model prompt-evaluation counters;
+- integrate bounded/selective L2 read/retrieval through this observable context-assembly path rather than by directly dumping structured memory into the prompt;
+- preserve the validated memory and routing semantics while adding observability and the read-side plumbing.
+
+Acceptance boundary:
+
+- no regression of the validated v9.3 and v9.4-dev3 contracts;
+- traces make separate prompt-evaluation and decode cost visible for each local inference phase;
+- one turn does not repeat equivalent history/structured-memory scans without an explicit reason;
+- L2 retrieval is bounded, selective, provenance-preserving, and its incremental prompt cost is measurable;
+- instrumentation itself must not become a material latency source.
+
+#### v9.4-dev5 — measured performance tuning
+
+Purpose:
+
+- optimize only after dev4 can show where time and context are actually spent;
+- benchmark prompt/context traffic reductions and remove redundant inference or retrieval work when evidence shows end-to-end benefit;
+- run per-host concurrency/thread-count sweeps rather than assuming maximum thread occupancy is optimal;
+- compare representative clean/low-background-load runs with normal operating conditions to detect memory, CPU, paging, or scheduler contention;
+- evaluate whether compaction or other non-interactive work can be deferred to idle/background windows without blocking the next interactive turn;
+- treat executor/model alternatives, including sparse/MoE options, as measured experiments rather than default migrations.
+
+Method:
+
+- change one material variable at a time;
+- require end-to-end improvement, not only an isolated microbenchmark win;
+- keep semantic/retrieval regression tests unchanged while measuring performance candidates;
+- reject platform-specific tuning that does not reproduce on the target host class;
+- promote only results that are repeatable and large enough to matter relative to run-to-run variance.
+
+This sequence intentionally separates **dev3 correctness validation**, **dev4 observability/read-side context assembly**, and **dev5 optimization experiments** so performance gains remain causally interpretable.
 
 ## Multi-host
 
