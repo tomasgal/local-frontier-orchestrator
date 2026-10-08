@@ -193,6 +193,23 @@ L3 may retrieve from L0/L2 and optional external knowledge adapters. L4 is a der
 
 Durable factual/project memory should not be conflated with opaque model weights.
 
+### Generic epistemic mediator research boundary
+
+The planned bias-aware research mode has a narrower **generic, non-personalized mediator** workstream documented in [GENERIC_EPISTEMIC_MEDIATOR.md](GENERIC_EPISTEMIC_MEDIATOR.md).
+
+Its first design target is not a universal bias classifier. It should:
+
+- inspect observable properties of the current interaction;
+- keep direct evidence separate from derived interpretation;
+- compare behaviour against an explicit ground-truth, neutral, balanced, or counterbalanced reference condition;
+- express **bias magnitude / effect strength** as a phenomenon-specific deviation from that reference rather than as a generic risk score;
+- support auditable pre-response and post-response interventions;
+- preserve event, method, evidence, intervention and outcome provenance for later L4 analysis.
+
+The first candidate phenomena are user-side framing / confirmation-seeking signals, model-side sycophancy / agreement bias, and automation bias / appropriate reliance primarily as an outcome variable.
+
+This research contract should remain technology-neutral until the L3 retrieval/resolution and L4 research-analysis interfaces are stable enough to justify implementation coupling.
+
 ## 8. Synthesis policy
 
 The current prototype uses non-zero sampling during frontier synthesis because the local layer is intentionally allowed to act as an editor and critic rather than a byte-for-byte pipe.
