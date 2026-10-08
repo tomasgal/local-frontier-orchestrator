@@ -153,6 +153,8 @@ The goal is not to create an “unbiased AI.” The goal is to study whether a l
 
 See [`docs/HUMAN_AI_BIAS_BALANCER.md`](docs/HUMAN_AI_BIAS_BALANCER.md).
 
+A narrower **generic, non-personalized mediation** workstream is documented in [`docs/GENERIC_EPISTEMIC_MEDIATOR.md`](docs/GENERIC_EPISTEMIC_MEDIATOR.md). It focuses on operationalizing observable interaction-level phenomena, measuring **bias magnitude relative to explicit reference/control conditions** rather than assigning a generic risk score, defining auditable pre/post-response interventions, and evaluating direct versus mediated interaction on reproducible benchmarks. Candidate implementation ideas that are not yet frozen are collected in [`docs/CANDIDATE_SOLUTION_DESIGNS.md`](docs/CANDIDATE_SOLUTION_DESIGNS.md).
+
 The planned research architecture names the derived analytical layer **L4**: L0 is raw evidence, L1 working memory, L2 structured factual state, L3 retrieval/resolution, and L4 research/epistemic analysis output. L4 is intended for provenance-preserving observations, hypotheses, interventions and outcomes rather than for authoritative facts or hidden user profiling. See [docs/L4_RESEARCH_ANALYSIS.md](docs/L4_RESEARCH_ANALYSIS.md).
 
 ## Repository layout
@@ -168,6 +170,8 @@ The planned research architecture names the derived analytical layer **L4**: L0 
 │   ├── ARCHITECTURE.md
 │   ├── CODEX_ROUTER_NOTES.md
 │   ├── HUMAN_AI_BIAS_BALANCER.md
+│   ├── GENERIC_EPISTEMIC_MEDIATOR.md
+│   ├── CANDIDATE_SOLUTION_DESIGNS.md
 │   ├── DOKUWIKI_SEARCH_SUBSYSTEM.md
 │   ├── L4_RESEARCH_ANALYSIS.md
 │   ├── NOTEBOOK_SETUP.md
