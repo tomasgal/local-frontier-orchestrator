@@ -4,6 +4,8 @@
 
 **Status:** research concept / protocol under development
 
+For the narrowed **generic, non-personalized mediation** workstream focused on operationalization, bias magnitude, benchmark design, and a bounded engineering prototype, see [GENERIC_EPISTEMIC_MEDIATOR.md](GENERIC_EPISTEMIC_MEDIATOR.md).
+
 This research track uses Local Frontier Orchestrator as an experimental platform for studying reciprocal bias in Human–LLM interaction.
 
 The core problem is not only that humans can be biased, or that language models can be biased. The more interesting system-level problem is that the two can become **coupled**.
@@ -272,14 +274,17 @@ Initial work should avoid making political persuasion, clinical advice, identity
 
 This document is intentionally shorter than the full study design. The project is not yet a preregistered experiment and the implementation does not yet claim to provide validated debiasing.
 
-The current prototype already provides auditable policy/config separation, persistent conversational state, raw interaction traces, local/frontier intervention points, and restart continuity across heterogeneous local hardware. The next engineering step is to validate exact historical retrieval and then freeze the behavioural interface needed for controlled mediator experiments.
+The current prototype already provides auditable policy/config separation, persistent conversational state, raw interaction traces, local/frontier intervention points, restart continuity, and validated historical-retrieval behaviour. The active memory work is now focused on L2 structured factual state, while L3 retrieval/resolution and L4 research-analysis remain planned architectural boundaries rather than implemented feature claims.
 
-Only after that should specific bias-balancing policies be frozen for controlled human-subject research.
+The generic mediator workstream can therefore proceed now at the level of theory, operationalization, benchmark design, and interface specification, while implementation should avoid premature coupling to unstable L3/L4 details.
+
+Only after the relevant interfaces and bias-balancing policies are sufficiently stable should controlled human-subject and personalized-mediation experiments be frozen.
 
 ## Selected background
 
 - Rastogi et al. (2022), *Deciding Fast and Slow: The Role of Cognitive Biases in AI-assisted Decision-making*.
-- Sharma et al. (2023), *Towards Understanding Sycophancy in Language Models*.
+- Sharma et al. (2024), *Towards Understanding Sycophancy in Language Models*.
+- Schemmer et al. (2023), *Appropriate Reliance on AI Advice: Conceptualization and the Effect of Explanations*.
 - Glickman & Sharot (2025), *How human–AI feedback loops alter human perceptual, emotional and social judgements*.
 - Jain et al. (2026), *Interaction Context Often Increases Sycophancy in LLMs*.
 - Dubois et al. (2026), *Ask don't tell: Reducing sycophancy in large language models*.
