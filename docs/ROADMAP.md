@@ -112,12 +112,27 @@ Research goals:
 
 ## Human–AI bias balancing
 
-- define explicit mediator interventions;
-- add trace schema for reliance, verification, confidence, and disagreement;
+The research track is split into a broader longitudinal/personalization program and a narrower **generic, non-personalized mediator** workstream.
+
+Near-term research/design work for the generic mediator:
+
+- operationalize a small number of observable interaction-level phenomena, initially emphasizing human framing / confirmation-seeking signals, model sycophancy / agreement bias, and appropriate reliance as an outcome;
+- measure **bias magnitude / effect strength** relative to explicit ground-truth, neutral, balanced, or counterbalanced reference conditions rather than assigning a generic low/medium/high risk score;
+- distinguish direct observations from derived psychological interpretations and keep event-scoped hypotheses out of L2 factual state and ordinary conversational memory;
+- define auditable pre-response and post-response interventions such as neutral rewrites, counter-evidence requests, alternative-hypothesis prompts, critique, and verification triggers;
+- define paired/counterbalanced benchmarks and metrics including false-prior agreement, sycophancy, accuracy, answer shift, counter-evidence coverage, false interventions, latency and token/call overhead;
+- stabilize a technology-neutral mediator contract before coupling the implementation to still-evolving L3/L4 interfaces;
+- keep authority-related effects and anthropomorphism as secondary theoretical topics until they have defensible operational measures.
+
+Broader research work remains:
+
+- add trace schema for reliance, verification, confidence, disagreement, interventions and outcomes;
 - distinguish generic from personalized policies;
 - keep content beliefs out of the first personalization model;
 - develop offline replay/stress tests for confirmation-machine behaviour;
 - freeze an auditable experimental configuration before human-subject testing.
+
+See [HUMAN_AI_BIAS_BALANCER.md](HUMAN_AI_BIAS_BALANCER.md), [GENERIC_EPISTEMIC_MEDIATOR.md](GENERIC_EPISTEMIC_MEDIATOR.md), and [CANDIDATE_SOLUTION_DESIGNS.md](CANDIDATE_SOLUTION_DESIGNS.md).
 
 ## Later possibilities
 
