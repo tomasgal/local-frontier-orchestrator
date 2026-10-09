@@ -70,6 +70,12 @@ if (-not (Test-Path -LiteralPath $memoryStoreModule)) {
 }
 . $memoryStoreModule
 
+$l2ReadModule = Join-Path $PSScriptRoot 'LfoStructuredRetrieval.ps1'
+if (-not (Test-Path -LiteralPath $l2ReadModule)) {
+    throw "L2 read module not found: $l2ReadModule"
+}
+. $l2ReadModule
+
 $telemetryModule = Join-Path $PSScriptRoot 'LfoTurnTelemetry.ps1'
 if (-not (Test-Path -LiteralPath $telemetryModule)) { throw "Dev4 telemetry module not found: $telemetryModule" }
 . $telemetryModule
@@ -953,7 +959,7 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.4-dev3 (L2 structured write integration). Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "Qwen local chat v9.4-dev4 (observable context assembly; optional L2 retrieval). Commands: /exit, /clear, /paste, /think on, /think off"
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
