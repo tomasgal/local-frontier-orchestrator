@@ -1129,6 +1129,60 @@ function Protect-LfoPersistenceFromReadSide(
     }
 }
 
+# Dev5 mixed current-user facts form a separate, strictly more constrained
+# write source than model-proposed memory_ops. Existing model read guard remains.
+function Get-LfoDev5MixedWriteCandidate([string]$Prompt, [string]$Route) {
+    $disabled = [pscustomobject]@{
+        Status = 'disabled'; EvidenceText = ''; EvidenceStart = -1
+        EvidenceLength = 0; ParsedOps = $null
+    }
+    if ($Route -ne 'LOCAL' -or -not $script:MemoryEnabled -or
+        -not $script:StructuredMemoryEnabled -or
+        -not (Test-LfoDev5LeanReadPolicyEligible) -or
+        $null -eq $script:LfoTurnContext -or
+        [string]$script:LfoTurnContext.Query -cne $Prompt -or
+        [string]$script:LfoTurnContext.Stats.l2_read_status -ne 'ok') {
+        return $disabled
+    }
+    $settings = $script:Config.LocalGeneration
+    if (-not ($settings.Contains('MixedUserEvidenceWriteEnabled') -and
+        [bool]$settings.MixedUserEvidenceWriteEnabled)) { return $disabled }
+    # A prior L2 value or model transcript is never parsed by this function.
+    $evidence = Get-LfoMixedUserRamEvidence -CurrentUserPrompt $Prompt
+    if ($evidence.Status -ne 'accepted') {
+        $disabled.Status = 'no-verified-user-assertion'
+        return $disabled
+    }
+    return [pscustomobject]@{
+        Status = 'candidate'; EvidenceText = [string]$evidence.EvidenceText
+        EvidenceStart = [int]$evidence.EvidenceStart
+        EvidenceLength = [int]$evidence.EvidenceLength
+        ParsedOps = $evidence.ParsedOps
+    }
+}
+
+# This scope check is not an authorization for the model to write. It only
+# verifies a previously parsed CURRENT-USER op names exactly one pre-existing
+# entity with a current fact in this same conversation. Never create a new
+# entity from a read-assisted question; ambiguity fails closed.
+function Test-LfoDev5MixedWriteEntityScope($Connection, [string]$Subject, [string]$ScopeId) {
+    $key = ConvertTo-LfoEntityNameKey $Subject
+    if ([string]::IsNullOrWhiteSpace($key)) { return $false }
+    $entities = @(Invoke-LfoSqliteQuery $Connection @'
+SELECT DISTINCT n.entity_id
+FROM entity_names n
+WHERE n.normalized_name = ?1;
+'@ @($key))
+    if ($entities.Count -ne 1) { return $false }
+    $current = @(Invoke-LfoSqliteQuery $Connection @'
+SELECT f.id
+FROM current_facts f
+WHERE f.subject_entity_id = ?1 AND f.scope_id = ?2
+LIMIT 1;
+'@ @([int64]$entities[0].entity_id,$ScopeId))
+    return ($current.Count -eq 1)
+}
+
 function Persist-TurnAndMemory(
     [string]$Prompt,
     [string]$FinalContent,
@@ -1169,6 +1223,13 @@ function Persist-TurnAndMemory(
     $InlineMemoryOps = $readGuard.Ops
     $InlineMemoryNote = $readGuard.Note
 
+    # Pure current-user provenance remains independent of model proposals.
+    # Candidate is applied only after checking entity uniqueness/scope
+    # against the same SQLite connection used by normal structured memory.
+    $mixedCandidate = Get-LfoDev5MixedWriteCandidate $Prompt $Route
+    $mixedUserWriteStatus = [string]$mixedCandidate.Status
+    $mixedUserApplied = 0
+
     $timestamp = (Get-Date).ToString('o')
     $memoryBefore = if ($script:MemoryEnabled) {
         Get-LfoTurnMemoryBlock $Prompt
@@ -1208,13 +1269,35 @@ function Persist-TurnAndMemory(
         $l2Connection = $null
         try {
             $l2Connection = Open-LfoMemoryStore $script:StructuredMemoryPath
-            $l2Result = Apply-LfoStructuredMemoryOps $l2Connection $InlineMemoryOps $turnId $l2Scope
+            $effectiveOps = $InlineMemoryOps  # model ops already protected
+            if ($readGuard.GuardActive -and $mixedCandidate.Status -eq 'candidate') {
+                $userOp = @($mixedCandidate.ParsedOps.Valid)
+                if ($userOp.Count -ne 1 -or
+                    -not (Test-LfoDev5MixedWriteEntityScope $l2Connection ([string]$userOp[0].Subject) $l2Scope)) {
+                    $mixedUserWriteStatus = 'rejected-entity-or-scope'
+                } else {
+                    $effectiveOps = $mixedCandidate.ParsedOps
+                    $mixedUserWriteStatus = 'validated-current-user'
+                }
+            }
+            $l2Result = Apply-LfoStructuredMemoryOps $l2Connection $effectiveOps $turnId $l2Scope
             $l2Status = [string]$l2Result.Status
             $l2AppliedCount = [int]$l2Result.AppliedCount
             $l2RejectedCount = [int]$l2Result.RejectedCount
+            if ($mixedUserWriteStatus -eq 'validated-current-user') {
+                if ($l2Status -eq 'applied' -and $l2AppliedCount -eq 1) {
+                    $mixedUserWriteStatus = 'applied-current-user'
+                    $mixedUserApplied = 1
+                } else {
+                    $mixedUserWriteStatus = 'not-applied'
+                }
+            }
         } catch {
             $l2Status = 'failed'
             $l2Error = $_.Exception.Message
+            if ($mixedUserWriteStatus -eq 'validated-current-user') {
+                $mixedUserWriteStatus = 'failed'
+            }
         } finally {
             if ($null -ne $l2Connection) {
                 try { Close-LfoSqliteDatabase $l2Connection } catch {
@@ -1338,6 +1421,11 @@ function Persist-TurnAndMemory(
             l2_ops_suppressed_rejected_count = [int]$readGuard.SuppressedRejectedCount
             l2_read_write_guard_active = [bool]$readGuard.GuardActive
             l2_read_write_guard_reason = $readGuard.Reason
+            mixed_user_evidence_status = $mixedUserWriteStatus
+            mixed_user_evidence_start = [int]$mixedCandidate.EvidenceStart
+            mixed_user_evidence_length = [int]$mixedCandidate.EvidenceLength
+            mixed_user_write_applied_count = [int]$mixedUserApplied
+            l2_write_source = $(if ($mixedUserApplied -gt 0) { 'validated-current-user' } elseif ($readGuard.GuardActive) { 'read-guard-no-model-writes' } else { 'model-unmodified' })
             l1_model_note_suppressed = [bool]$readGuard.NoteSuppressed
             l2_seconds = [Math]::Round($l2Sw.Elapsed.TotalSeconds, 3)
             l2_error = $l2Error
@@ -1444,6 +1532,14 @@ function Persist-TurnAndMemory(
     }
 
     if ($script:MemoryEnabled) {
+        if ($mixedUserWriteStatus -eq 'no-verified-user-assertion' -and
+            $Prompt -match '(?i)\?\s+also,') {
+            Write-Host '[memory: mixed update not verified; no current-user fact persisted]' -ForegroundColor Yellow
+        } elseif ($mixedUserWriteStatus -eq 'rejected-entity-or-scope') {
+            Write-Host '[memory: mixed update refused (ambiguous or missing scoped entity)]' -ForegroundColor Yellow
+        } elseif ($mixedUserWriteStatus -eq 'failed') {
+            Write-Host '[memory: mixed update could not be persisted]' -ForegroundColor Yellow
+        }
         if ($memoryError) {
             $state = $memoryError
         } elseif ($memoryNoteAppended) {
