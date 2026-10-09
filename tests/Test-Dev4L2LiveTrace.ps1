@@ -27,10 +27,45 @@ $turns = @(foreach ($file in $traceFiles) {
         }
     }
 })
-if ($turns.Count -ne 1) { throw "Expected exactly one isolated Qwen turn trace, found $($turns.Count)." }
-$t = $turns[0]
+# A mistyped PowerShell checker inside the Qwen REPL can create an extra
+# (unwanted) conversational turn. Check the original target by ID AND exact
+# synthetic question, without rerunning the slow CPU inference.
+$expectedQuestion = 'What are the stored OS, RAM, database and nightly backup facts for ORION?'
+$target = @($turns | Where-Object {
+    [int]$_.turn_id -eq 3 -and
+    [string]$_.user -ceq $expectedQuestion -and
+    [int]$_.epoch -eq 1
+})
+if ($target.Count -ne 1) {
+    throw ("Expected exactly one matching ORION test turn (turn_id=3); found {0} across {1} traces." -f $target.Count, $turns.Count)
+}
+$t = $target[0]
+$extra = @($turns | Where-Object { [int]$_.turn_id -ne 3 })
+if ($extra.Count -gt 0) {
+    Write-Host ("WARNING: {0} additional REPL turn(s) found. Validating original turn 3 and entire DB state; no model rerun required." -f $extra.Count) -ForegroundColor Yellow
+    $unsafeExtra = @($extra | Where-Object {
+        [int]$_.epoch -ne 1 -or
+        [int]$_.turn_id -le 3 -or
+        [int]$_.l2_applied_count -ne 0 -or
+        [int]$_.l2_rejected_count -ne 0 -or
+        [bool]$_.memory_note_appended
+    })
+    if ($unsafeExtra.Count -gt 0) {
+        throw 'Extra REPL turn(s) changed memory or invalidated the isolated acceptance fixture.'
+    }
+}
 Write-Host '===== MODEL ANSWER (semantic review) ====='
 Write-Host ([string]$t.final_answer)
+# The live question is deliberately answerable only from the four seeded L2
+# facts. Require all of them and exclude obsolete/cross-scope distractors.
+$answer = [string]$t.final_answer
+if ($answer -notmatch '(?i)Debian\s+13' -or
+    $answer -notmatch '(?i)64\s*GB' -or
+    $answer -notmatch '(?i)PostgreSQL\s+16' -or
+    $answer -notmatch '(?i)nightly\s+backups?\s+(?:are\s+)?enabled' -or
+    $answer -match '(?i)Ubuntu\s+24\.04|FreeBSD\s+14|VEGA') {
+    throw 'LOCAL answer did not satisfy the four current ORION facts without distractors.'
+}
 Write-Host '===== TURN AND GUARD ====='
 $t | Select-Object turn_id,route,answer_seconds,l2_status,l2_applied_count,l2_rejected_count,l2_ops_model_valid_count,l2_ops_model_rejected_count,l2_ops_suppressed_valid_count,l2_ops_suppressed_rejected_count,l2_read_write_guard_active,l2_read_write_guard_reason,l1_model_note_suppressed,memory_note_appended | Format-List
 Write-Host '===== CONTEXT ====='
@@ -82,5 +117,5 @@ ORDER BY f.id;
 $pendingPath = Join-Path $Root 'state\pending_notes.jsonl'
 $pending = if (Test-Path -LiteralPath $pendingPath) { [string](Get-Content -LiteralPath $pendingPath -Raw -Encoding UTF8) } else { '' }
 if (-not [string]::IsNullOrWhiteSpace($pending)) { throw 'L1 micro-note was persisted from L2 read-side evidence' }
-Write-Host 'DEV4 STAGE2 LIVE READ-SIDE GUARD + SQLITE + L1 PARITY: PASS'
-Write-Host 'Review the printed model answer separately for factual correctness.'
+Write-Host 'DEV4 STAGE2 LIVE READ-SIDE + ANSWER + GUARD + SQLITE + L1 PARITY: PASS'
+if ($extra.Count -gt 0) { Write-Host "Ignored $($extra.Count) extra conversational turn(s); all were read-only in trace and SQLite remains unchanged." -ForegroundColor Yellow }
