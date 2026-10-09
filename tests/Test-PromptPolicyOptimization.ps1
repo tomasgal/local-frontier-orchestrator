@@ -29,12 +29,19 @@ if ([double]$config.LocalGeneration.Temperature -ne 0.10) {
 }
 
 $l2Policy = Get-Content -LiteralPath (Join-Path $repoRoot 'policy\l2-structured-memory.txt') -Raw -Encoding UTF8
-if ($l2Policy.Length -gt 1200) {
-    throw "L2 policy exceeded compact budget: $($l2Policy.Length) chars"
+# The compact-policy experiment failed the unchanged extraction battery on
+# a CPU-only reference host. Freeze the previously validated full policy:
+# textual shortness alone is not a correctness acceptance criterion.
+if ($l2Policy.Length -lt 1800 -or $l2Policy.Length -gt 3000) {
+    throw "Unexpected full-baseline L2 policy size: $($l2Policy.Length) chars"
 }
-foreach ($required in @('SET_TEXT','SET_INTEGER','SET_REAL','SET_BOOLEAN','ADD_RELATION','snake_case','target_entity_type')) {
+foreach ($required in @(
+    'SET_TEXT', 'SET_INTEGER', 'SET_REAL', 'SET_BOOLEAN', 'ADD_RELATION',
+    'snake_case', 'target_entity_type MUST be empty for every SET_*',
+    'A correction is simply another SET_*', 'Examples:'
+)) {
     if (-not $l2Policy.Contains($required)) {
-        throw "Compact L2 policy lost required contract token: $required"
+        throw "Full-baseline L2 policy lost required contract text: $required"
     }
 }
 
