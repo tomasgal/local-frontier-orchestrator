@@ -45,8 +45,10 @@ function Read-Dev5IsolatedTrial([string]$Root, [string]$ExpectedMode) {
     $build = @($t.dev4_phases | Where-Object { $_.phase -eq 'local_request_build' })
     $post = @($t.dev4_phases | Where-Object { $_.phase -eq 'local_response_processing' })
     if ($build.Count -gt 1 -or $post.Count -gt 1) { throw "Duplicate LOCAL timing phase: $folder" }
-    $buildSeconds = $(if ($build.Count -eq 1) { [double]$build[0].wall_seconds } else { 0.0 })
-    $postSeconds = $(if ($post.Count -eq 1) { [double]$post[0].wall_seconds } else { 0.0 })
+    # A missing phase is NOT a zero-second phase: older traces did not
+    # measure it. Preserve null for honest per-phase comparisons.
+    $buildSeconds = $(if ($build.Count -eq 1) { [double]$build[0].wall_seconds } else { $null })
+    $postSeconds = $(if ($post.Count -eq 1) { [double]$post[0].wall_seconds } else { $null })
     # The L2 retrieval phase is nested inside context_assembly: count only
     # parent assembly time to avoid subtracting the same work twice.
     $unattributed = [double]$t.answer_seconds - [double]$t.dev4_context.assembly_seconds -
@@ -77,8 +79,8 @@ function Read-Dev5IsolatedTrial([string]$Root, [string]$ExpectedMode) {
         AnswerWallS = [Math]::Round([double]$t.answer_seconds,3)
         L2ReadS = [Math]::Round([double]$t.dev4_context.l2_read_seconds,3)
         ContextAssemblyS = [Math]::Round([double]$t.dev4_context.assembly_seconds,3)
-        RequestBuildS = [Math]::Round($buildSeconds,3)
-        ResponseProcessS = [Math]::Round($postSeconds,3)
+        RequestBuildS = $(if ($null -ne $buildSeconds) { [Math]::Round($buildSeconds,3) } else { $null })
+        ResponseProcessS = $(if ($null -ne $postSeconds) { [Math]::Round($postSeconds,3) } else { $null })
         UntimedAnswerS = [Math]::Round($unattributed,3)
         HasGapPhases = ($build.Count -eq 1 -and $post.Count -eq 1)
         Root = $folder
@@ -98,14 +100,26 @@ Write-Host '=== Matched isolated trials (one per mode) ==='
 Write-Host '=== COMPACT relative to FULL ==='
 $fields = @('PromptTokens','OutputTokens','PrefillS','DecodeS','ModelWallS','AnswerWallS','L2ReadS','ContextAssemblyS','RequestBuildS','ResponseProcessS','UntimedAnswerS')
 $diff = @(foreach ($field in $fields) {
-    $a = [double]$full.$field
-    $b = [double]$compact.$field
-    [pscustomobject]@{
-        Metric = $field
-        Full = $a
-        Compact = $b
-        Delta = [Math]::Round($b-$a,3)
-        DeltaPct = if ($a -ne 0) { [Math]::Round(100*($b-$a)/$a,1) } else { $null }
+    $a = $full.$field
+    $b = $compact.$field
+    if ($null -eq $a -or $null -eq $b) {
+        [pscustomobject]@{
+            Metric = $field
+            Full = $a
+            Compact = $b
+            Delta = $null
+            DeltaPct = $null
+        }
+    } else {
+        $av = [double]$a
+        $bv = [double]$b
+        [pscustomobject]@{
+            Metric = $field
+            Full = $av
+            Compact = $bv
+            Delta = [Math]::Round($bv-$av,3)
+            DeltaPct = if ($av -ne 0) { [Math]::Round(100*($bv-$av)/$av,1) } else { $null }
+        }
     }
 })
 $diff | Format-Table -AutoSize
