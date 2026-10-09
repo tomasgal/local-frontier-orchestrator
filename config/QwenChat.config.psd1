@@ -67,6 +67,12 @@
         # high-priority system text into a separate quoted user-role message,
         # immediately before the actual current user prompt. Opt-in only.
         LowerTrustL2EvidenceEnabled = $false
+
+        # Dev5 experimental mixed question + explicit current-user RAM update.
+        # Pure current-turn quote/span parser authorizes at most one typed op;
+        # model-generated L2 ops remain guarded. Requires A+B L2 read path.
+        # OFF by default until TEMP-only integration and LIVE acceptance.
+        MixedUserEvidenceWriteEnabled = $false
     }
 
     SynthesisGeneration = @{
