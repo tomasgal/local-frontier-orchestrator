@@ -5,6 +5,7 @@ param(
     [string]$Model = 'qwen3.5:4b-q4_K_M',
     [int]$ContextLengthHint = 5120,
     [switch]$CompactReadSchema,
+    [switch]$LeanReadPolicy,
     [switch]$SetupOnly
 )
 $ErrorActionPreference = 'Stop'
@@ -14,6 +15,10 @@ $template = Get-Content -LiteralPath $baseConfig -Raw -Encoding UTF8
 $anchorData = "DataDirectory = '%LOCALAPPDATA%\LocalFrontierOrchestrator'"
 $anchorRead = 'StructuredReadEnabled = $false'
 $anchorCompact = 'CompactReadSchemaEnabled = $false'
+$anchorLean = 'LeanReadPolicyEnabled = $false'
+if ($LeanReadPolicy -and -not $CompactReadSchema) {
+    throw 'Lean read policy requires CompactReadSchema for a valid A+B experiment.'
+}
 if ($template.Split([string[]]@($anchorData),[StringSplitOptions]::None).Count -ne 2 -or
     $template.Split([string[]]@($anchorRead),[StringSplitOptions]::None).Count -ne 2) {
     throw 'Expected isolated config anchors are missing or ambiguous.'
@@ -21,6 +26,10 @@ if ($template.Split([string[]]@($anchorData),[StringSplitOptions]::None).Count -
 if ($CompactReadSchema -and
     $template.Split([string[]]@($anchorCompact),[StringSplitOptions]::None).Count -ne 2) {
     throw 'Dev5 compact-read schema config anchor missing or ambiguous.'
+}
+if ($LeanReadPolicy -and
+    $template.Split([string[]]@($anchorLean),[StringSplitOptions]::None).Count -ne 2) {
+    throw 'Dev5 lean policy config anchor missing or ambiguous.'
 }
 $root = Join-Path $env:TEMP ('LFO-dev4-live-read-' + [guid]::NewGuid().ToString('N'))
 $state = Join-Path $root 'state'
@@ -31,6 +40,9 @@ $isolatedConfig = $template.Replace($anchorData,"DataDirectory = '$root'").Repla
 if ($CompactReadSchema) {
     $isolatedConfig = $isolatedConfig.Replace($anchorCompact,'CompactReadSchemaEnabled = $true')
 }
+if ($LeanReadPolicy) {
+    $isolatedConfig = $isolatedConfig.Replace($anchorLean,'LeanReadPolicyEnabled = $true')
+}
 [IO.File]::WriteAllText($testConfig,$isolatedConfig,(New-Object Text.UTF8Encoding($false)))
 $configData = Import-PowerShellDataFile -LiteralPath $testConfig
 if ($configData.Memory.DataDirectory -ne $root -or
@@ -38,6 +50,7 @@ if ($configData.Memory.DataDirectory -ne $root -or
     -not $configData.Memory.StructuredEnabled -or
     -not $configData.Memory.StructuredReadEnabled -or
     [bool]$configData.LocalGeneration.CompactReadSchemaEnabled -ne [bool]$CompactReadSchema -or
+    [bool]$configData.LocalGeneration.LeanReadPolicyEnabled -ne [bool]$LeanReadPolicy -or
     -not $configData.ResearchLogging.Enabled) {
     throw 'Isolated L2-read config validation FAILED'
 }
@@ -91,6 +104,7 @@ $global:dev4L2Root = $root
 Write-Host "DEV4 READ TEST DATA: $root"
 Write-Host "Isolated config: enabled; L0/L1 empty; 4 current ORION facts: PASS"
 Write-Host ("Dev5 compact read schema: {0}" -f [bool]$CompactReadSchema)
+Write-Host ("Dev5 lean read policy: {0}" -f [bool]$LeanReadPolicy)
 Write-Host "Test prompt: What are the stored OS, RAM, database and nightly backup facts for ORION?"
 Write-Host "After the answer, enter /exit; inspect logs and database independently."
 if (-not $SetupOnly) {
