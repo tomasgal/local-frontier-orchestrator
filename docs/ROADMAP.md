@@ -199,3 +199,10 @@ Research goals:
 - additional frontier tiers;
 - write-capable tools as separate capabilities with explicit safety boundaries;
 - optional training/fine-tuning from curated traces after a stable task definition exists.
+
+
+### Dev5 G2 persistence hardening and dev3 net-gain benchmark — 2026-10-09
+
+- **Committed, Windows OFFLINE test pending:** move mixed current-user alias/scope authorization into the same `BEGIN IMMEDIATE` transaction as the actual write; reject ambiguous identities and missing scope without mutation, count only actual `written` ops, surface failed or rejected persistence to the user. Preserve all four opt-in flags OFF in defaults and unchanged dev4/main.
+- **Offline acceptance gate:** run TEMP-only `Test-Dev5SqliteAtomicity.ps1` and expanded `Test-Dev5MixedRuntimePersistence.ps1` before claiming atomic safety or making another live model call; regression suite still required. SQL trigger failure, replay, two-writer lock, and alias collision are unvalidated until the Windows run.
+- **Benchmark prepared, NOT measured:** use pinned dev3 `a34658b81742596520da844618b5bb39f3329279`, dev5 resolved SHA and five comparable LOCAL semantic cases; compare answer correctness, L1/L2 invariants, attributable phase time, token traffic, always-on tracing overhead and representative workload-weighted total. See [DEV5_VS_DEV3_BENCHMARK_PROTOCOL.md](DEV5_VS_DEV3_BENCHMARK_PROTOCOL.md). Keep dev5-only mixed provenance improvements outside the speed denominator. No net-gain release promotion without matched evidence.
