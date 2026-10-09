@@ -1,6 +1,6 @@
 # Dev5 versus dev3: representative, correctness-gated benchmark
 
-**Status (2026-10-09): G2 offline gate PASSED (9/9 suites on Windows); comparator repaired, new comparator self-test PENDING. No matched dev3/dev5 end-to-end results or net-gain acceptance.** This protocol is deliberately model-free until the Windows TEMP-only SQLite atomicity tests pass. Historical ORION/TITAN live timings are **not** a dev3/dev5 paired workload: different tasks, schemas, scopes and uncontrolled host states cannot establish a whole-project speedup.
+**Status (2026-10-09): PAUSED at G2.** G2 9/9 Windows offline suites PASS; comparator synthetic-only self-test PASS; four-repetition measured model-free components PASS but high paired-sign variance. A single two-turn dev3/dev5 pilot produced valid answers but **did not activate dev5 A+B** and reported an unintended model-origin L2 update. **No valid five-workload matched end-to-end result or net-gain acceptance.** Read [DEV5_G2_HANDOFF.md](DEV5_G2_HANDOFF.md) before resuming. This protocol is deliberately model-free until the Windows TEMP-only SQLite atomicity tests pass. Historical ORION/TITAN live timings are **not** a dev3/dev5 paired workload: different tasks, schemas, scopes and uncontrolled host states cannot establish a whole-project speedup.
 
 ## Refs and isolation
 
@@ -77,3 +77,10 @@ The single physical-line Windows command, after ensuring the correct branch and 
 `& .\tests\Measure-Dev5VsDev3Offline.ps1 -Repetitions 4`
 
 **Validation status (2026-10-09): source authored and peer-reviewed statically; NOT executed on Lenovo.** Do not count these prospective measurements as evidence until actual successful host output is supplied.
+
+
+## G2 paused experiment note: natural workload versus optimizer-unit tests
+
+The first dev3/dev5 live pilot on source pins dev3 `a34658b...` and dev5 `1f57ec1...` answered the same synthetic server query correctly, with one-sample answer wall dev3 **184.84 s** vs dev5 **130.54 s**; input tokens **1508 vs 1517**, output **298 vs 234**. It **does not qualify** as a verified `scoped-read` A+B sample: dev5 classified the imperative `State BENCH_SERVER...` as `write_only_turn`, retrieved zero L2 facts and ran FULL schema/policy. Model proposed four ops and one applied persisted op (`l2_write_source=model-unmodified`); the exact SQLite row remains to be checked. Thus the -29.4% single-pair wall observation is neither a causal A+B speedup nor a representative net Dev5-vs-Dev3 result. Do not put it into the measured five-case comparator or retroactively rename its routing state. The test nonetheless usefully demonstrates trace-based diagnosis and incomplete containment of a read-intent/declared-write mix-up.
+
+Before further inference, retain the existing five semantic workload categories but freeze *natural* phrasing and postcondition checks independently of heuristic trigger patterns, document cases in which dev3 and dev5 do not have equivalent retrieval capability, and record explicit per-turn read/write authority, guard status, optimization eligibility and actual persistence. Include both (i) a controlled dev5 FULL versus A+B *eligible* L2-read mechanism cohort and (ii) a natural, correctness-gated dev3/dev5 **system-wide** cohort allowing missed optimizations to contribute their real cost. Wrong heuristic choices should have bounded latency/token penalties and identifiable traces but must not cause unrelated durable memory mutations. Keep model digest, cold/warm state and background resource use auditable. No automatic 30-answer battery is authorized; user has paused testing. Refer to [DEV5_G2_HANDOFF.md](DEV5_G2_HANDOFF.md).
