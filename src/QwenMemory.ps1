@@ -530,7 +530,6 @@ function Start-LfoTurnContext([string]$Query) {
     $sw = [Diagnostics.Stopwatch]::StartNew()
     $memory = Get-MemoryContextData $Query
     $recent = @(Get-RecentConversationMessages)
-    $sw.Stop()
 
     $recentChars = 0
     foreach ($item in $recent) { $recentChars += ([string]$item.content).Length }
@@ -542,7 +541,7 @@ function Start-LfoTurnContext([string]$Query) {
         memory_block_chars = ([string]$memory.Block).Length
         recent_messages = $recent.Count
         recent_messages_chars = $recentChars
-        assembly_seconds = [Math]::Round($sw.Elapsed.TotalSeconds, 4)
+        assembly_seconds = 0.0
     }
     $script:LfoTurnContext = [pscustomobject]@{
         Query = $Query
@@ -551,6 +550,8 @@ function Start-LfoTurnContext([string]$Query) {
         RecentMessages = $recent
         Stats = $stats
     }
+    $sw.Stop()
+    $stats.assembly_seconds = [Math]::Round($sw.Elapsed.TotalSeconds, 4)
 
     Add-LfoTurnPhase -Phase 'context_assembly' -Kind 'retrieval' -WallSeconds $sw.Elapsed.TotalSeconds -InputChars $Query.Length
 }
