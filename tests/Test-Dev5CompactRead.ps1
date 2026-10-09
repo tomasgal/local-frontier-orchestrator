@@ -2,7 +2,7 @@
 # Offline only. Never opens SQLite or production files, and never calls Ollama.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-foreach ($relative in @('src\QwenChat.ps1','src\QwenMemory.ps1','src\LfoStructuredMemory.ps1','tests\Start-Dev4L2LiveFixture.ps1','tests\Test-Dev4L2LiveTrace.ps1','tests\Compare-Dev5CompactRead.ps1')) {
+foreach ($relative in @('src\QwenChat.ps1','src\QwenMemory.ps1','src\LfoStructuredMemory.ps1','tests\Start-Dev4L2LiveFixture.ps1','tests\Test-Dev4L2LiveTrace.ps1','tests\Compare-Dev5CompactRead.ps1','tests\Compare-Dev5ReadPolicy.ps1')) {
     $tokens = $null
     $errors = $null
     [void][Management.Automation.Language.Parser]::ParseFile(
