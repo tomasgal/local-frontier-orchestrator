@@ -117,6 +117,12 @@ if ($disabledBlock -match 'CURRENT STRUCTURED FACTS' -or (Get-LfoTurnContextStat
 }
 $script:L2ReadEnabled = $true
 
+# Updating a fact must not preload the older L2 value into model context.
+$correction = Get-LfoRelevantCurrentL2 'Correction: ORION now runs AlmaLinux 10 instead of Debian 13.'
+if ($correction.Count -ne 0 -or $correction.Status -ne 'write_only_turn') {
+    throw 'L2 current-turn correction contamination guard FAILED'
+}
+
 # Probe ambiguous alias resolution: manual ambiguous entity name (no production state).
 $writer = Open-LfoMemoryStore $dbPath
 try {
@@ -146,6 +152,7 @@ if ($null -ne (Open-LfoMemoryReadOnly $missingDb) -or (Test-Path -LiteralPath $m
     CharacterBudget = $small.Text.Length
     L2ContextCharacters = $stats.l2_read_chars
     L2ContextItems = $stats.l2_read_items
+    CorrectionTurnReadSkipped = ($correction.Status -eq 'write_only_turn')
     AmbiguousAliasFailClosed = $true
     MissingDatabaseNotCreated = $true
     ProductionMemoryTouched = $false
