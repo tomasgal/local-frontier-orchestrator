@@ -1161,27 +1161,8 @@ function Get-LfoDev5MixedWriteCandidate([string]$Prompt, [string]$Route) {
     }
 }
 
-# This scope check is not an authorization for the model to write. It only
-# verifies a previously parsed CURRENT-USER op names exactly one pre-existing
-# entity with a current fact in this same conversation. Never create a new
-# entity from a read-assisted question; ambiguity fails closed.
-function Test-LfoDev5MixedWriteEntityScope($Connection, [string]$Subject, [string]$ScopeId) {
-    $key = ConvertTo-LfoEntityNameKey $Subject
-    if ([string]::IsNullOrWhiteSpace($key)) { return $false }
-    $entities = @(Invoke-LfoSqliteQuery $Connection @'
-SELECT DISTINCT n.entity_id
-FROM entity_names n
-WHERE n.normalized_name = ?1;
-'@ @($key))
-    if ($entities.Count -ne 1) { return $false }
-    $current = @(Invoke-LfoSqliteQuery $Connection @'
-SELECT f.id
-FROM current_facts f
-WHERE f.subject_entity_id = ?1 AND f.scope_id = ?2
-LIMIT 1;
-'@ @([int64]$entities[0].entity_id,$ScopeId))
-    return ($current.Count -eq 1)
-}
+# Dev5 mixed authorization is checked by Apply-LfoStructuredMemoryOps under
+# the SQLite BEGIN IMMEDIATE writer lock, never by an external preflight SELECT.
 
 function Persist-TurnAndMemory(
     [string]$Prompt,
@@ -1270,18 +1251,24 @@ function Persist-TurnAndMemory(
         try {
             $l2Connection = Open-LfoMemoryStore $script:StructuredMemoryPath
             $effectiveOps = $InlineMemoryOps  # model ops already protected
+            $guardedUserWrite = $false
             if ($readGuard.GuardActive -and $mixedCandidate.Status -eq 'candidate') {
                 $userOp = @($mixedCandidate.ParsedOps.Valid)
-                if ($userOp.Count -ne 1 -or
-                    -not (Test-LfoDev5MixedWriteEntityScope $l2Connection ([string]$userOp[0].Subject) $l2Scope)) {
+                if ($userOp.Count -ne 1) {
                     $mixedUserWriteStatus = 'rejected-entity-or-scope'
                 } else {
                     $effectiveOps = $mixedCandidate.ParsedOps
+                    $guardedUserWrite = $true
                     $mixedUserWriteStatus = 'validated-current-user'
                 }
             }
-            $l2Result = Apply-LfoStructuredMemoryOps $l2Connection $effectiveOps $turnId $l2Scope
+            # Authorization and mutation occur inside the SAME SQLite writer
+            # transaction. Another connection cannot change aliases between them.
+            $l2Result = Apply-LfoStructuredMemoryOps -Connection $l2Connection -ParsedOps $effectiveOps -SourceTurn $turnId -ScopeId $l2Scope -RequireUniqueCurrentSubject:$guardedUserWrite
             $l2Status = [string]$l2Result.Status
+            if ($guardedUserWrite -and $l2Status -eq 'guard-rejected') {
+                $mixedUserWriteStatus = 'rejected-entity-or-scope'
+            }
             $l2AppliedCount = [int]$l2Result.AppliedCount
             $l2RejectedCount = [int]$l2Result.RejectedCount
             if ($mixedUserWriteStatus -eq 'validated-current-user') {
