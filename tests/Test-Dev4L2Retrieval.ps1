@@ -106,6 +106,56 @@ if ($assembled.Count -ne 2 -or [string]$assembled[0].content -notmatch 'ORION.os
     [string]$assembled[0].content -match 'Ubuntu 24.04|FreeBSD 14') {
     throw 'L2 LOCAL prompt integration/evidence guard FAILED'
 }
+# The small model may echo retrieved L2 data as memory_ops and micro-note.
+# The persistence boundary must deterministically suppress both on LOCAL read turns,
+# retaining counters describing what the model attempted to write.
+$echoOps = [pscustomobject]@{
+    Valid = @(
+        [pscustomobject]@{ Op='SET_TEXT'; Subject='ORION'; Predicate='os'; TypedValue='Debian 13' },
+        [pscustomobject]@{ Op='SET_INTEGER'; Subject='ORION'; Predicate='ram_gb'; TypedValue=[int64]64 },
+        [pscustomobject]@{ Op='SET_TEXT'; Subject='ORION'; Predicate='db_version'; TypedValue='PostgreSQL 16' },
+        [pscustomobject]@{ Op='SET_BOOLEAN'; Subject='ORION'; Predicate='nightly_backups_enabled'; TypedValue=$true }
+    )
+    Rejected = @()
+}
+$echoNote = [pscustomobject]@{ Text='ORION Debian 13'; Raw='ORION Debian 13' }
+$guard = Protect-LfoPersistenceFromReadSide 'LOCAL' $echoOps $echoNote
+if (-not $guard.GuardActive -or $guard.ModelValidCount -ne 4 -or
+    $guard.SuppressedValidCount -ne 4 -or $guard.SuppressedRejectedCount -ne 0 -or
+    @($guard.Ops.Valid).Count -ne 0 -or @($guard.Ops.Rejected).Count -ne 0 -or
+    $null -ne $guard.Note -or -not $guard.NoteSuppressed -or
+    $guard.Reason -ne 'local-l2-retrieval-is-not-new-evidence') {
+    throw 'L2 local read-memory echo guard FAILED'
+}
+# Distinguish rejected model ops from persistence rejection.
+$rejectedEcho = [pscustomobject]@{ Valid=@(); Rejected=@([pscustomobject]@{ Reason='malformed' }) }
+$rejectedGuard = Protect-LfoPersistenceFromReadSide 'LOCAL' $rejectedEcho $null
+if ($rejectedGuard.SuppressedRejectedCount -ne 1 -or @($rejectedGuard.Ops.Rejected).Count -ne 0) {
+    throw 'L2 rejected-op read guard FAILED'
+}
+$writer = Open-LfoMemoryStore $dbPath
+try {
+    $rowsBefore = [int64]@(Invoke-LfoSqliteQuery $writer 'SELECT COUNT(*) AS n FROM facts;')[0].n
+    $result = Apply-LfoStructuredMemoryOps $writer $guard.Ops 3 'conversation:1'
+    $rowsAfter = [int64]@(Invoke-LfoSqliteQuery $writer 'SELECT COUNT(*) AS n FROM facts;')[0].n
+    if ($result.Status -ne 'empty' -or $result.AppliedCount -ne 0 -or
+        $result.RejectedCount -ne 0 -or $rowsAfter -ne $rowsBefore) {
+        throw 'L2 read guard did not prevent SQLite write'
+    }
+} finally { Close-LfoSqliteDatabase $writer }
+# A FRONTIER synthesis has independent evidence and must preserve its ops,
+# while an L2-disabled LOCAL turn retains normal dev3 write semantics.
+$frontierGuard = Protect-LfoPersistenceFromReadSide 'FRONTIER' $echoOps $echoNote
+if ($frontierGuard.GuardActive -or @($frontierGuard.Ops.Valid).Count -ne 4 -or
+    $null -eq $frontierGuard.Note) { throw 'FRONTIER evidence flow was blocked' }
+$script:LfoTurnContext = $null
+$nonReadGuard = Protect-LfoPersistenceFromReadSide 'LOCAL' $echoOps $echoNote
+if ($nonReadGuard.GuardActive -or @($nonReadGuard.Ops.Valid).Count -ne 4 -or
+    $null -eq $nonReadGuard.Note) { throw 'Ordinary LOCAL write contract regressed' }
+# Restore the previous read snapshot to finish the opt-out parity check below.
+Start-LfoTurnTelemetry
+Start-LfoTurnContext 'What is the OS and RAM for ORION?'
+
 # Disable read-side in the same fixture: baseline context must remain identical to L0/L1.
 $script:L2ReadEnabled = $false
 Start-LfoTurnTelemetry
@@ -153,6 +203,10 @@ if ($null -ne (Open-LfoMemoryReadOnly $missingDb) -or (Test-Path -LiteralPath $m
     L2ContextCharacters = $stats.l2_read_chars
     L2ContextItems = $stats.l2_read_items
     CorrectionTurnReadSkipped = ($correction.Status -eq 'write_only_turn')
+    EchoedModelFactsSuppressed = $guard.SuppressedValidCount
+    ModelNoteSuppressed = $guard.NoteSuppressed
+    SuppressedWriteRows = ($rowsAfter - $rowsBefore)
+    FrontierOpsPreserved = (-not $frontierGuard.GuardActive)
     AmbiguousAliasFailClosed = $true
     MissingDatabaseNotCreated = $true
     ProductionMemoryTouched = $false
