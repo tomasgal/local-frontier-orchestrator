@@ -586,7 +586,10 @@ function Get-LfoRelevantCurrentL2([string]$Query) {
         $connection = Open-LfoMemoryReadOnly $script:StructuredMemoryPath
         if ($null -eq $connection) { return $empty }
         $scopeId = "conversation:$([int]$script:RuntimeState.epoch)"
-        $found = Get-LfoMemoryRelevantCurrentFacts $connection $keys $scopeId $script:L2ReadMaxItems $script:L2ReadMaxChars
+        # The limit applies to the entire added prompt block, including heading.
+        $l2Header = 'CURRENT STRUCTURED FACTS (L2; recorded state, not independently verified):'
+        $factBudget = [Math]::Max(0, $script:L2ReadMaxChars - $l2Header.Length - 2)
+        $found = Get-LfoMemoryRelevantCurrentFacts $connection $keys $scopeId $script:L2ReadMaxItems $factBudget
         return [pscustomobject]@{
             Text = [string]$found.Text
             Count = [int]$found.Count
@@ -601,7 +604,11 @@ function Get-LfoRelevantCurrentL2([string]$Query) {
             Status='failed'; Error=$_.Exception.Message
         }
     } finally {
-        if ($null -ne $connection) { Close-LfoSqliteDatabase $connection }
+        if ($null -ne $connection) {
+            try { Close-LfoSqliteDatabase $connection } catch {
+                # Optional retrieval must not block LOCAL generation on cleanup.
+            }
+        }
     }
 }
 
@@ -620,8 +627,10 @@ function Start-LfoTurnContext([string]$Query) {
         Add-LfoTurnPhase -Phase 'l2_retrieval' -Kind 'retrieval' -WallSeconds $l2Seconds -Success ($l2.Status -ne 'failed') -InputChars $Query.Length
     }
     $assembledBlock = [string]$memory.Block
+    $l2Added = ''
     if ($l2.Count -gt 0) {
-        $assembledBlock += "`nCURRENT STRUCTURED FACTS (L2; recorded state, not independently verified):`n$($l2.Text)"
+        $l2Added = "`nCURRENT STRUCTURED FACTS (L2; recorded state, not independently verified):`n$($l2.Text)"
+        $assembledBlock += $l2Added
     }
 
     $recentChars = 0
@@ -632,7 +641,7 @@ function Start-LfoTurnContext([string]$Query) {
         l0_old_data_chars = ([string]$memory.RetrievedOldData).Length
         l0_old_data_items = $oldItems
         memory_block_chars = $assembledBlock.Length
-        l2_read_chars = ([string]$l2.Text).Length
+        l2_read_chars = $l2Added.Length
         l2_read_items = [int]$l2.Count
         l2_read_candidates = [int]$l2.CandidateKeys
         l2_read_status = [string]$l2.Status
