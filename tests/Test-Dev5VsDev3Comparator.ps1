@@ -28,7 +28,7 @@ function New-LfoComparatorFixture([string]$Variant) {
         gpu_profile='synthetic'
         scoped_read_evidence='matched-bounded-recent-turn'
     }
-    if($Variant -eq 'dev5'){$environment.dev5_flags='A=on;B=on;C=off;Mixed=off;StructuredRead=on'}
+    if($Variant -eq 'dev5'){$environment['dev5_flags']='A=on;B=on;C=off;Mixed=off;StructuredRead=on'}
     $samples=@()
     foreach($id in $cases) {
         foreach($rep in @(1,2,3)) {
