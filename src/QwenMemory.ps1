@@ -733,6 +733,22 @@ function Get-CurrentUserPrompt {
     return [string]$last[0].content
 }
 
+# Dev5 candidate A: the dev4 LOCAL L2-read guard discards all model-derived
+# memory_ops and memory_note on this turn. Do not ask Qwen to generate them.
+# Eligibility is based on actual per-turn L2 injection, not a query heuristic.
+function Test-LfoDev5CompactReadEligible {
+    if ($null -eq $script:Config -or
+        $null -eq $script:Config.LocalGeneration) { return $false }
+    $settings = $script:Config.LocalGeneration
+    if (-not ($settings -is [System.Collections.IDictionary])) { return $false }
+    if (-not $settings.Contains('CompactReadSchemaEnabled') -or
+        -not [bool]$settings.CompactReadSchemaEnabled) { return $false }
+    if (-not $script:L2ReadEnabled -or
+        $null -eq $script:LfoTurnContext -or
+        $null -eq $script:LfoTurnContext.Stats) { return $false }
+    return ([int]$script:LfoTurnContext.Stats.l2_read_items -gt 0)
+}
+
 function Get-QwenConversationMessages {
     $query = Get-CurrentUserPrompt
     $systemText = Get-OrchestratorSystemPrompt
@@ -757,6 +773,16 @@ Do not derive L2 operations from old STATE, PENDING, RELEVANT OLD DATA, CURRENT 
 '@
     $systemText += [Environment]::NewLine + [Environment]::NewLine +
         $script:L2StructuredMemoryTemplate.Replace('{{L2_EVIDENCE_SCOPE}}', $l2EvidenceScope.Trim())
+
+    if (Test-LfoDev5CompactReadEligible) {
+        # A read-only LOCAL L2-assisted turn cannot persist model memory
+        # outputs by design; keep the routing and answer contract unchanged.
+        $systemText += [Environment]::NewLine + [Environment]::NewLine +
+            'DEV5 READ-ONLY OUTPUT OVERRIDE: For this L2-assisted question, ' +
+            'the enforced output schema has exactly route and answer. ' +
+            'Do not produce memory_note or memory_ops fields. ' +
+            'The wrapper will not save new L1 or L2 facts from this turn.'
+    }
 
     $out = @(
         @{ role = 'system'; content = $systemText }
