@@ -47,9 +47,6 @@ public static class LfoWinSqlite
     public static extern int sqlite3_busy_timeout(IntPtr db, int milliseconds);
 
     [DllImport("winsqlite3.dll", CallingConvention = CallingConvention.Cdecl)]
-    public static extern int sqlite3_get_autocommit(IntPtr db);
-
-    [DllImport("winsqlite3.dll", CallingConvention = CallingConvention.Cdecl)]
     public static extern int sqlite3_exec(
         IntPtr db,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string sql,
@@ -131,6 +128,23 @@ public static class LfoWinSqlite
         Marshal.Copy(p, bytes, 0, len);
         return Encoding.UTF8.GetString(bytes);
     }
+}
+'@
+}
+
+# Windows PowerShell cannot replace an already loaded Add-Type class.
+# Keep the transaction-state native import in a separate, stable interop type
+# so a long-lived session with an older LfoWinSqlite definition remains usable.
+function Initialize-LfoSqliteTransactionInterop {
+    if ('LfoSqliteTransactionInteropV1' -as [type]) { return }
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class LfoSqliteTransactionInteropV1
+{
+    [DllImport("winsqlite3.dll", CallingConvention = CallingConvention.Cdecl)]
+    public static extern int sqlite3_get_autocommit(IntPtr db);
 }
 '@
 }
@@ -523,7 +537,8 @@ ON CONFLICT(entity_id, name) DO NOTHING;
 # Called only while holding BEGIN IMMEDIATE in guarded read+current-user writes.
 # A globally ambiguous mention must not be resolved by entity type.
 function Test-LfoMemoryUniqueCurrentSubject($Connection, [string]$Subject, [string]$ScopeId) {
-    if ([LfoWinSqlite]::sqlite3_get_autocommit([IntPtr]$Connection.Handle) -ne 0) {
+    Initialize-LfoSqliteTransactionInterop
+    if ([LfoSqliteTransactionInteropV1]::sqlite3_get_autocommit([IntPtr]$Connection.Handle) -ne 0) {
         throw 'Unique-current-subject authorization requires an open SQLite writer transaction.'
     }
     $key = ConvertTo-LfoEntityNameKey $Subject
