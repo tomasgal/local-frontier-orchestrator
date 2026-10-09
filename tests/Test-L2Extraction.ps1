@@ -3,7 +3,8 @@
 
 param(
     [string]$Model,
-    [string]$ConfigPath
+    [string]$ConfigPath,
+    [string]$PolicyPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -20,7 +21,8 @@ $baseUri = [string]$config.BaseUri
 
 . (Join-Path $repoRoot 'src\LfoStructuredMemory.ps1')
 
-$policyTemplate = Get-Content -LiteralPath (Join-Path $repoRoot 'policy\l2-structured-memory.txt') -Raw -Encoding UTF8
+if ([string]::IsNullOrWhiteSpace($PolicyPath)) { $PolicyPath = Join-Path $repoRoot 'policy\l2-structured-memory.txt' }
+$policyTemplate = Get-Content -LiteralPath $PolicyPath -Raw -Encoding UTF8
 # Parser regression: the only tolerated malformed integer spelling is one
 # exact brace wrapper around an otherwise valid integer.
 $parserProbe = ConvertFrom-LfoStructuredMemoryOps @(
