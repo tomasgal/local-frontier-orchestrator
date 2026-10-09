@@ -97,6 +97,25 @@ if ($block -notmatch 'CURRENT STRUCTURED FACTS' -or $block -notmatch 'Debian 13'
 if (@(Get-LfoTurnPhases | Where-Object { $_.phase -eq 'l2_retrieval' }).Count -ne 1) {
     throw 'L2 phase telemetry FAILED'
 }
+# Verify L2 enters the actual LOCAL system prompt without changing evidence rules.
+function Get-OrchestratorSystemPrompt { return 'TEST ORCHESTRATOR' }
+$script:L2StructuredMemoryTemplate = 'L2 RULES: {{L2_EVIDENCE_SCOPE}}'
+$assembled = @(Get-QwenConversationMessages)
+if ($assembled.Count -ne 2 -or [string]$assembled[0].content -notmatch 'ORION.os = Debian 13' -or
+    [string]$assembled[0].content -notmatch 'Do not derive L2 operations from old STATE' -or
+    [string]$assembled[0].content -match 'Ubuntu 24.04|FreeBSD 14') {
+    throw 'L2 LOCAL prompt integration/evidence guard FAILED'
+}
+# Disable read-side in the same fixture: baseline context must remain identical to L0/L1.
+$script:L2ReadEnabled = $false
+Start-LfoTurnTelemetry
+$script:LfoTurnContext = $null
+Start-LfoTurnContext 'What is the OS and RAM for ORION?'
+$disabledBlock = Get-LfoTurnMemoryBlock 'What is the OS and RAM for ORION?'
+if ($disabledBlock -match 'CURRENT STRUCTURED FACTS' -or (Get-LfoTurnContextStats).l2_read_items -ne 0) {
+    throw 'Opt-out L2 regression FAILED'
+}
+$script:L2ReadEnabled = $true
 
 # Probe ambiguous alias resolution: manual ambiguous entity name (no production state).
 $writer = Open-LfoMemoryStore $dbPath
