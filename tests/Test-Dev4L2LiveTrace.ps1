@@ -60,13 +60,14 @@ if ($phaseReads.Count -ne 1) { throw 'Expected exactly one measured L2 retrieval
 . (Join-Path (Split-Path -Parent $PSScriptRoot) 'src\LfoStructuredRetrieval.ps1')
 $reader = Open-LfoMemoryReadOnly $dbPath
 try {
-    $rows = @(Invoke-LfoSqliteQuery $reader @'
+    $sql = @'
 SELECT f.scope_id,f.source_turn,f.valid_from_turn,f.valid_to_turn,f.predicate,
        f.literal_type,f.value_text,f.value_integer,
        (SELECT n.name FROM entity_names n WHERE n.entity_id=f.subject_entity_id ORDER BY n.id LIMIT 1) AS subject
 FROM facts f
 ORDER BY f.id;
-'@)
+'@
+    $rows = @(Invoke-LfoSqliteQuery $reader $sql)
     $orion = @($rows | Where-Object { $_.subject -eq 'ORION' -and $_.scope_id -eq 'conversation:1' })
     $current = @($orion | Where-Object { $null -eq $_.valid_to_turn })
     $historical = @($orion | Where-Object { $null -ne $_.valid_to_turn })
