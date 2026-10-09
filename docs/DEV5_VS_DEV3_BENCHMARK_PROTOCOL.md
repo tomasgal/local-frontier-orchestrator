@@ -1,6 +1,6 @@
 # Dev5 versus dev3: representative, correctness-gated benchmark
 
-**Status (2026-10-09): PREPARED; no matched end-to-end workload results or net-gain acceptance.** This protocol is deliberately model-free until the Windows TEMP-only SQLite atomicity tests pass. Historical ORION/TITAN live timings are **not** a dev3/dev5 paired workload: different tasks, schemas, scopes and uncontrolled host states cannot establish a whole-project speedup.
+**Status (2026-10-09): G2 offline gate PASSED (9/9 suites on Windows); comparator repaired, new comparator self-test PENDING. No matched dev3/dev5 end-to-end results or net-gain acceptance.** This protocol is deliberately model-free until the Windows TEMP-only SQLite atomicity tests pass. Historical ORION/TITAN live timings are **not** a dev3/dev5 paired workload: different tasks, schemas, scopes and uncontrolled host states cannot establish a whole-project speedup.
 
 ## Refs and isolation
 
@@ -32,17 +32,17 @@ Primary outcome: the **workload-weighted end-to-end answer time**, with independ
 
 ## Offline comparator contract
 
-`tests/Compare-Dev5VsDev3Workload.ps1` reads **measured** JSON inputs; it does not invent results or call Ollama. Each file is a JSON object with `schema="lfo-dev5-vs-dev3-v1"`, `variant="dev3"` or `"dev5"`, an `environment` object, and `samples` array.
+`tests/Compare-Dev5VsDev3Workload.ps1` reads **measured** JSON inputs; it does not invent results or call Ollama. Each file is a JSON object with `schema="lfo-dev5-vs-dev3-v1"`, `data_kind="measured"`, `variant="dev3"` or `"dev5"`, an `environment` object, and `samples` array. The comparator rejects non-measured input by default. Only its isolated self-test may pass `-AllowSyntheticTestData` for `data_kind="synthetic-self-test"`; those values can never support a performance claim.
 
-Required environment keys, identical in both files: `fixture_version`, `host_class`, `model_id`, `model_digest`, `ollama_version`, `num_ctx`, `think`, `warm_state`, `logging_mode`. Both must also set `scoped_read_evidence="matched-bounded-recent-turn"`. Each needs a full lowercase 40-character `commit_sha`; dev3 **must** match the pinned `a34658b81742596520da844618b5bb39f3329279`, and dev5 must identify its distinct pinned experiment commit. Dev5 additionally requires `dev5_flags="A=on;B=on;C=off;Mixed=off;StructuredRead=on"`. Preserve exact thread/GPU profiles and diagnostic switch settings as further provenance.
+Required environment keys, identical in both files: `fixture_version`, `host_class`, `model_id`, `model_digest`, `ollama_version`, `num_ctx`, `think`, `warm_state`, `logging_mode`, `thread_profile`, `gpu_profile`. Both must also set `scoped_read_evidence="matched-bounded-recent-turn"`. Each needs a full lowercase 40-character `commit_sha`; dev3 **must** match the pinned `a34658b81742596520da844618b5bb39f3329279`, and dev5 must identify its distinct pinned experiment commit. Dev5 additionally requires `dev5_flags="A=on;B=on;C=off;Mixed=off;StructuredRead=on"`. Preserve exact thread/GPU profiles and diagnostic switch settings as further provenance.
 
-A measured sample: `{"case_id":"dense-write","repetition":1,"answer_correct":true,"memory_correct":true,"answer_wall_s":123.45,"input_tokens":1000,"output_tokens":50}`. **These numbers illustrate the input schema and are not observations.** Include all five common case IDs in each file and identical unique repetition numbers for each case. Export full model/context/persistence timing fields separately alongside the required summary fields for audit. The checker rejects missing, unmatched, nonpositive or incorrect samples. It prints per-case median wall and a weighted aggregate; fewer than three repetitions is explicitly exploratory.
+A measured sample: `{"case_id":"dense-write","repetition":1,"answer_correct":true,"memory_correct":true,"answer_wall_s":123.45,"input_tokens":1000,"output_tokens":50}`. **These numbers illustrate the input schema and are not observations.** Include all five common case IDs in each file and identical unique repetition numbers for each case. Export full model/context/persistence timing fields separately alongside the required summary fields for audit. The checker rejects missing, unmatched, nonpositive or incorrect samples. Its synthetic-only self-test also checks parser validity, successful pairing, unambiguous synthetic output labeling, and eight deliberate contract violations. It prints per-case median wall and a weighted aggregate; fewer than three repetitions is explicitly exploratory.
 
 Optional `-WeightsPath` accepts `{"schema":"lfo-observed-workload-weights-v1","provenance":"<documented workload sample and date>","weights":{"plain-local":0.2,"dense-write":0.2,"correction":0.2,"preference-only":0.2,"scoped-read":0.2}}`. The numerical weights shown are **illustrative placeholders**, not an observed workload distribution. The provenance must describe a real sample; avoid claiming observed weighting until measured. Without `-WeightsPath`, comparator labels the aggregate `ILLUSTRATIVE_ONLY`.
 
 PowerShell commands are intentionally a **single physical line** each:
 
-`& .\tests\Test-Dev5SqliteAtomicity.ps1`
+`& .\tests\Test-Dev5VsDev3Comparator.ps1`
 
 `& .\tests\Compare-Dev5VsDev3Workload.ps1 -Dev3Path '<TEMP>\dev3-measured.json' -Dev5Path '<TEMP>\dev5-measured.json'`
 
@@ -52,5 +52,14 @@ Before any locally run command: verify the current branch, clean tree and that t
 
 - **Confirmed earlier, one-sample:** A+B read reduced ORION prompt input from 1641 to 1042 tokens compared with A-only; candidate A reduced generated tokens 294 to 45 versus full-schema control. These are mechanism-level reductions, not a dev3-vs-dev5 full-loop benchmark.
 - **Confirmed earlier:** mixed current-user RAM64→96 write passed one isolated live test, with source span and scope independently checked. This is a separate functional feature.
-- **Committed, unvalidated on Windows:** dev5 guarded L2 scope/alias authorization under SQLite `BEGIN IMMEDIATE`, duplicate-count correction, and new SQL failure/lock/alias-collision offline test. Do not mark PASS until actually executed.
+- **PASSED on Windows (2026-10-09):** guarded L2 scope/alias authorization under SQLite `BEGIN IMMEDIATE`, duplicate-count correction, SQL fault injection/rollback, competing writer lock, alias collision race, and all six mixed persistence integration scenarios. All nine offline test scripts returned `PASS=True` in the same user PowerShell session, with no Ollama or production-memory access. The expected failure-injection warnings are part of successful negative tests.
 - **OPEN:** representative matched dev3-vs-dev5 wall/tokens by semantic case, default tracing overhead, workload weighting, variance, cross-host transfer, and a defensible whole-app net performance result.
+
+
+## G2 acceptance evidence and comparator repair (2026-10-09)
+
+The second clean fast-forward pull brought `90e2230` into the user host. `Test-Dev5SqliteAtomicity.ps1`, `Test-Dev5MixedRuntimePersistence.ps1`, `Test-Dev5CompactRead.ps1`, `Test-LfoMemoryStore.ps1`, `Test-Dev5MixedUserProvenance.ps1`, `Test-Dev5SemanticReadBoundary.ps1`, `Test-Dev4L2Retrieval.ps1`, `Test-Dev4Observability.ps1`, and `Test-PromptPolicyOptimization.ps1` all reported **PASS=True**. This closes the *offline G2 correctness gate* but does not imply production enablement, multi-host portability, or a dev3/dev5 speedup.
+
+The benchmark comparator itself was **not** among those nine executed scripts. Subsequent static review found it malformed: truncated commit-SHA condition and accidentally repeated validation/aggregation code. Replaced with one coherent comparator (`b4957f5`) and added `Test-Dev5VsDev3Comparator.ps1` with entirely synthetic fixtures (`ae1be82`, fixture compatibility fix `7f1377c`). Comparator enforces exact pinned dev3 SHA, distinct 40-hex dev5 SHA, common evidence, identical environment including thread/GPU, paired nonduplicate repetitions, correct outcomes, scenario set, A+B flags, and synthetic-vs-measured provenance. **New comparator self-test has not yet run in Windows PowerShell.**
+
+Next cheap action: under a clean `v9.4-dev5-compact-read` branch, ff-pull and run `& .\tests\Test-Dev5VsDev3Comparator.ps1` against exclusively TEMP synthetic fixtures, without Ollama. After PASS, design separately measured model-free processing overhead in independent dev3/dev5 TEMP fixtures; only measured JSON may enter the real comparison. 
