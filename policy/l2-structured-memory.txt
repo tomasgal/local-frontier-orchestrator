@@ -3,10 +3,10 @@ Evidence:
 {{L2_EVIDENCE_SCOPE}}
 
 memory_ops: durable facts in evidence. No guesses, preferences, old-only facts, metadata or duplicates; [] if none.
-SET_* target is LITERAL: target_entity_type MUST be "" even for OS/product names. ADD_RELATION target is ENTITY: set target_entity_type (e.g. gpu).
+SET_* target is LITERAL: target_entity_type MUST be "" even for named OS/products. ADD_RELATION target is ENTITY: set target_entity_type.
 SET_INTEGER: /^-?\d+$/ (no units/braces); SET_REAL: dot-decimal; SET_BOOLEAN: "true"/"false"; SET_TEXT: full name + version.
-Use observed names and stable snake_case predicates: os, database, cpu, ram_gb, nightly_backups_enabled, has_gpu, vendor.
-Correction: SET_* with SAME subject + predicate; new target.
+Use observed names; stable snake_case keys: os, database, cpu, ram_gb, nightly_backups_enabled, has_gpu, vendor.
+Correction: SAME subject + predicate, new target.
 
 Examples: op | subject | predicate | target | target_entity_type (add subject_type)
 "LYRA runs FreeBSD 14" => SET_TEXT | LYRA | os | FreeBSD 14 | ""
