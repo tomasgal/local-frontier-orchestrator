@@ -42,6 +42,15 @@ function Read-Dev5IsolatedTrial([string]$Root, [string]$ExpectedMode) {
     $phases = @($t.dev4_phases | Where-Object { $_.phase -eq 'local_generation' })
     if ($phases.Count -ne 1) { throw "Missing/ambiguous LOCAL generation phase: $folder" }
     $p = $phases[0]
+    $build = @($t.dev4_phases | Where-Object { $_.phase -eq 'local_request_build' })
+    $post = @($t.dev4_phases | Where-Object { $_.phase -eq 'local_response_processing' })
+    if ($build.Count -gt 1 -or $post.Count -gt 1) { throw "Duplicate LOCAL timing phase: $folder" }
+    $buildSeconds = $(if ($build.Count -eq 1) { [double]$build[0].wall_seconds } else { 0.0 })
+    $postSeconds = $(if ($post.Count -eq 1) { [double]$post[0].wall_seconds } else { 0.0 })
+    # The L2 retrieval phase is nested inside context_assembly: count only
+    # parent assembly time to avoid subtracting the same work twice.
+    $unattributed = [double]$t.answer_seconds - [double]$t.dev4_context.assembly_seconds -
+        [double]$p.wall_seconds - $buildSeconds - $postSeconds
     $ans = [string]$t.final_answer
     if ($t.route -ne 'LOCAL' -or [string]$t.dev5_local_output_mode -ne $mode -or
         [int]$t.dev4_context.l2_read_items -ne 4 -or [int]$t.dev4_context.l2_read_chars -ne 336 -or
@@ -68,6 +77,10 @@ function Read-Dev5IsolatedTrial([string]$Root, [string]$ExpectedMode) {
         AnswerWallS = [Math]::Round([double]$t.answer_seconds,3)
         L2ReadS = [Math]::Round([double]$t.dev4_context.l2_read_seconds,3)
         ContextAssemblyS = [Math]::Round([double]$t.dev4_context.assembly_seconds,3)
+        RequestBuildS = [Math]::Round($buildSeconds,3)
+        ResponseProcessS = [Math]::Round($postSeconds,3)
+        UntimedAnswerS = [Math]::Round($unattributed,3)
+        HasGapPhases = ($build.Count -eq 1 -and $post.Count -eq 1)
         Root = $folder
     }
 }
@@ -80,10 +93,10 @@ if ($full.Model -cne $compact.Model -or $full.ContextHint -ne $compact.ContextHi
 
 Write-Host '=== Matched isolated trials (one per mode) ==='
 @($full,$compact) |
-    Select-Object Mode,Model,ContextHint,PromptTokens,OutputTokens,PrefillS,DecodeS,ModelWallS,AnswerWallS,L2ReadS,ContextAssemblyS |
+    Select-Object Mode,Model,ContextHint,PromptTokens,OutputTokens,PrefillS,DecodeS,ModelWallS,AnswerWallS,UntimedAnswerS,RequestBuildS,ResponseProcessS |
     Format-Table -AutoSize
 Write-Host '=== COMPACT relative to FULL ==='
-$fields = @('PromptTokens','OutputTokens','PrefillS','DecodeS','ModelWallS','AnswerWallS','L2ReadS','ContextAssemblyS')
+$fields = @('PromptTokens','OutputTokens','PrefillS','DecodeS','ModelWallS','AnswerWallS','L2ReadS','ContextAssemblyS','RequestBuildS','ResponseProcessS','UntimedAnswerS')
 $diff = @(foreach ($field in $fields) {
     $a = [double]$full.$field
     $b = [double]$compact.$field
@@ -97,4 +110,11 @@ $diff = @(foreach ($field in $fields) {
 })
 $diff | Format-Table -AutoSize
 Write-Host 'Both conditions passed LOCAL answer, L2 retrieval and persistence trace screening.'
+if ([Math]::Abs($full.UntimedAnswerS) -gt 10 -or [Math]::Abs($compact.UntimedAnswerS) -gt 10) {
+    Write-Warning ('Timing anomaly: end-to-end time contains >10s outside measured context/model/prepare phases (FULL {0}s; COMPACT {1}s). Do NOT interpret the answer-wall delta as an architectural speedup.' -f
+        $full.UntimedAnswerS,$compact.UntimedAnswerS)
+}
+if (-not $full.HasGapPhases -or -not $compact.HasGapPhases) {
+    Write-Warning 'One or more trials predate request-build/response-processing instrumentation. The untimed gap lumps those costs together; causal attribution needs new paired telemetry.'
+}
 Write-Host 'CAUTION: one A/B pair is exploratory; cold/warm and background-load variance remain uncontrolled.'
