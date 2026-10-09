@@ -436,12 +436,12 @@ The structured **write** boundary is now validated across two materially differe
 A **post-dev3 optimization candidate** is implemented on the development branch but is not yet a validated checkpoint:
 
 - LOCAL generation temperature is reduced from `0.20` to `0.10`;
-- the L2 extraction policy is compressed deterministically from 2,414 to 917 characters while retaining the operation and type contract;
+- the originally validated full L2 extraction policy is retained: compact policy variants failed the unchanged extraction battery, including typed validation and semantic fidelity;
 - an additional 871-character duplicated LOCAL structured-output instruction block is removed;
 - a conservative wrapper detector permits a deterministic acknowledgement instead of a second full local inference only when a pure declarative state update already produced a non-empty, fully valid L2 operation set;
-- an offline regression script checks syntax, the compact policy contract, temperature, and positive/negative declarative-fallback fixtures.
+- an offline regression script checks syntax, restored full-policy contract anchors, temperature, and positive/negative declarative-fallback fixtures.
 
-The optimization candidate must still pass the offline regression, the unchanged extraction battery, and a same-fixture live benchmark on a host before promotion. L2 reads are not yet supplied to prompt construction; read/retrieval remains the next major architectural integration boundary after this tuning pass.
+Evidence boundary: two shorter L2 policy variants failed extraction; the original full policy passed all five cases by valid/rejected counts when run as an isolated override against the same model/schema. The post-FRONTIER CPU-model predicate remained less specific than ideal, so numeric PASS alone is not sufficient semantic proof. The original policy has been restored in the branch; this rollback and the remaining optimization candidate still require local deterministic regression, extraction recheck and an isolated same-fixture live benchmark before promotion. L2 reads are not yet supplied to prompt construction.
 
 
 ### Non-goals for v9.4
