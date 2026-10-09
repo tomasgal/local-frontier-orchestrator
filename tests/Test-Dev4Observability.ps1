@@ -34,6 +34,8 @@ New-Item -ItemType Directory -Force -Path (Join-Path $temp 'logs') | Out-Null
 $script:MemoryEnabled = $true
 $script:MemoryRecentTurns = 1
 $script:MemoryContextMaxChars = 600
+$script:MemoryStateMaxChars = 160
+$script:MemoryNoteMaxChars = 40
 $script:MemoryRecentContextMaxChars = 6000
 $script:MemoryRetrievalMaxChars = 2500
 $script:MemoryRetrievalMaxItems = 3
@@ -60,13 +62,15 @@ Start-LfoTurnContext 'LYRA hardware'
 $before = Get-LfoTurnMemoryBlock 'LYRA hardware'
 $stats = Get-LfoTurnContextStats
 if ($stats.l0_old_data_items -ne 1 -or $before -notmatch '48 GB RAM' -or
+    $before -notmatch 'STATE-INITIAL' -or
     @((Get-LfoTurnRecentMessages)).Count -ne 1) {
     throw 'Dev4 context assembly or L0 retrieval FAILED'
 }
 [IO.File]::WriteAllText($script:WorkingMemoryPath,'STATE-CHANGED')
 $afterCached = Get-LfoTurnMemoryBlock 'LYRA hardware'
 $afterDirect = Get-MemoryContextBlock 'LYRA hardware'
-if ($afterCached -cne $before -or $afterDirect -ceq $before) {
+if ($afterCached -cne $before -or $afterCached -notmatch 'STATE-INITIAL' -or
+    $afterDirect -ceq $before -or $afterDirect -notmatch 'STATE-CHANGED') {
     throw 'Dev4 turn cache failed to preserve immutable pre-turn snapshot'
 }
 $phaseNames = @((Get-LfoTurnPhases) | ForEach-Object { $_.phase })
