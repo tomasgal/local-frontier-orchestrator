@@ -7,7 +7,7 @@ if ([string]::IsNullOrWhiteSpace($Root) -or
     throw 'No adversarial fixture root. Run Start-Dev5AdversarialL2Fixture.ps1 first.'
 }
 $path=[IO.Path]::GetFullPath($Root)
-$tempPrefix=[IO.Path]::GetFullPath($env:TEMP).TrimEnd('\','/')+[IO.Path]::DirectorySeparatorChar
+$tempPrefix=[IO.Path]::GetFullPath($env:TEMP).TrimEnd([char[]]@('\','/'))+[IO.Path]::DirectorySeparatorChar
 if (-not $path.StartsWith($tempPrefix,[StringComparison]::OrdinalIgnoreCase) -or
     -not ([IO.Path]::GetFileName($path) -like 'LFO-dev5-adversarial-*')) {
     throw 'Refusing non-TEMP or non-adversarial fixture root'
