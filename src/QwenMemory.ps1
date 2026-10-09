@@ -521,7 +521,8 @@ function Get-MemoryContextData([string]$Query = '') {
 }
 
 function Get-MemoryContextBlock([string]$Query = '') {
-    return [string](Get-MemoryContextData $Query).Block
+    $data = Get-MemoryContextData $Query
+    return [string]$data.Block
 }
 
 # One read-only L0/L1/recent-message snapshot per turn. Post-write state is rebuilt.
@@ -1085,7 +1086,7 @@ function Persist-TurnAndMemory(
             policy_fingerprint = $script:PolicyFingerprint
             performance = $performance
             dev4_phases = @(Get-LfoTurnPhases)
-            dev4_context = Get-LfoTurnContextStats
+            dev4_context = (Get-LfoTurnContextStats)
             retrieved_old_data = $retrievedBefore
             bias_signals = @()
         }
