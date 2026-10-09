@@ -572,8 +572,16 @@ function Get-LfoRelevantCurrentL2([string]$Query) {
     $empty = [pscustomobject]@{
         Text=''; Count=0; CandidateKeys=0; Status='disabled'; Error=$null
     }
-    if (-not $script:L2ReadEnabled -or
-        -not (Test-Path -LiteralPath $script:StructuredMemoryPath -PathType Leaf)) {
+    if (-not $script:L2ReadEnabled) { return $empty }
+
+    # Read intent only: current-turn corrections/declarations must not be
+    # contaminated by previously stored L2 values.
+    if (Test-DeclarativeStateUpdatePrompt $Query) {
+        $empty.Status = 'write_only_turn'
+        return $empty
+    }
+    if (-not (Test-Path -LiteralPath $script:StructuredMemoryPath -PathType Leaf)) {
+        $empty.Status = 'missing_db'
         return $empty
     }
 
