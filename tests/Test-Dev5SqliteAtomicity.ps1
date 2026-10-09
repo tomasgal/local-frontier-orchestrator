@@ -81,7 +81,12 @@ BEGIN SELECT RAISE(ABORT,'injected-fact-insert-failure'); END;
 
     # Reproduce the old check-then-write race deterministically: after a
     # read-side lookup says unique, a different writer adds a colliding alias.
-    Assert-LfoTest (Test-LfoMemoryUniqueCurrentSubject $db 'ORION' 'conversation:1') 'Fixture unexpectedly ambiguous before race.'
+    $outsideGuardRejected = $false
+    try { [void](Test-LfoMemoryUniqueCurrentSubject $db 'ORION' 'conversation:1') }
+    catch { $outsideGuardRejected = ($_.Exception.Message -like '*requires an open SQLite writer transaction*') }
+    Assert-LfoTest $outsideGuardRejected 'Authorization helper must reject checks outside a transaction.'
+    $preflightRows = @(Invoke-LfoSqliteQuery $db "SELECT DISTINCT entity_id FROM entity_names WHERE normalized_name='orion';")
+    Assert-LfoTest ($preflightRows.Count -eq 1) 'Fixture unexpectedly ambiguous before race.'
     Start-LfoMemoryTransaction $other
     try {
         Invoke-LfoSqliteNonQuery $other 'INSERT INTO entities(entity_type,created_turn) VALUES (?1,?2);' @('server',11)
@@ -94,7 +99,7 @@ BEGIN SELECT RAISE(ABORT,'injected-fact-insert-failure'); END;
     Assert-LfoTest ($race.Status -eq 'guard-rejected' -and $race.AppliedCount -eq 0 -and $afterRace.Count -eq 2 -and [int64]$afterRace[1].value_integer -eq 96 -and $null -eq $afterRace[1].valid_to_turn) 'Alias collision between read and write was not rejected.'
     $otherScope = @(Get-LfoTestRam $db 'conversation:2')
     Assert-LfoTest ($otherScope.Count -eq 1 -and [int64]$otherScope[0].value_integer -eq 128 -and $null -eq $otherScope[0].valid_to_turn) 'Cross-epoch scope mutated.'
-    [pscustomobject]@{PASS=$true;AtomicGuard=$true;DuplicateReplay=$true;DuplicateBatch=$true;InvalidShapeRejected=$true;ScopeRejected=$true;SqlFailureRollback=$true;LateBatchRollback=$true;WriterLockEnforced=$true;AliasRaceRejected=$true;ProductionMemoryTouched=$false;OllamaCalled=$false;TempRoot=$root} | Format-List
+    [pscustomobject]@{PASS=$true;AtomicGuard=$true;DuplicateReplay=$true;DuplicateBatch=$true;InvalidShapeRejected=$true;ScopeRejected=$true;SqlFailureRollback=$true;LateBatchRollback=$true;WriterLockEnforced=$true;OutsideTransactionGuardRejected=$true;AliasRaceRejected=$true;ProductionMemoryTouched=$false;OllamaCalled=$false;TempRoot=$root} | Format-List
 } finally {
     if ($null -ne $other) { Close-LfoSqliteDatabase $other }
     Close-LfoSqliteDatabase $db
