@@ -32,7 +32,7 @@ This roadmap describes engineering directions, not release commitments.
 
 ## v9.4 milestone — L2 structured memory
 
-v9.4 is the active memory-development milestone after the validated v9.3 baseline. The current implementation checkpoint is **v9.4-dev3 (L2 structured write integration)**.
+v9.4 is the active memory-development milestone after the validated v9.3 baseline. The current development branch is **v9.4-dev4-observability** (stage 1 and stage 2 functional validation PASS on the constrained reference host); v9.4-dev3 is the earlier structured write-side checkpoint.
 
 Purpose:
 
@@ -78,7 +78,7 @@ Current v9.4-dev3 status (2026-10-05):
 - SQLite work remains negligible relative to local inference: measured live L2 writes were roughly hundredths of a second to about one second, while constrained-host local turns take tens to hundreds of seconds;
 - post-dev3 runtime optimization validated on an isolated constrained CPU-only reference host (2026-10-09): LOCAL temperature `0.20 -> 0.10`, removal of an 871-character duplicated LOCAL rule block, and deterministic acknowledgement for a pure declarative update with a fully valid L2 set (prevented answer-only retry in a live turn). Two compact L2-policy candidates failed extraction and were abandoned; the original full policy was restored with exact blob identity to baseline;
 - offline deterministic regression PASS; five-fixture extraction counts PASS (4/0, 3/0, 1/0, 0/0, 3/0 valid/rejected), retaining a pre-existing post-FRONTIER predicate ambiguity (`model` versus `cpu`). Isolated two-turn live fixture PASS: both LOCAL, first turn 4 accepted L2 facts, correction 1 accepted fact, 0 rejected, 5 historical SQLite rows with correct OS supersession and 4 current facts;
-- measured comparison on the constrained reference host: first turn 185.81 -> 169.006 seconds and prompt 1674 -> 1488 tokens; correction 34.14 -> 25.845 seconds. These are paired single-run observations, not statistically proven speedups or confirmed cross-host gains. SQLite write time remained negligible. L2 retrieval into Qwen context remains pending for dev4.
+- measured comparison on the constrained reference host: first turn 185.81 -> 169.006 seconds and prompt 1674 -> 1488 tokens; correction 34.14 -> 25.845 seconds. These are paired single-run observations, not statistically proven speedups or confirmed cross-host gains. SQLite write time remained negligible. At that earlier dev3 checkpoint L2 reads into the prompt were still pending; they were later added and functionally validated under dev4 stage 2 with a deterministic read/write guard.
 
 ### Planned v9.4 development sequence after dev3
 
