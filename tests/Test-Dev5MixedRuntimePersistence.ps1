@@ -24,7 +24,7 @@ $script:PolicyFingerprint='mixed-integration'
 $results=@()
 function Test-MixedPersist{
     param([string]$Name,[string]$Prompt,[bool]$Enable,
-          [bool]$Ambiguous=$false,[bool]$Write=$false,[bool]$Duplicate=$false,[string]$Status='disabled')
+          [bool]$Ambiguous=$false,[bool]$Write=$false,[bool]$Duplicate=$false,[bool]$StoreFailure=$false,[string]$Status='disabled')
     $root=Join-Path $env:TEMP ('LFO-dev5-mixed-integrated-'+[guid]::NewGuid().ToString('N'))
     [void](New-Item -ItemType Directory -Path $root -Force)
     $script:Config.Memory.DataDirectory=$root
@@ -40,7 +40,8 @@ function Test-MixedPersist{
     [IO.File]::WriteAllText($script:PendingNotesPath,'')
     $script:RuntimeState=[ordered]@{version=2;memory_schema=2;epoch=1;next_turn_id=3;completed_since_compaction=0}
     Save-RuntimeState
-    $db=Open-LfoMemoryStore $script:StructuredMemoryPath
+    $seedDbPath=$script:StructuredMemoryPath
+    $db=Open-LfoMemoryStore $seedDbPath
     try{
         [void](Set-LfoMemoryAttribute $db 'ORION' 'os' 'Debian 13' 1 'server' 'conversation:1')
         [void](Set-LfoMemoryAttribute $db 'ORION' 'ram_gb' ([int64]$(if($Duplicate){96}else{64})) 1 'server' 'conversation:1')
@@ -65,11 +66,16 @@ function Test-MixedPersist{
             Invoke-LfoSqliteNonQuery $db 'INSERT INTO entity_names(entity_id,name,normalized_name,source_turn) VALUES (?1,?2,?3,?4);' @([int64]$newId[0].id,'ORION','orion',2)
         }finally{Close-LfoSqliteDatabase $db}
     }
+    if($StoreFailure){
+        $blockingFile=Join-Path $root 'blocked-parent'
+        [IO.File]::WriteAllText($blockingFile,'file-blocks-a-directory')
+        $script:StructuredMemoryPath=Join-Path $blockingFile 'cannot-open.db'
+    }
     $raw=[pscustomobject]@{op='SET_INTEGER';subject='ORION';subject_type='server';predicate='ram_gb';target='256';target_entity_type=''}
     $echo=ConvertFrom-LfoStructuredMemoryOps -RawOps @($raw) -MaxOps 1
     $note=[pscustomobject]@{Text='ORION RAM is now 256 GB';Raw='untrusted model echo'}
     Persist-TurnAndMemory -Prompt $Prompt -FinalContent 'Debian 13' -Route 'LOCAL' -PolicyReason 'offline' -LocalRaw '{}' -FrontierResult '' -Response $null -AnswerSeconds 0 -InlineMemoryNote $note -InlineMemoryOps $echo
-    $reader=Open-LfoMemoryReadOnly $script:StructuredMemoryPath
+    $reader=Open-LfoMemoryReadOnly $seedDbPath
     try{
         $facts=@(Invoke-LfoSqliteQuery $reader 'SELECT id,predicate,value_integer,source_turn,scope_id,valid_to_turn FROM facts ORDER BY id;')
         $ram=@(Invoke-LfoSqliteQuery $reader @'
@@ -110,6 +116,9 @@ WHERE n.normalized_name='orion' AND f.predicate='ram_gb' AND f.scope_id='convers
        [bool]$trace[0].memory_note_appended -or [int]$trace[0].turn_id -ne 3){
         throw "Mixed audit/read guard trace incorrect: $Name"
     }
+    if($StoreFailure -and ([string]$trace[0].l2_status -ne 'failed' -or [string]::IsNullOrWhiteSpace([string]$trace[0].l2_error))){
+        throw "SQLite open failure did not appear in trace: $Name"
+    }
     if($Write -and ([string]$trace[0].l2_write_source -ne 'validated-current-user' -or
         [int]$trace[0].l2_applied_count -ne 1 -or [int]$trace[0].mixed_user_evidence_start -lt 0)){
         throw "Validated user provenance not audited: $Name"
@@ -125,7 +134,8 @@ $p='What OS does ORION run? Also, ORION RAM is now 96 GB.'
 $results+=Test-MixedPersist -Name 'opted-in-user-write' -Prompt $p -Enable $true -Write $true -Status 'applied-current-user'
 $results+=Test-MixedPersist -Name 'disabled-preserves-guard' -Prompt $p -Enable $false -Status 'disabled'
 $results+=Test-MixedPersist -Name 'already-current-duplicate' -Prompt $p -Enable $true -Duplicate $true -Status 'duplicate-current-user'
+$results+=Test-MixedPersist -Name 'sqlite-open-error-reported' -Prompt $p -Enable $true -StoreFailure $true -Status 'failed'
 $results+=Test-MixedPersist -Name 'alias-collision-rejected' -Prompt $p -Enable $true -Ambiguous $true -Status 'rejected-entity-or-scope'
 $results+=Test-MixedPersist -Name 'unsupported-claim-rejected' -Prompt 'What OS does ORION run? Also, ORION RAM might be 96 GB.' -Enable $true -Status 'no-verified-user-assertion'
 $results|Format-Table -AutoSize
-[pscustomobject]@{PASS=$true;Cases=$results.Count;RuntimeUserWriteVerified=$true;DuplicateUserWriteCountedZero=$true;DefaultOffPreserved=$true;AmbiguityFailClosed=$true;UnverifiedClaimFailClosed=$true;ModelOpsAndL1Suppressed=$true;OllamaCalled=$false;ProductionMemoryTouched=$false}|Format-List
+[pscustomobject]@{PASS=$true;Cases=$results.Count;RuntimeUserWriteVerified=$true;DuplicateUserWriteCountedZero=$true;SqliteFailureReported=$true;DefaultOffPreserved=$true;AmbiguityFailClosed=$true;UnverifiedClaimFailClosed=$true;ModelOpsAndL1Suppressed=$true;OllamaCalled=$false;ProductionMemoryTouched=$false}|Format-List
