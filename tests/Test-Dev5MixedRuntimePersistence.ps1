@@ -15,6 +15,10 @@ foreach($name in @('src\QwenMemory.ps1','src\QwenChat.ps1','src\LfoMixedTurnEvid
 $script:Config=Import-PowerShellDataFile -LiteralPath (Join-Path $repo 'config\QwenChat.config.psd1')
 $script:Config.LocalGeneration.CompactReadSchemaEnabled=$true
 $script:Config.LocalGeneration.LeanReadPolicyEnabled=$true
+# L2 retrieval is opt-in by default: an A+B config alone cannot enable reads.
+# This test exercises mixed READ+write, so explicitly enable L2 in the
+# isolated test configuration (production defaults remain unchanged).
+$script:Config.Memory.StructuredReadEnabled=$true
 $script:Model='offline'
 $script:PolicyFingerprint='mixed-integration'
 $results=@()
@@ -26,6 +30,10 @@ function Test-MixedPersist{
     $script:Config.Memory.DataDirectory=$root
     $script:Config.LocalGeneration.MixedUserEvidenceWriteEnabled=$Enable
     Initialize-QwenMemoryConfiguration -ContextLengthHint 5120
+    if (-not $script:MemoryEnabled -or -not $script:StructuredMemoryEnabled -or
+        -not $script:L2ReadEnabled) {
+        throw "Isolated mixed fixture must enable Memory, StructuredMemory and L2Read: $Name"
+    }
     [void](New-Item -ItemType Directory -Path $script:StateDir -Force)
     [void](New-Item -ItemType Directory -Path $script:LogDir -Force)
     [IO.File]::WriteAllText($script:WorkingMemoryPath,'')
@@ -43,7 +51,12 @@ function Test-MixedPersist{
     Start-LfoTurnTelemetry
     $script:LfoTurnContext=$null
     Start-LfoTurnContext $Prompt
-    if((Get-LfoTurnContextStats).l2_read_items -ne 3){throw "Expected exactly 3 scoped facts: $Name"}
+    $contextStats=Get-LfoTurnContextStats
+    if ([int]$contextStats.l2_read_items -ne 3 -or
+        [string]$contextStats.l2_read_status -ne 'ok') {
+        throw ("Expected 3 scoped L2 facts: {0}, got items={1}, status={2}, error={3}" -f
+            $Name,$contextStats.l2_read_items,$contextStats.l2_read_status,$contextStats.l2_read_error)
+    }
     if($Ambiguous){
         $db=Open-LfoMemoryStore $script:StructuredMemoryPath
         try{
