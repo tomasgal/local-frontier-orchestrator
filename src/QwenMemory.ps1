@@ -1303,6 +1303,7 @@ function Persist-TurnAndMemory(
             performance = $performance
             dev4_phases = @(Get-LfoTurnPhases)
             dev4_context = (Get-LfoTurnContextStats)
+            dev5_local_output_mode = $(if (Test-LfoDev5CompactReadEligible) { 'compact-read' } else { 'full' })
             retrieved_old_data = $retrievedBefore
             bias_signals = @()
         }
