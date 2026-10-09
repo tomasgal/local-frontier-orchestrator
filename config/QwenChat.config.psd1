@@ -56,6 +56,11 @@
         # schema only when a read-only LOCAL turn received current L2 facts.
         # Opt-in experiment, not a release default. Compare with dev4.
         CompactReadSchemaEnabled = $false
+
+        # Dev5 candidate B: independently opt-in to omit the redundant full
+        # L2 WRITE extraction policy on A-eligible read-only LOCAL turns.
+        # Requires candidate A; all read/write persistence guards remain.
+        LeanReadPolicyEnabled = $false
     }
 
     SynthesisGeneration = @{
