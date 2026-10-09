@@ -24,7 +24,7 @@ $script:PolicyFingerprint='mixed-integration'
 $results=@()
 function Test-MixedPersist{
     param([string]$Name,[string]$Prompt,[bool]$Enable,
-          [bool]$Ambiguous=$false,[bool]$Write=$false,[string]$Status='disabled')
+          [bool]$Ambiguous=$false,[bool]$Write=$false,[bool]$Duplicate=$false,[string]$Status='disabled')
     $root=Join-Path $env:TEMP ('LFO-dev5-mixed-integrated-'+[guid]::NewGuid().ToString('N'))
     [void](New-Item -ItemType Directory -Path $root -Force)
     $script:Config.Memory.DataDirectory=$root
@@ -43,7 +43,7 @@ function Test-MixedPersist{
     $db=Open-LfoMemoryStore $script:StructuredMemoryPath
     try{
         [void](Set-LfoMemoryAttribute $db 'ORION' 'os' 'Debian 13' 1 'server' 'conversation:1')
-        [void](Set-LfoMemoryAttribute $db 'ORION' 'ram_gb' ([int64]64) 1 'server' 'conversation:1')
+        [void](Set-LfoMemoryAttribute $db 'ORION' 'ram_gb' ([int64]$(if($Duplicate){96}else{64})) 1 'server' 'conversation:1')
         [void](Set-LfoMemoryAttribute $db 'ORION' 'ram_gb' ([int64]128) 1 'server' 'conversation:2')
         [void](Set-LfoMemoryAttribute $db 'ORION' 'operator_note' 'ORION RAM is now 256 GB.' 2 'server' 'conversation:1')
     }finally{Close-LfoSqliteDatabase $db}
@@ -88,7 +88,7 @@ WHERE n.normalized_name='orion' AND f.predicate='ram_gb' AND f.scope_id='convers
                [int]$ram[1].source_turn -ne 3 -or $null -ne $ram[1].valid_to_turn){
                 throw "Validated user write lost scoped source-turn history: $Name"
             }
-        }elseif($facts.Count -ne 4 -or $ram.Count -ne 1 -or [int64]$ram[0].value_integer -ne 64 -or $null -ne $ram[0].valid_to_turn){
+        }elseif($facts.Count -ne 4 -or $ram.Count -ne 1 -or [int64]$ram[0].value_integer -ne $(if($Duplicate){96}else{64}) -or $null -ne $ram[0].valid_to_turn){
             throw "No-write case mutated SQLite: $Name"
         }
         if($other.Count -ne 1 -or [int64]$other[0].value_integer -ne 128 -or
@@ -124,7 +124,8 @@ WHERE n.normalized_name='orion' AND f.predicate='ram_gb' AND f.scope_id='convers
 $p='What OS does ORION run? Also, ORION RAM is now 96 GB.'
 $results+=Test-MixedPersist -Name 'opted-in-user-write' -Prompt $p -Enable $true -Write $true -Status 'applied-current-user'
 $results+=Test-MixedPersist -Name 'disabled-preserves-guard' -Prompt $p -Enable $false -Status 'disabled'
+$results+=Test-MixedPersist -Name 'already-current-duplicate' -Prompt $p -Enable $true -Duplicate $true -Status 'duplicate-current-user'
 $results+=Test-MixedPersist -Name 'alias-collision-rejected' -Prompt $p -Enable $true -Ambiguous $true -Status 'rejected-entity-or-scope'
 $results+=Test-MixedPersist -Name 'unsupported-claim-rejected' -Prompt 'What OS does ORION run? Also, ORION RAM might be 96 GB.' -Enable $true -Status 'no-verified-user-assertion'
 $results|Format-Table -AutoSize
-[pscustomobject]@{PASS=$true;Cases=$results.Count;RuntimeUserWriteVerified=$true;DefaultOffPreserved=$true;AmbiguityFailClosed=$true;UnverifiedClaimFailClosed=$true;ModelOpsAndL1Suppressed=$true;OllamaCalled=$false;ProductionMemoryTouched=$false}|Format-List
+[pscustomobject]@{PASS=$true;Cases=$results.Count;RuntimeUserWriteVerified=$true;DuplicateUserWriteCountedZero=$true;DefaultOffPreserved=$true;AmbiguityFailClosed=$true;UnverifiedClaimFailClosed=$true;ModelOpsAndL1Suppressed=$true;OllamaCalled=$false;ProductionMemoryTouched=$false}|Format-List
