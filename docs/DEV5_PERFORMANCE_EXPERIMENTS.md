@@ -116,6 +116,25 @@ This experiment directly demonstrates removal of **599 input tokens** on the sco
 **Interpretation:** promising architecture-level reduction in redundant model work without hardware specialization, supported by isolated functional tests and one sample for A+B. Confounds: CPU availability, paging, model warmness, request serialization, context caching, and run order. Evaluation of additional question classes, repeated alternating trials, cross-host transfer, impacts on read-enabled deployment defaults, and the mandatory net dev5-over-dev3 total workload accounting remain **OPEN**. Production flags must remain OFF until those criteria pass.
 
 
+
+## Dev5 semantic boundary stress matrix — added 2026-10-09, LOCAL RUN PENDING
+
+New deterministic and TEMP-only `tests/Test-Dev5SemanticReadBoundary.ps1` exercises A+B's actual SQLite L2 read path, turn-context assembly, conditional short/full policy, output schema selection, and independent dev4 read/write guard. It explicitly does **not** execute Ollama and does not assert that a model obeyed a policy. Ten cases:
+
+1. Current four-fact ORION read with superseded Ubuntu 24.04 excluded.
+2. ORION from a different conversation epoch containing only FreeBSD 14.
+3. Empty conversation epoch: no L2 facts, therefore full schema/full extraction policy.
+4. Unknown LYRA alias: no stored facts, full fallback.
+5. Explicit ORION correction: bypass retrieval, preserve normal write-side contract.
+6. Explicit user memory instruction: likewise preserve the normal write-side contract.
+7. Mixed question plus new RAM=96 GB assertion: the read guard must suppress simulated new-model writes while stored RAM=64 GB remains unchanged. **Expected known limitation: the new assertion is deliberately NOT persisted**; this is not evidence that mixed-intent support is complete.
+8. L2 retrieval disabled: full schema and unchanged write contract.
+9. Retrieved operator note on TITAN that looks like a hostile instruction. The test verifies only that this is recorded data and selects the read-only path; **model resistance to prompt injection is explicitly NOT TESTED**. Stored free text currently enters model context and needs a dedicated adversarial/escaping review.
+10. Ambiguous ORION alias: fail closed with no arbitrary entity selection or compact path.
+
+The script separately asserts FRONTIER model-independent write ops are preserved and no original SQLite facts or L1 notes are changed. Its own output clearly distinguishes deterministic wrapper behavior from untested model semantic behavior. **Not yet executed on the constrained Windows reference host; do not label this matrix PASS without an actual run.** After passing, evaluate one targeted adversarial model trial or implement an explicit stored-data serialization boundary, rather than extrapolating from the ORION fact question. The existing default opt-out remains unchanged.
+
+
 ## Acceptance gates
 
 1. Run `tests/Test-Dev5CompactRead.ps1` (no Ollama or production files): default full schema, two-field schema, unchanged parser and routing, full fallback with no L2 hits/disabled feature/disabled L2 read, unchanged provenance policy text, and character count difference.
