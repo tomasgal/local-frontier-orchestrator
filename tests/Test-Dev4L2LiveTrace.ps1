@@ -40,6 +40,11 @@ if ($target.Count -ne 1) {
     throw ("Expected exactly one matching ORION test turn (turn_id=3); found {0} across {1} traces." -f $target.Count, $turns.Count)
 }
 $t = $target[0]
+$expectedMode = $(if ([bool]$cfg.LocalGeneration.CompactReadSchemaEnabled) { 'compact-read' } else { 'full' })
+if ([string]$t.dev5_local_output_mode -ne $expectedMode) {
+    throw ("Local output schema mode mismatch: config expected {0}, trace reported {1}." -f
+        $expectedMode, [string]$t.dev5_local_output_mode)
+}
 $extra = @($turns | Where-Object { [int]$_.turn_id -ne 3 })
 if ($extra.Count -gt 0) {
     Write-Host ("WARNING: {0} additional REPL turn(s) found. Validating original turn 3 and entire DB state; no model rerun required." -f $extra.Count) -ForegroundColor Yellow
@@ -67,7 +72,7 @@ if ($answer -notmatch '(?i)Debian\s+13' -or
     throw 'LOCAL answer did not satisfy the four current ORION facts without distractors.'
 }
 Write-Host '===== TURN AND GUARD ====='
-$t | Select-Object turn_id,route,answer_seconds,l2_status,l2_applied_count,l2_rejected_count,l2_ops_model_valid_count,l2_ops_model_rejected_count,l2_ops_suppressed_valid_count,l2_ops_suppressed_rejected_count,l2_read_write_guard_active,l2_read_write_guard_reason,l1_model_note_suppressed,memory_note_appended | Format-List
+$t | Select-Object turn_id,route,answer_seconds,dev5_local_output_mode,l2_status,l2_applied_count,l2_rejected_count,l2_ops_model_valid_count,l2_ops_model_rejected_count,l2_ops_suppressed_valid_count,l2_ops_suppressed_rejected_count,l2_read_write_guard_active,l2_read_write_guard_reason,l1_model_note_suppressed,memory_note_appended | Format-List
 Write-Host '===== CONTEXT ====='
 $t.dev4_context | Format-List
 Write-Host '===== MODEL PHASES ====='
