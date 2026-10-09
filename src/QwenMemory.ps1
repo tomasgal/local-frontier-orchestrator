@@ -70,6 +70,15 @@ function Initialize-QwenMemoryConfiguration(
         $script:Config.Memory.ContainsKey('StructuredEnabled') -and
         [bool]$script:Config.Memory.StructuredEnabled
     $script:StructuredMemoryPath = Join-Path $script:StateDir 'l2-memory.db'
+    $script:L2ReadEnabled = $script:StructuredMemoryEnabled -and
+        $script:Config.Memory.ContainsKey('StructuredReadEnabled') -and
+        [bool]$script:Config.Memory.StructuredReadEnabled
+    $script:L2ReadMaxItems = if ($script:Config.Memory.ContainsKey('StructuredReadMaxItems')) {
+        [Math]::Max(0, [Math]::Min(12, [int]$script:Config.Memory.StructuredReadMaxItems))
+    } else { 6 }
+    $script:L2ReadMaxChars = if ($script:Config.Memory.ContainsKey('StructuredReadMaxChars')) {
+        [Math]::Max(0, [Math]::Min(1200, [int]$script:Config.Memory.StructuredReadMaxChars))
+    } else { 800 }
     $script:Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 }
 
@@ -525,11 +534,95 @@ function Get-MemoryContextBlock([string]$Query = '') {
     return [string]$data.Block
 }
 
+# Candidate generation uses literal words/short phrases from this user turn.
+# No lexical fallback to broad entity scans. The storage layer requires exact
+# normalized aliases, so the model never generates identifiers or SQL.
+function Get-LfoL2MentionKeys([string]$Query) {
+    if ([string]::IsNullOrWhiteSpace($Query)) { return @() }
+    $tokens = @([regex]::Matches($Query, '[\p{L}\p{N}][\p{L}\p{N}._+-]*') |
+        ForEach-Object { $_.Value } | Select-Object -First 40)
+    $informative = @(Get-SearchTermsFromText $Query)
+    $seen = @{}
+    $keys = @()
+    foreach ($size in @(4,3,2,1)) {
+        for ($i = 0; $i -le ($tokens.Count - $size); $i++) {
+            $span = @($tokens[$i..($i + $size - 1)])
+            $hasInformativeWord = $false
+            foreach ($part in $span) {
+                if ((ConvertTo-SearchText $part) -in $informative) {
+                    $hasInformativeWord = $true
+                    break
+                }
+            }
+            if (-not $hasInformativeWord) { continue }
+            $key = ConvertTo-LfoEntityNameKey ($span -join ' ')
+            if ($key.Length -lt 3 -or $key.Length -gt 96) { continue }
+            if ($seen.ContainsKey($key)) { continue }
+            $seen[$key] = $true
+            $keys += $key
+            if ($keys.Count -ge 48) { return @($keys) }
+        }
+    }
+    return @($keys)
+}
+
+function Get-LfoRelevantCurrentL2([string]$Query) {
+    $empty = [pscustomobject]@{
+        Text=''; Count=0; CandidateKeys=0; Status='disabled'; Error=$null
+    }
+    if (-not $script:L2ReadEnabled -or
+        -not (Test-Path -LiteralPath $script:StructuredMemoryPath -PathType Leaf)) {
+        return $empty
+    }
+
+    $keys = @(Get-LfoL2MentionKeys $Query)
+    if ($keys.Count -eq 0) {
+        $empty.Status = 'no_query_entity'
+        return $empty
+    }
+
+    $connection = $null
+    try {
+        $connection = Open-LfoMemoryReadOnly $script:StructuredMemoryPath
+        if ($null -eq $connection) { return $empty }
+        $scopeId = "conversation:$([int]$script:RuntimeState.epoch)"
+        $found = Get-LfoMemoryRelevantCurrentFacts $connection $keys $scopeId $script:L2ReadMaxItems $script:L2ReadMaxChars
+        return [pscustomobject]@{
+            Text = [string]$found.Text
+            Count = [int]$found.Count
+            CandidateKeys = [int]$found.CandidateKeys
+            Status = [string]$found.Status
+            Error = $null
+        }
+    } catch {
+        # Failure to read optional L2 must never prevent a LOCAL answer.
+        return [pscustomobject]@{
+            Text=''; Count=0; CandidateKeys=$keys.Count
+            Status='failed'; Error=$_.Exception.Message
+        }
+    } finally {
+        if ($null -ne $connection) { Close-LfoSqliteDatabase $connection }
+    }
+}
+
 # One read-only L0/L1/recent-message snapshot per turn. Post-write state is rebuilt.
 function Start-LfoTurnContext([string]$Query) {
     $sw = [Diagnostics.Stopwatch]::StartNew()
     $memory = Get-MemoryContextData $Query
     $recent = @(Get-RecentConversationMessages)
+    $l2 = [pscustomobject]@{ Text=''; Count=0; CandidateKeys=0; Status='disabled'; Error=$null }
+    $l2Seconds = 0.0
+    if ($script:L2ReadEnabled) {
+        $l2Sw = [Diagnostics.Stopwatch]::StartNew()
+        $l2 = Get-LfoRelevantCurrentL2 $Query
+        $l2Sw.Stop()
+        $l2Seconds = $l2Sw.Elapsed.TotalSeconds
+        Add-LfoTurnPhase -Phase 'l2_retrieval' -Kind 'retrieval' -WallSeconds $l2Seconds -Success ($l2.Status -ne 'failed') -InputChars $Query.Length
+    }
+    $assembledBlock = [string]$memory.Block
+    if ($l2.Count -gt 0) {
+        $assembledBlock += "`nCURRENT STRUCTURED FACTS (L2; recorded state, not independently verified):`n$($l2.Text)"
+    }
 
     $recentChars = 0
     foreach ($item in $recent) { $recentChars += ([string]$item.content).Length }
@@ -538,14 +631,21 @@ function Start-LfoTurnContext([string]$Query) {
         l1_core_chars = ([string]$memory.Core).Length
         l0_old_data_chars = ([string]$memory.RetrievedOldData).Length
         l0_old_data_items = $oldItems
-        memory_block_chars = ([string]$memory.Block).Length
+        memory_block_chars = $assembledBlock.Length
+        l2_read_chars = ([string]$l2.Text).Length
+        l2_read_items = [int]$l2.Count
+        l2_read_candidates = [int]$l2.CandidateKeys
+        l2_read_status = [string]$l2.Status
+        l2_read_seconds = [Math]::Round($l2Seconds, 4)
+        l2_read_error = $l2.Error
+        l2_max_chars = [int]$script:L2ReadMaxChars
         recent_messages = $recent.Count
         recent_messages_chars = $recentChars
         assembly_seconds = 0.0
     }
     $script:LfoTurnContext = [pscustomobject]@{
         Query = $Query
-        MemoryBlock = [string]$memory.Block
+        MemoryBlock = $assembledBlock
         RetrievedOldData = [string]$memory.RetrievedOldData
         RecentMessages = $recent
         Stats = $stats
@@ -634,7 +734,7 @@ When historical values conflict, prefer explicit later corrections and state unc
     $l2EvidenceScope = @'
 For route LOCAL, the L2 evidence is the CURRENT USER TURN as interpreted by this Qwen pass.
 For route FRONTIER, emit memory_ops=[] because the post-frontier synthesis pass owns L2 memory for the turn.
-Do not derive L2 operations from old STATE, PENDING, RELEVANT OLD DATA, or older turns unless the current turn explicitly re-establishes the fact.
+Do not derive L2 operations from old STATE, PENDING, RELEVANT OLD DATA, CURRENT STRUCTURED FACTS (L2), or older turns unless the current turn explicitly re-establishes the fact.
 '@
     $systemText += [Environment]::NewLine + [Environment]::NewLine +
         $script:L2StructuredMemoryTemplate.Replace('{{L2_EVIDENCE_SCOPE}}', $l2EvidenceScope.Trim())
