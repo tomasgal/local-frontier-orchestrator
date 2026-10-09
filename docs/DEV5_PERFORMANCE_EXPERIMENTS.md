@@ -1,6 +1,6 @@
 # v9.4-dev5 — architecture-first performance experiments
 
-Status: **candidate A first isolated compact-read LIVE correctness/PERSISTENCE PASS, promising single-run performance observation; matched full-schema control still pending** (2026-10-09).
+Status: **candidate A functional LIVE PASS and timing-anomaly diagnostic completed; candidate B lean read-policy opt-in implementation committed, offline validation pending** (2026-10-09).
 Parent checkpoint: `v9.4-dev4-observability` — stage 1 and stage 2 functionally PASS on the reference CPU-only host.
 Baseline `main` remains v9.3; nothing in this plan is a release/default-performance claim.
 
@@ -70,7 +70,27 @@ Follow-up instrumentation committed **after** these first live trials:
 - `tests/Compare-Dev5CompactRead.ps1` reports `UntimedAnswerS`, subtracting context assembly, model wall, and, when present, request/response phases (never subtracts the nested L2 retrieval twice). It prints a **warning** when more than 10 s of answer wall is unaccounted or when old traces lack these new phases.
 - `tests/Test-Dev5CompactRead.ps1` offline regression checks that both timing hooks remain present. These changes have now **passed all five offline regression suites on Lenovo (2026-10-09)**, including `TimingPhasesDeclared=2`, with a clean Git worktree and no production-memory access. They have **not yet been exercised in a new live inference**. The old trace gap can be quantified but cannot be retrospectively attributed to one specific pre/post-model operation.
 
-The user has also rerun the read-only comparer on existing FULL and COMPACT fixture roots: matched semantics PASS; `UntimedAnswerS` FULL **110.953 s**, COMPACT **0.694 s**. The comparer correctly emitted warnings for the >10-second timing anomaly and for absent new timing phases in old traces. All earlier functional and persistence tests remain PASS. **Next diagnostic:** one fresh, TEMP-only full-schema trial with the new request-build/response-processing Stopwatch phases, followed immediately by the strict SQLite checker and read-only comparer, to determine whether the 111-second outlier recurs and, if so, which operation owns that time. An isolated, unreplicated full run is a *diagnostic* check, not evidence of a repeatable performance difference. Do not automatically run another full A/B pair; reevaluate after this result. Do not repeatedly spend multiple minutes on the constrained reference host without a specific discrimination target. The production default remains disabled. Candidate A only accelerates the opt-in L2-assisted read path; whole-application dev5 net-speedup acceptance across the dev3 workload is **still open**.
+The earlier read-only comparison verified `UntimedAnswerS` FULL **110.953 s**, COMPACT **0.694 s**, and correctly warned that the historical traces lacked the new request/response phases.
+
+### Targeted instrumented FULL diagnostic — 2026-10-09
+
+The user then ran **one fresh TEMP-only full-schema LOCAL trial with the new instrumentation**. It independently passed the strict ORION semantic, write-guard, provenance, seven-row SQLite and no-L1-note checker. Results: prompt **1588**, generated **294**, `answer_seconds=203.140`, `context_assembly=1.4278s`, `local_request_build=0.0401s`, `local_generation=201.0549s` (prefill 106.1351s, decode 74.7088s, other 20.2110s), `local_response_processing=0.3924s`, and only **0.225s** unaccounted. The previously observed **110.953s** unexplained FULL turn-wall residual **did not recur**. Its historical cause is unresolved; do not retroactively label it as JSON overhead, paging, or an architecture cost.
+
+Against the single existing COMPACT read sample (unchanged 154.549s answer, 153.0422s model, 45 output tokens, 13.0807s decode), this instrumented FULL run yields observed -249 output tokens (-84.7%), -61.6281s decode (-82.5%), -48.0127s Ollama wall (-23.9%), and -48.591s turn wall (-23.9%). This comparison excludes the large prior outlier but is still **one compact observation** and uncontrolled host-condition ordering. Evidence for the removed unnecessary `memory_ops[]` generation is strong; **repeatable speedup and dev5 net gain over dev3 are not yet accepted**.
+
+The comparator previously represented absent request-build/response-processing phases in old traces as numeric zero, leading to misleading -100% deltas. Commit `0821e1e` fixes this: missing values remain `$null`, and no percentage is calculated when one mode lacks a phase. This fix **requires Lenovo offline revalidation**.
+
+## Candidate B — separate opt-in reduction of redundant read-side L2 extraction policy
+
+Candidate A shortened the output schema but kept the full validated ~2458-character L2 WRITE extraction policy in its read-only LOCAL system prompt, and added a small compact-mode override. The resulting compact prompt was **1641 tokens**, 53 more than the FULL prompt. Candidate B tests removal of *unused write-extraction instructions* from that one read-only path to reduce prefill traffic, as a **distinct material variable** from A.
+
+- `LocalGeneration.LeanReadPolicyEnabled = $false` is a second experimental switch, OFF by default. It becomes effective only if candidate A is enabled, structured L2 reads are enabled, and the turn's frozen context actually includes L2 facts. Thus normal four-field writes, corrections (which bypass read side), FRONTER synthesis and A-only control turns keep the original full L2 policy unchanged.
+- When B is explicitly enabled, `Get-QwenConversationMessages` replaces the long WRITE extraction policy with a short read-only evidence policy, while preserving the original orchestrator policy, actual L2 scoped/provenance facts, the two-field `route + answer` JSON schema, and **the independent deterministic dev4 persistence guard**.
+- Research trace now records `dev5_read_policy_mode=full|lean-read`. The TEMP-only `Start-Dev4L2LiveFixture.ps1` accepts `-CompactReadSchema -LeanReadPolicy` together; strict checker validates the selected mode, including backward compatibility for older traces. Offline `Test-Dev5CompactRead.ps1` now asserts A-only parity, A+B policy reduction, unchanged retrieval context, missing/disabled L2 fallback, and full normal-write path. **These changes have NOT yet been run on Lenovo, and B has no live semantic or performance result.**
+- Sequence: (1) pull with Git auto-maintenance disabled given the OneDrive checkout; (2) run the updated five offline regressions and old-trace comparison; (3) only if PASS, run one fresh isolated A+B ORION trial with full semantic/SQLite checker; (4) compare with A-only trial, taking input token counts, prefill latency, output token counts and end-to-end time separately; reject if answers, routing or read/write isolation regress. Any reduction is limited to the opt-in L2-assisted read path.
+- Do not promote A or B to defaults on a single small synthetic workload. Measure normal dev3-path performance and permanent dev4/dev5 overhead on representative workloads before claiming the project-wide required net improvement.
+
+
 
 ## Acceptance gates
 
@@ -82,7 +102,7 @@ The user has also rerun the read-only comparer on existing FULL and COMPACT fixt
 
 ## Later experiments, not implemented
 
-- **B — prompt traffic**: conditionally omit redundant write-side L2 policy on protected read-only turns *after* candidate A semantic validation, without weakening the actual persistence guard. Benchmark prefill and prompt counts separately.
+- **B — prompt traffic (implemented, unvalidated)**: independently opt-in to replacing redundant L2 write-extraction policy with a small read-only evidence policy in A-eligible protected turns; benchmark prefill and prompt counts, preserving all default write contracts and persistence guard.
 - **C — stable-prefix / context traffic**: evaluate prompt-prefix reuse and bounded changes to volatile context placement, ensuring evidence precedence, memory scope and safe guard semantics. Consider actual Ollama prompt-eval cache behavior before assumptions.
 - **D — scheduling/redundant work**: evaluate whether compaction can leave the interactive critical path, and whether repeated history access, inference or serialization can be eliminated.
 - Keep host-specific thread, affinity, accelerators and quantization in runtime profiles; they are secondary comparisons, not the expected reason for architectural speedups.
