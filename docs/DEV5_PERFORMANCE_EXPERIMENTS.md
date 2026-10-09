@@ -48,6 +48,30 @@ The mechanism has direct evidence: the compact output emits no L2 ops, whereas t
 
 Next acceptance step: run a **fresh full-schema control under the same dev5 code branch**, using the same isolated fixture but without `-CompactReadSchema`, and invoke the strict trace/SQLite checker immediately after `/exit`. Save the previous compact root separately. Then run `tests/Compare-Dev5CompactRead.ps1 -FullRoot <full root> -CompactRoot <compact root>` to enforce equal model/context/expected answer and display token/time differences without rerunning Ollama. This one fresh A/B pair remains exploratory; alternate and repeat only if meaningful variance estimation is warranted.
 
+## Follow-up full-schema control and timing anomaly — 2026-10-09
+
+The user ran a fresh **FULL** control on the **same dev5 branch**, without `-CompactReadSchema`, matching `qwen3.5:4b-q4_K_M`, context hint 5120, identical ORION query, four L2 facts / 336 added chars, independent TEMP-only SQLite. Both full and compact passed the strict LOCAL four-fact answer, write guard, no L1 note, seven unchanged database rows, and trace-mode checks. The read-only comparator `tests/Compare-Dev5CompactRead.ps1` passed semantic screening.
+
+| Metric | Fresh full control | Compact candidate | Compact - full |
+| --- | ---: | ---: | ---: |
+| Prompt tokens | 1588 | 1641 | +53 (+3.3%) |
+| Output tokens | 294 | 45 | -249 (-84.7%) |
+| Prefill time | 109.6928 s | 112.4917 s | +2.7989 s (+2.6%) |
+| Decode time | 76.7314 s | 13.0807 s | -63.6507 s (-83.0%) |
+| Measured Ollama request wall | 212.8339 s | 153.0422 s | -59.7917 s (-28.1%) |
+| Turn-to-answer elapsed wall | 324.962 s | 154.549 s | -170.413 s (-52.4%) |
+| L2 retrieval | 1.0494 s | 0.7252 s | -0.3242 s |
+| Context assembly | 1.1756 s | 0.8132 s | -0.3624 s |
+
+**Critical anomaly:** the full turn reports 324.962 s before persistence, yet only 212.8339 s in measured Ollama HTTP plus 1.1756 s in context assembly: roughly **110.95 s is outside these phases**. The compact trial shows only about **0.69 s** outside model/context assembly. This is not plausibly explained by L2 retrieval or normal JSON parsing without further evidence. It may reflect unmeasured request construction/response processing, process suspension or memory pressure, but the cause is **unknown**. The ~52.4% turn-wall delta must not be presented as a verified speedup. The model-request improvement (-28.1%) is closer to the changed component yet still vulnerable to run-order, model caching and host load. The token-generation reduction is the strongest reproducible mechanism-level signal; the full baseline emitted exactly 294 tokens in both observed full runs.
+
+Follow-up instrumentation committed **after** these first live trials:
+- `src/QwenChat.ps1` now measures `local_request_build` (constructing and serializing the Ollama body) and `local_response_processing` (cleaning/parsing the returned local answer and routing), in both full and compact modes. This adds only Stopwatch/phase bookkeeping, not model calls or semantic changes.
+- `tests/Compare-Dev5CompactRead.ps1` reports `UntimedAnswerS`, subtracting context assembly, model wall, and, when present, request/response phases (never subtracts the nested L2 retrieval twice). It prints a **warning** when more than 10 s of answer wall is unaccounted or when old traces lack these new phases.
+- `tests/Test-Dev5CompactRead.ps1` offline regression checks that both timing hooks remain present. These changes are **not yet tested on Lenovo**. The old trace gap can be quantified but cannot be retrospectively attributed to one specific pre/post-model operation.
+
+Next: rerun offline test and read-only comparator on the **existing** two fixture roots, without Ollama. Decide whether a later instrumented alternating compact/full pair is justified to localize the 110.95-s gap and evaluate host variance. Do not repeatedly spend multiple minutes on the constrained reference host without a specific discrimination target. The production default remains disabled. Candidate A only accelerates the opt-in L2-assisted read path; whole-application dev5 net-speedup acceptance across the dev3 workload is **still open**.
+
 ## Acceptance gates
 
 1. Run `tests/Test-Dev5CompactRead.ps1` (no Ollama or production files): default full schema, two-field schema, unchanged parser and routing, full fallback with no L2 hits/disabled feature/disabled L2 read, unchanged provenance policy text, and character count difference.
