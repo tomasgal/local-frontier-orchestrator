@@ -140,7 +140,7 @@ if ([string]$hostile[0].content -match 'IGNORE PREVIOUS INSTRUCTIONS' -or
 $script:LfoTurnContext.L2EvidenceText = 'ORION.os = Debian 13 [scope=conversation:1; source_turn=2]'
 $script:LfoTurnContext.MemoryBlock = "STATE:`nPENDING:`nCURRENT STRUCTURED FACTS (L2):`n$($script:LfoTurnContext.L2EvidenceText)"
 $script:Config.LocalGeneration.LowerTrustL2EvidenceEnabled = $false
-if (Test-LfoDev5LowerTrustL2EvidenceEligible -or
+if ((Test-LfoDev5LowerTrustL2EvidenceEligible) -or
     [string](@(Get-QwenConversationMessages)[0].content) -ne [string]$lean[0].content) {
     throw 'Candidate C OFF broke the validated A+B input'
 }
