@@ -61,6 +61,12 @@
         # L2 WRITE extraction policy on A-eligible read-only LOCAL turns.
         # Requires candidate A; all read/write persistence guards remain.
         LeanReadPolicyEnabled = $false
+
+        # Dev5 candidate C (lower-trust data placement, not a security proof):
+        # when A+B already apply, move retrieved L2 records out of the
+        # high-priority system text into a separate quoted user-role message,
+        # immediately before the actual current user prompt. Opt-in only.
+        LowerTrustL2EvidenceEnabled = $false
     }
 
     SynthesisGeneration = @{
