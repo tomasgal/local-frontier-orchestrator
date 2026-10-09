@@ -135,9 +135,11 @@ if ($rejectedGuard.SuppressedRejectedCount -ne 1 -or @($rejectedGuard.Ops.Reject
 }
 $writer = Open-LfoMemoryStore $dbPath
 try {
-    $rowsBefore = [int64]@(Invoke-LfoSqliteQuery $writer 'SELECT COUNT(*) AS n FROM facts;')[0].n
+    $preRows = @(Invoke-LfoSqliteQuery $writer 'SELECT COUNT(*) AS n FROM facts;')
+    $rowsBefore = [int64]$preRows[0].n
     $result = Apply-LfoStructuredMemoryOps $writer $guard.Ops 3 'conversation:1'
-    $rowsAfter = [int64]@(Invoke-LfoSqliteQuery $writer 'SELECT COUNT(*) AS n FROM facts;')[0].n
+    $postRows = @(Invoke-LfoSqliteQuery $writer 'SELECT COUNT(*) AS n FROM facts;')
+    $rowsAfter = [int64]$postRows[0].n
     if ($result.Status -ne 'empty' -or $result.AppliedCount -ne 0 -or
         $result.RejectedCount -ne 0 -or $rowsAfter -ne $rowsBefore) {
         throw 'L2 read guard did not prevent SQLite write'
