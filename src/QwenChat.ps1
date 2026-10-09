@@ -331,6 +331,22 @@ function Invoke-CodexReadOnly([string]$Prompt) {
 }
 
 function Get-QwenLocalOutputFormat {
+    if (Test-LfoDev5CompactReadEligible) {
+        # Dev4 already makes this exact LOCAL read mode non-persistent.
+        # Drop redundant model-generated side-channels, keeping Qwen routing.
+        return @{
+            type = 'object'
+            properties = @{
+                route = @{ type = 'string'; enum = @('LOCAL', 'FRONTIER') }
+                answer = @{
+                    type = 'string'
+                    description = 'For LOCAL: complete natural response. For FRONTIER: empty.'
+                }
+            }
+            required = @('route', 'answer')
+            additionalProperties = $false
+        }
+    }
     return @{
         type = 'object'
         properties = @{
