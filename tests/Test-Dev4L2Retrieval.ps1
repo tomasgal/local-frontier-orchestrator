@@ -130,8 +130,24 @@ if (-not $guard.GuardActive -or $guard.ModelValidCount -ne 4 -or
 # Distinguish rejected model ops from persistence rejection.
 $rejectedEcho = [pscustomobject]@{ Valid=@(); Rejected=@([pscustomobject]@{ Reason='malformed' }) }
 $rejectedGuard = Protect-LfoPersistenceFromReadSide 'LOCAL' $rejectedEcho $null
-if ($rejectedGuard.SuppressedRejectedCount -ne 1 -or @($rejectedGuard.Ops.Rejected).Count -ne 0) {
-    throw 'L2 rejected-op read guard FAILED'
+if (-not $rejectedGuard.GuardActive -or
+    $rejectedGuard.ModelRejectedCount -ne 1 -or
+    $rejectedGuard.SuppressedRejectedCount -ne 1 -or
+    @($rejectedGuard.Ops.Rejected).Count -ne 0) {
+    throw ('L2 rejected-op read guard FAILED: active={0}, modelRejected={1}, suppressedRejected={2}, effectiveRejected={3}' -f
+        $rejectedGuard.GuardActive,$rejectedGuard.ModelRejectedCount,
+        $rejectedGuard.SuppressedRejectedCount,@($rejectedGuard.Ops.Rejected).Count)
+}
+# Windows PowerShell 5.1 also needs to preserve exactly one valid operation.
+$singletonOps = [pscustomobject]@{ Valid=@($echoOps.Valid[0]); Rejected=@() }
+$singletonGuard = Protect-LfoPersistenceFromReadSide 'LOCAL' $singletonOps $null
+if (-not $singletonGuard.GuardActive -or
+    $singletonGuard.ModelValidCount -ne 1 -or
+    $singletonGuard.SuppressedValidCount -ne 1 -or
+    @($singletonGuard.Ops.Valid).Count -ne 0) {
+    throw ('L2 single valid-op read guard FAILED: active={0}, modelValid={1}, suppressedValid={2}, effectiveValid={3}' -f
+        $singletonGuard.GuardActive,$singletonGuard.ModelValidCount,
+        $singletonGuard.SuppressedValidCount,@($singletonGuard.Ops.Valid).Count)
 }
 $writer = Open-LfoMemoryStore $dbPath
 try {
@@ -206,6 +222,8 @@ if ($null -ne (Open-LfoMemoryReadOnly $missingDb) -or (Test-Path -LiteralPath $m
     L2ContextItems = $stats.l2_read_items
     CorrectionTurnReadSkipped = ($correction.Status -eq 'write_only_turn')
     EchoedModelFactsSuppressed = $guard.SuppressedValidCount
+    SingleModelFactSuppressed = $singletonGuard.SuppressedValidCount
+    SingleRejectedOpSuppressed = $rejectedGuard.SuppressedRejectedCount
     ModelNoteSuppressed = $guard.NoteSuppressed
     SuppressedWriteRows = ($rowsAfter - $rowsBefore)
     FrontierOpsPreserved = (-not $frontierGuard.GuardActive)
