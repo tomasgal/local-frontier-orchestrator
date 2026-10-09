@@ -105,8 +105,12 @@ if (-not (Test-LfoDev5LeanReadPolicyEligible) -or
 }
 # Candidate C separates retrieved L2 data from system-priority instructions,
 # without changing A+B when its own opt-in is OFF.
+# Explicitly disable B for the negative eligibility assertion; the preceding
+# A+B policy-reduction assertions deliberately left B enabled.
+$script:Config.LocalGeneration.LeanReadPolicyEnabled = $false
 $script:Config.LocalGeneration.LowerTrustL2EvidenceEnabled = $true
-if (Test-LfoDev5LowerTrustL2EvidenceEligible) {
+if ((Test-LfoDev5LeanReadPolicyEligible) -or
+    (Test-LfoDev5LowerTrustL2EvidenceEligible)) {
     throw 'Candidate C must require B, not merely candidate A'
 }
 $script:Config.LocalGeneration.LeanReadPolicyEnabled = $true
