@@ -86,6 +86,8 @@ The **v9.4-dev3 write-side and post-dev3 optimization validation boundary is now
 
 #### v9.4-dev4 — performance observability and context assembly
 
+**Dev4 stage 1 implementation checkpoint (2026-10-09; runtime validation PENDING):** a separate branch `v9.4-dev4-observability` starts from the dev3/post-dev3 validated baseline. It adds `LfoTurnTelemetry.ps1` (per-phase wall, Ollama prompt evaluation/prefill, decode, generated tokens and unattributed duration, without new model requests); an immutable *pre-turn* L0/L1/recent-message snapshot reused across LOCAL, answer recovery, FRONTIER handoff and synthesis; and `dev4_phases`/`dev4_context` research-trace fields. Existing post-write trace intentionally recomputes post-write memory so it can reflect changes made in the turn. L1/L2 write durations are also annotated as phases. A no-Ollama/no-production-memory regression `tests/Test-Dev4Observability.ps1` was committed, but has **not yet run on the reference host**. This stage does not enable L2 retrieval, shorten context, tune hardware, or modify the schema/policy/answer semantics. **Do not mark dev4 validated** until the offline regression and isolated end-to-end parity/overhead tests pass; bounded/selective L2 read integration remains the subsequent stage.
+
 Purpose:
 
 - make local inference cost attributable by phase before further tuning;
