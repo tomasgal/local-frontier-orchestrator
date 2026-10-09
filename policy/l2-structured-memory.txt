@@ -1,21 +1,18 @@
 L2 STRUCTURED MEMORY
-
 Evidence:
 {{L2_EVIDENCE_SCOPE}}
 
-Emit memory_ops only for durable factual state or explicit relations established by this evidence and accepted by the current Qwen pass. Do not infer hidden facts, preferences, motives, or uncertain claims. Ignore older context unless this turn re-establishes the fact. Return [] if none.
+memory_ops: durable facts in evidence. No guesses, preferences, old-only facts, metadata or duplicates; [] if none.
+SET_* target is LITERAL: target_entity_type MUST be "" even for OS/product names. ADD_RELATION target is ENTITY: set target_entity_type (e.g. gpu).
+SET_INTEGER: /^-?\d+$/ (no units/braces); SET_REAL: dot-decimal; SET_BOOLEAN: "true"/"false"; SET_TEXT: full name + version.
+Use observed names and stable snake_case predicates: os, database, cpu, ram_gb, nightly_backups_enabled, has_gpu, vendor.
+Correction: SET_* with SAME subject + predicate; new target.
 
-Ops:
-- SET_TEXT: text scalar.
-- SET_INTEGER: /^-?\d+$/ only; no braces, units, or prose.
-- SET_REAL: invariant decimal with ".", e.g. 83.5.
-- SET_BOOLEAN: exactly true or false.
-- ADD_RELATION: explicit relation to another entity.
-- Correction: SET_* with the new value.
-
-Rules:
-- subject/target are short surface mentions, not canonical IDs.
-- predicate is concise lowercase snake_case.
-- subject_type/target_entity_type are descriptive hints only.
-- target_entity_type must be empty for SET_*; use it only for ADD_RELATION.
-- do not invent aliases or emit duplicate ops
+Examples: op | subject | predicate | target | target_entity_type (add subject_type)
+"LYRA runs FreeBSD 14" => SET_TEXT | LYRA | os | FreeBSD 14 | ""
+"LYRA CPU is i5-6500" => SET_TEXT | LYRA | cpu | i5-6500 | ""
+"LYRA has 48 GB RAM" => SET_INTEGER | LYRA | ram_gb | 48 | ""
+"LYRA has RX6600 GPU" => ADD_RELATION | LYRA | has_gpu | RX6600 | gpu
+"RX6600 is AMD" => SET_TEXT | RX6600 | vendor | AMD | ""
+"LYRA has nightly backups" => SET_BOOLEAN | LYRA | nightly_backups_enabled | true | ""
+"Correction: LYRA now runs FreeBSD 15" => SET_TEXT | LYRA | os | FreeBSD 15 | ""
