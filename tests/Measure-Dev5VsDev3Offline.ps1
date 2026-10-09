@@ -14,7 +14,9 @@ $branch=@(Invoke-LfoGit @('branch','--show-current'))
 if($branch.Count -ne 1 -or [string]$branch[0] -cne $expectedBranch){throw 'Wrong branch: dev5 only.'}
 $dirty=@(Invoke-LfoGit @('status','--porcelain'))
 if($dirty.Count -ne 0){throw 'Dirty worktree: will not measure a moving/uncommitted checkout.'}
-$dev5Pin=[string]@(Invoke-LfoGit @('rev-parse','HEAD'))[0]
+$dev5Resolved=@(Invoke-LfoGit @('rev-parse','HEAD'))
+if($dev5Resolved.Count -ne 1){throw 'Ambiguous dev5 HEAD.'}
+$dev5Pin=[string]$dev5Resolved[0]
 if($dev5Pin -cnotmatch '^[0-9a-f]{40}$' -or $dev5Pin -ceq $dev3Pin){throw 'Invalid dev5 pin.'}
 $type=@(Invoke-LfoGit @('cat-file','-t',$dev3Pin))
 if($type.Count -ne 1 -or [string]$type[0] -cne 'commit'){throw 'Dev3 baseline commit missing locally; fetch project branches first.'}
