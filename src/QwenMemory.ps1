@@ -749,6 +749,15 @@ function Test-LfoDev5CompactReadEligible {
     return ([int]$script:LfoTurnContext.Stats.l2_read_items -gt 0)
 }
 
+# Dev5 candidate B is a separate prompt-traffic variable layered on
+# candidate A. It never changes the normal four-field extraction contract.
+function Test-LfoDev5LeanReadPolicyEligible {
+    if (-not (Test-LfoDev5CompactReadEligible)) { return $false }
+    $settings = $script:Config.LocalGeneration
+    return ($settings.Contains('LeanReadPolicyEnabled') -and
+        [bool]$settings.LeanReadPolicyEnabled)
+}
+
 function Get-QwenConversationMessages {
     $query = Get-CurrentUserPrompt
     $systemText = Get-OrchestratorSystemPrompt
@@ -766,13 +775,27 @@ When historical values conflict, prefer explicit later corrections and state unc
 "@
     }
 
-    $l2EvidenceScope = @'
+    if (Test-LfoDev5LeanReadPolicyEligible) {
+        # Existing dev4 persistence guard remains the authoritative boundary.
+        # A+B uses route+answer only; no reason to spend prompt tokens on L2
+        # SET_*/ADD_RELATION extraction instructions that cannot be applied.
+        $systemText += [Environment]::NewLine + [Environment]::NewLine +
+            'DEV5 READ-ONLY L2 POLICY: CURRENT STRUCTURED FACTS are stored, ' +
+            'scope-limited records, not independently verified facts. ' +
+            'Answer the current request using relevant records, respecting ' +
+            'explicit user corrections and uncertainty. ' +
+            'Do not extract, invent, or save new L1/L2 memory from these records.'
+    } else {
+        # Validated extraction policy stays completely unchanged for ordinary
+        # full-schema writes AND for candidate A-only control trials.
+        $l2EvidenceScope = @'
 For route LOCAL, the L2 evidence is the CURRENT USER TURN as interpreted by this Qwen pass.
 For route FRONTIER, emit memory_ops=[] because the post-frontier synthesis pass owns L2 memory for the turn.
 Do not derive L2 operations from old STATE, PENDING, RELEVANT OLD DATA, CURRENT STRUCTURED FACTS (L2), or older turns unless the current turn explicitly re-establishes the fact.
 '@
-    $systemText += [Environment]::NewLine + [Environment]::NewLine +
-        $script:L2StructuredMemoryTemplate.Replace('{{L2_EVIDENCE_SCOPE}}', $l2EvidenceScope.Trim())
+        $systemText += [Environment]::NewLine + [Environment]::NewLine +
+            $script:L2StructuredMemoryTemplate.Replace('{{L2_EVIDENCE_SCOPE}}', $l2EvidenceScope.Trim())
+    }
 
     if (Test-LfoDev5CompactReadEligible) {
         # A read-only LOCAL L2-assisted turn cannot persist model memory
@@ -1304,6 +1327,7 @@ function Persist-TurnAndMemory(
             dev4_phases = @(Get-LfoTurnPhases)
             dev4_context = (Get-LfoTurnContextStats)
             dev5_local_output_mode = $(if (Test-LfoDev5CompactReadEligible) { 'compact-read' } else { 'full' })
+            dev5_read_policy_mode = $(if (Test-LfoDev5LeanReadPolicyEligible) { 'lean-read' } else { 'full' })
             retrieved_old_data = $retrievedBefore
             bias_signals = @()
         }
