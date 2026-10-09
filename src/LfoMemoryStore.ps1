@@ -517,6 +517,24 @@ ON CONFLICT(entity_id, name) DO NOTHING;
     return $entityId
 }
 
+# Called only while holding BEGIN IMMEDIATE in guarded read+current-user writes.
+# A globally ambiguous mention must not be resolved by entity type.
+function Test-LfoMemoryUniqueCurrentSubject($Connection, [string]$Subject, [string]$ScopeId) {
+    $key = ConvertTo-LfoEntityNameKey $Subject
+    if ([string]::IsNullOrWhiteSpace($key) -or [string]::IsNullOrWhiteSpace($ScopeId)) { return $false }
+    $rows = @(Invoke-LfoSqliteQuery $Connection @'
+SELECT DISTINCT n.entity_id
+FROM entity_names n
+WHERE n.normalized_name = ?1;
+'@ @($key))
+    if ($rows.Count -ne 1) { return $false }
+    $current = @(Invoke-LfoSqliteQuery $Connection @'
+SELECT f.id FROM current_facts f
+WHERE f.subject_entity_id = ?1 AND f.scope_id = ?2 LIMIT 1;
+'@ @([int64]$rows[0].entity_id, $ScopeId))
+    return ($current.Count -eq 1)
+}
+
 function Get-LfoMemoryEntityId(
     $Connection,
     [string]$Mention,
@@ -783,7 +801,8 @@ function Apply-LfoStructuredMemoryOps(
     $Connection,
     $ParsedOps,
     [int64]$SourceTurn,
-    [string]$ScopeId
+    [string]$ScopeId,
+    [switch]$RequireUniqueCurrentSubject
 ) {
     if ($SourceTurn -le 0) {
         throw 'L2 persistence requires a positive SourceTurn.'
@@ -823,6 +842,26 @@ function Apply-LfoStructuredMemoryOps(
     $results = @()
     Start-LfoMemoryTransaction $Connection
     try {
+        # The guard and the write MUST share this SQLite writer transaction.
+        # A preflight SELECT outside BEGIN IMMEDIATE is vulnerable to alias
+        # collisions or scope changes by a second writer (TOCTOU).
+        if ($RequireUniqueCurrentSubject) {
+            $safeShape = ($valid.Count -eq 1 -and
+                [string]$valid[0].Op -eq 'SET_INTEGER' -and
+                -not [string]::IsNullOrWhiteSpace([string]$valid[0].Subject))
+            if (-not $safeShape -or
+                -not (Test-LfoMemoryUniqueCurrentSubject $Connection ([string]$valid[0].Subject) $ScopeId)) {
+                # No SQL mutations were performed. Commit releases the writer
+                # lock; the result is a rejected authorization, not SQL failure.
+                Complete-LfoMemoryTransaction $Connection
+                return [pscustomobject]@{
+                    Status = 'guard-rejected'
+                    AppliedCount = 0
+                    RejectedCount = 0
+                    Results = @()
+                }
+            }
+        }
         foreach ($op in $valid) {
             switch ([string]$op.Op) {
                 'SET_TEXT' {
@@ -854,7 +893,9 @@ function Apply-LfoStructuredMemoryOps(
 
     return [pscustomobject]@{
         Status = 'applied'
-        AppliedCount = $results.Count
+        # Duplicate rows are acknowledged but were not written; count only
+        # genuine inserts, including within a repeated or multi-op batch.
+        AppliedCount = @($results | Where-Object { [string]$_.Status -eq 'written' }).Count
         RejectedCount = 0
         Results = @($results)
     }
