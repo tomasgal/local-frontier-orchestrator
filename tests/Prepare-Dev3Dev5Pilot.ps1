@@ -52,7 +52,7 @@ foreach($variant in @('dev3','dev5')){
     $rs=[ordered]@{version=2;memory_schema=2;epoch=1;next_turn_id=3;completed_since_compaction=0}
     [IO.File]::WriteAllText((Join-Path $state 'runtime_state.json'),($rs|ConvertTo-Json),$utf8)
     # Both have the same underlying facts, although only dev5 reads them into the prompt.
-    & powershell.exe -NoProfile -NonInteractive -Command "& { param([string]\$module,[string]\$db); . \$module; \$c=Open-LfoMemoryStore \$db; try { [void](Set-LfoMemoryAttribute \$c 'BENCH_SERVER' 'os' 'Synthetic OS 13' 1 'server' 'conversation:1'); [void](Set-LfoMemoryAttribute \$c 'BENCH_SERVER' 'ram_gb' ([int64]96) 1 'server' 'conversation:1'); [void](Set-LfoMemoryAttribute \$c 'BENCH_SERVER' 'disk_gb' ([int64]512) 1 'server' 'conversation:1'); [void](Set-LfoMemoryAttribute \$c 'BENCH_SERVER' 'cpu_count' ([int64]8) 1 'server' 'conversation:1'); \$n=@(Invoke-LfoSqliteQuery \$c 'SELECT id FROM current_facts WHERE scope_id=?1;' @('conversation:1')).Count; if(\$n -ne 4){throw 'Fact count mismatch'} } finally {Close-LfoSqliteDatabase \$c} }" (Join-Path $source 'src\LfoMemoryStore.ps1') (Join-Path $state 'l2-memory.db')
+    & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $repo 'tests\Seed-Dev3Dev5PilotMemory.ps1') -SourceRoot $source -DbPath (Join-Path $state 'l2-memory.db')
     if($LASTEXITCODE -ne 0){throw "SQLite seed failed $variant"}
     $manifest.runs+=@([ordered]@{variant=$variant;source=$source;config=$cfgPath;memory=$data})
 }
