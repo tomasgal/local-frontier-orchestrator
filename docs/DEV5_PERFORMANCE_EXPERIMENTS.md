@@ -208,6 +208,18 @@ Required offline acceptance before any live inference:
 This is **design-only planning**, not a new implemented candidate, not a claim of correct mixed-turn persistence, and not grounds to relax the existing dev4 guard before the new validation mechanism exists.
 
 
+
+## Mixed user evidence validator — pure staged prototype, Lenovo test PENDING
+
+Following the full-matched negative candidate C comparison, a **standalone, opt-out-independent, unintegrated** proof of concept was committed to the dev5 branch, with no change whatsoever to `src/QwenMemory.ps1`, `src/QwenChat.ps1`, shared configs, or production memory:
+
+- `src/LfoMixedTurnEvidence.ps1` declares `Get-LfoMixedUserRamEvidence(CurrentUserPrompt)`: one conservative, anchored deterministic grammar for the exact mixed request `What OS does ORION run? Also, ORION RAM is now 96 GB.` (also supports `What operating system...`). The parser does **not** ingest L0/L1/L2, model output or trace data. It requires the uppercase entity in the question and in the assertion to match ordinally; `RAM is now <positive bounded integer> GB` must be the **only** independent assertion. It returns the original current-user substring plus character offset/length and one canonical typed `SET_INTEGER subject=ORION,predicate=ram_gb,target=96` operation validated through the unchanged `ConvertFrom-LfoStructuredMemoryOps` contract.
+- It rejects everything outside this precise current-user lexical envelope: unknown questions, other subjects, indirect `a log says` or quoted claims, uncertainty, negatives, question-shaped values, multiple statements, huge/zero numbers, extra instructions and injected old/current stored text. Rejection is a safe failure, **not** proof of general English or Slovak mixed-intent coverage.
+- `tests/Test-Dev5MixedUserProvenance.ps1` is a new, isolated and model-free TEMP SQLite test: 2 positive source-span cases, 20 negative cases; seeds ORION RAM=64 GB and decoy 128 GB in another conversation plus an operator note saying RAM=256, and independently ensures an L2-only value cannot become a current-user assertion. It checks that the existing `Protect-LfoPersistenceFromReadSide` still rejects a simulated model echo; separately, **as a test-only rehearsal**, applies the independently source-backed 96 GB typed op to a TEMP SQLite store and verifies RAM64 supersession, RAM96 current, `source_turn=3` and cross-scope 128 GB unchanged.
+- **No production runtime integration exists yet:** `Get-QwenLocalOutputFormat` and `Protect-LfoPersistenceFromReadSide` have not changed; the real application still does not persist a mixed read+new claim. Thus the rehearsal must not be described as a fixed bug or successful runtime mixed-turn persistence. The new offline script has **NOT YET run on Windows Lenovo**; all previous six-suite PASS results predate the new files.
+- Next: run the new standalone test and existing six offline suites on a clean Lenovo branch with Git auto-maintenance disabled. If PASS, only then consider a separate, OFF-by-default runtime integration for recognized current-user evidence, with strict typed provenance, trace metrics and independent persistence acceptance. Any unsupported wording remains fail-closed and must be explicitly disclosed to the user; no second model invocation.
+
+
 ## Acceptance gates
 
 1. Run `tests/Test-Dev5CompactRead.ps1` (no Ollama or production files): default full schema, two-field schema, unchanged parser and routing, full fallback with no L2 hits/disabled feature/disabled L2 read, unchanged provenance policy text, and character count difference.
