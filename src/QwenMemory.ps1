@@ -1285,9 +1285,13 @@ function Persist-TurnAndMemory(
             $l2AppliedCount = [int]$l2Result.AppliedCount
             $l2RejectedCount = [int]$l2Result.RejectedCount
             if ($mixedUserWriteStatus -eq 'validated-current-user') {
-                if ($l2Status -eq 'applied' -and $l2AppliedCount -eq 1) {
+                $written = @($l2Result.Results | Where-Object { [string]$_.Status -eq 'written' })
+                $duplicate = @($l2Result.Results | Where-Object { [string]$_.Status -eq 'duplicate' })
+                if ($l2Status -eq 'applied' -and $written.Count -eq 1) {
                     $mixedUserWriteStatus = 'applied-current-user'
                     $mixedUserApplied = 1
+                } elseif ($l2Status -eq 'applied' -and $duplicate.Count -eq 1) {
+                    $mixedUserWriteStatus = 'duplicate-current-user'
                 } else {
                     $mixedUserWriteStatus = 'not-applied'
                 }
