@@ -492,8 +492,10 @@ function Get-RelevantDataContext([string]$Query) {
     return ($parts -join "`n")
 }
 
-function Get-MemoryContextBlock([string]$Query = '') {
-    if (-not $script:MemoryEnabled) { return '' }
+function Get-MemoryContextData([string]$Query = '') {
+    if (-not $script:MemoryEnabled) {
+        return [pscustomobject]@{ Block = ''; Core = ''; RetrievedOldData = '' }
+    }
 
     $state = Get-WorkingMemoryRaw
     $pending = Get-PendingNotesText
@@ -505,11 +507,79 @@ function Get-MemoryContextBlock([string]$Query = '') {
     }
 
     $retrieved = Get-RelevantDataContext $Query
-    if (-not [string]::IsNullOrWhiteSpace($retrieved)) {
-        return "$core`nRELEVANT OLD DATA:`n$retrieved"
+    $block = if (-not [string]::IsNullOrWhiteSpace($retrieved)) {
+        "$core`nRELEVANT OLD DATA:`n$retrieved"
+    } else {
+        $core
     }
 
-    return $core
+    return [pscustomobject]@{
+        Block = $block
+        Core = $core
+        RetrievedOldData = $retrieved
+    }
+}
+
+function Get-MemoryContextBlock([string]$Query = '') {
+    return [string](Get-MemoryContextData $Query).Block
+}
+
+# One read-only L0/L1/recent-message snapshot per turn. Post-write state is rebuilt.
+function Start-LfoTurnContext([string]$Query) {
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $memory = Get-MemoryContextData $Query
+    $recent = @(Get-RecentConversationMessages)
+    $sw.Stop()
+
+    $recentChars = 0
+    foreach ($item in $recent) { $recentChars += ([string]$item.content).Length }
+    $oldItems = @([regex]::Matches([string]$memory.RetrievedOldData, '(?m)^T\d+\s+U:')).Count
+    $stats = [pscustomobject][ordered]@{
+        l1_core_chars = ([string]$memory.Core).Length
+        l0_old_data_chars = ([string]$memory.RetrievedOldData).Length
+        l0_old_data_items = $oldItems
+        memory_block_chars = ([string]$memory.Block).Length
+        recent_messages = $recent.Count
+        recent_messages_chars = $recentChars
+        assembly_seconds = [Math]::Round($sw.Elapsed.TotalSeconds, 4)
+    }
+    $script:LfoTurnContext = [pscustomobject]@{
+        Query = $Query
+        MemoryBlock = [string]$memory.Block
+        RetrievedOldData = [string]$memory.RetrievedOldData
+        RecentMessages = $recent
+        Stats = $stats
+    }
+
+    Add-LfoTurnPhase -Phase 'context_assembly' -Kind 'retrieval' -WallSeconds $sw.Elapsed.TotalSeconds -InputChars $Query.Length
+}
+
+function Get-LfoTurnMemoryBlock([string]$Query = '') {
+    if ($null -ne $script:LfoTurnContext -and
+        [string]$script:LfoTurnContext.Query -ceq $Query) {
+        return [string]$script:LfoTurnContext.MemoryBlock
+    }
+    return Get-MemoryContextBlock $Query
+}
+
+function Get-LfoTurnRetrievedOldData([string]$Query = '') {
+    if ($null -ne $script:LfoTurnContext -and
+        [string]$script:LfoTurnContext.Query -ceq $Query) {
+        return [string]$script:LfoTurnContext.RetrievedOldData
+    }
+    return Get-RelevantDataContext $Query
+}
+
+function Get-LfoTurnRecentMessages {
+    if ($null -ne $script:LfoTurnContext) {
+        return @($script:LfoTurnContext.RecentMessages)
+    }
+    return @(Get-RecentConversationMessages)
+}
+
+function Get-LfoTurnContextStats {
+    if ($null -eq $script:LfoTurnContext) { return $null }
+    return $script:LfoTurnContext.Stats
 }
 
 function Get-RecentConversationMessages {
@@ -545,7 +615,7 @@ function Get-CurrentUserPrompt {
 function Get-QwenConversationMessages {
     $query = Get-CurrentUserPrompt
     $systemText = Get-OrchestratorSystemPrompt
-    $memoryBlock = Get-MemoryContextBlock $query
+    $memoryBlock = Get-LfoTurnMemoryBlock $query
 
     if (-not [string]::IsNullOrWhiteSpace($memoryBlock)) {
         $systemText += @"
@@ -570,12 +640,12 @@ Do not derive L2 operations from old STATE, PENDING, RELEVANT OLD DATA, or older
     $out = @(
         @{ role = 'system'; content = $systemText }
     )
-    $out += @(Get-RecentConversationMessages)
+    $out += @(Get-LfoTurnRecentMessages)
     return @($out)
 }
 
 function Get-RecentConversationText([switch]$ExcludeLastUser) {
-    $items = @(Get-RecentConversationMessages)
+    $items = @(Get-LfoTurnRecentMessages)
 
     if ($ExcludeLastUser -and $items.Count -gt 0 -and [string]$items[-1].role -eq 'user') {
         if ($items.Count -eq 1) {
@@ -598,7 +668,8 @@ function Get-RecentConversationText([switch]$ExcludeLastUser) {
 function Invoke-QwenMemoryCall(
     [string]$SystemPrompt,
     [string]$UserPrompt,
-    [int]$NumPredict
+    [int]$NumPredict,
+    [string]$Phase = 'memory_call'
 ) {
     $bodyObj = @{
         model = $Model
@@ -616,10 +687,7 @@ function Invoke-QwenMemoryCall(
     }
 
     $body = $bodyObj | ConvertTo-Json -Depth 14 -Compress
-    return Invoke-RestMethod -Uri "$BaseUri/api/chat" -Method Post `
-        -ContentType 'application/json; charset=utf-8' `
-        -Body $body `
-        -TimeoutSec 600
+    return Invoke-LfoChatApi -Phase $Phase -Body $body
 }
 
 function Invoke-QwenMemoryNote(
@@ -643,7 +711,8 @@ $answerText
     $r = Invoke-QwenMemoryCall `
         (Expand-RuntimePolicy $script:MemoryNoteTemplate) `
         $memoryInput `
-        ([int]$script:Config.Memory.NoteNumPredict)
+        ([int]$script:Config.Memory.NoteNumPredict) `
+        'memory_recovery'
 
     $raw = [string]$r.message.content
     $note = Clean-MicroText $raw $script:MemoryNoteMaxChars
@@ -676,7 +745,8 @@ NOTES:$notes
     $r = Invoke-QwenMemoryCall `
         (Expand-RuntimePolicy $script:MemoryCompactionTemplate) `
         $memoryInput `
-        ([int]$script:Config.Memory.CompactionNumPredict)
+        ([int]$script:Config.Memory.CompactionNumPredict) `
+        'memory_compaction'
 
     $raw = [string]$r.message.content
     $newState = Clean-MicroText $raw $script:MemoryStateMaxChars
@@ -832,12 +902,12 @@ function Persist-TurnAndMemory(
 
     $timestamp = (Get-Date).ToString('o')
     $memoryBefore = if ($script:MemoryEnabled) {
-        Get-MemoryContextBlock $Prompt
+        Get-LfoTurnMemoryBlock $Prompt
     } else {
         ''
     }
     $retrievedBefore = if ($script:MemoryEnabled) {
-        Get-RelevantDataContext $Prompt
+        Get-LfoTurnRetrievedOldData $Prompt
     } else {
         ''
     }
@@ -1014,6 +1084,8 @@ function Persist-TurnAndMemory(
             memory_error = $memoryError
             policy_fingerprint = $script:PolicyFingerprint
             performance = $performance
+            dev4_phases = @(Get-LfoTurnPhases)
+            dev4_context = Get-LfoTurnContextStats
             retrieved_old_data = $retrievedBefore
             bias_signals = @()
         }
