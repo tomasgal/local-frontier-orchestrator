@@ -2,7 +2,7 @@
 # Offline only. Never opens SQLite or production files, and never calls Ollama.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-foreach ($relative in @('src\QwenChat.ps1','src\QwenMemory.ps1','src\LfoStructuredMemory.ps1','tests\Start-Dev4L2LiveFixture.ps1','tests\Test-Dev4L2LiveTrace.ps1','tests\Compare-Dev5CompactRead.ps1','tests\Compare-Dev5ReadPolicy.ps1','tests\Start-Dev5AdversarialL2Fixture.ps1','tests\Test-Dev5AdversarialL2Trace.ps1','src\LfoMixedTurnEvidence.ps1','tests\Test-Dev5MixedUserProvenance.ps1','tests\Test-Dev5MixedRuntimePersistence.ps1')) {
+foreach ($relative in @('src\QwenChat.ps1','src\QwenMemory.ps1','src\LfoStructuredMemory.ps1','tests\Start-Dev4L2LiveFixture.ps1','tests\Test-Dev4L2LiveTrace.ps1','tests\Compare-Dev5CompactRead.ps1','tests\Compare-Dev5ReadPolicy.ps1','tests\Start-Dev5AdversarialL2Fixture.ps1','tests\Test-Dev5AdversarialL2Trace.ps1','src\LfoMixedTurnEvidence.ps1','tests\Test-Dev5MixedUserProvenance.ps1','tests\Test-Dev5MixedRuntimePersistence.ps1','tests\Start-Dev5MixedLiveFixture.ps1','tests\Test-Dev5MixedLiveTrace.ps1')) {
     $tokens = $null
     $errors = $null
     [void][Management.Automation.Language.Parser]::ParseFile(
