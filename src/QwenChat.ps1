@@ -64,6 +64,14 @@ if (-not (Test-Path -LiteralPath $structuredMemoryModule)) {
 }
 . $structuredMemoryModule
 
+# Parse only the current explicit user sentence, never the retrieved evidence.
+# This module is intentionally pure and has no side effects on import.
+$mixedEvidenceModule = Join-Path $PSScriptRoot 'LfoMixedTurnEvidence.ps1'
+if (-not (Test-Path -LiteralPath $mixedEvidenceModule)) {
+    throw "Mixed-turn evidence validator missing: $mixedEvidenceModule"
+}
+. $mixedEvidenceModule
+
 $memoryStoreModule = Join-Path $PSScriptRoot 'LfoMemoryStore.ps1'
 if (-not (Test-Path -LiteralPath $memoryStoreModule)) {
     throw "L2 memory store module not found: $memoryStoreModule"
