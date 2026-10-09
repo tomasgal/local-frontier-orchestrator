@@ -1,6 +1,6 @@
 # Local Frontier Orchestrator
 
-**Status:** experimental / research prototype (`v0.1-alpha`) · **Main build:** `v9.3` (`pressure-compaction + explicit-memory recovery`) · **Development checkpoint:** `v9.4-dev3` (`L2 structured write integration`, validated on two host classes) · **Post-dev3 optimization:** implemented, validation pending
+**Status:** experimental / research prototype (`v0.1-alpha`) · **Main build:** `v9.3` (`pressure-compaction + explicit-memory recovery`) · **Development checkpoint:** `v9.4-dev3` (`L2 structured write integration`, validated on two host classes) · **Post-dev3 optimization:** isolated Lenovo-class CPU-only validation PASS (2026-10-09); multi-host performance transfer pending
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
@@ -18,7 +18,7 @@ As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validatio
 
 As of **2026-10-05**, `v9.4-dev3` has completed the structured **write-side** validation boundary on both a desktop reference host and a constrained CPU-only 8 GB notebook. The schema-v3 SQLite fact store uses opaque `entity_id` identity, separate entity surface-name records, typed literals, entity relations, source-turn provenance, scope isolation, duplicate suppression, atomic fail-closed multi-op writes, and reconstructible supersession history. The notebook independently reproduced the same multi-delta extraction contract, including a four-fact dense turn, entity relations, scalar correction, an empty L2 set for a preference-only turn, and post-FRONTIER structured extraction. A live correction remained LOCAL and produced the expected historical supersession in SQLite.
 
-The branch also contains a **post-dev3 runtime optimization candidate**: LOCAL temperature is reduced to `0.10`; an additional duplicated LOCAL structured-output rule block was removed; and a narrow deterministic acknowledgement path avoids a second local inference when a pure declarative state update has a fully valid non-empty L2 operation set but an unusable answer. Controlled extraction tests showed that shorter L2 policies broke the typed/predicate extraction contract, so the previously validated full L2 policy was restored. The remaining optimizations are **not yet validated end-to-end**. L2 retrieval is still **not injected into the model prompt**; finish regression and same-fixture live validation before starting read-side integration.
+**Post-dev3 runtime optimization — isolated host validation PASS (2026-10-09):** LOCAL temperature is `0.10`; an 871-character duplicated LOCAL structured-output rule block was removed; and a deterministic acknowledgement avoids a second answer-only inference when a pure declarative update has a non-empty fully valid L2 set but an unusable answer. Two compact L2-policy experiments regressed extraction, so the original fully validated policy was restored and its Git blob identity verified. Offline regression and five-fixture extraction counts passed (4/0, 3/0, 1/0, 0/0, 3/0 valid/rejected); the post-FRONTIER test still has a pre-existing semantic ambiguity when a CPU name is labeled as a computer model. In an isolated two-turn CPU-only 5120-context live run, a synthetic four-fact update stayed LOCAL, persisted all 4 ops and used `local-declarative-ack` without an answer retry; the correction stayed LOCAL, persisted 1 op and correctly superseded the prior OS value while preserving the other 3 facts. Initial turn: 185.81 s / 1674 prompt tokens before vs 169.01 s / 1488 after; correction: 34.14 s before vs 25.85 s after. These are single-run observations, not statistically established speedups or proof of cross-host transfer. L2 retrieval is **not yet injected**; its context-assembly integration remains the v9.4-dev4 boundary.
 
 ## Core architecture
 
@@ -270,7 +270,7 @@ local model -> ask_codex -> native Codex frontier -> local model
 Current work focuses on:
 
 - **v9.4-dev3 L2 structured-memory integration:** write-side semantics are validated across two host classes; typed facts/relations, multi-delta extraction, opaque entity identity plus surface-name resolution, deterministic current-state updates, atomic fail-closed turn writes, provenance/history, and relational queries sit behind a stable MemoryStore abstraction;
-- validating the post-dev3 runtime optimization candidate (deduplicated LOCAL instructions, LOCAL temperature 0.10, deterministic acknowledgement for pure declarative updates) without weakening structured extraction;
+- post-dev3 runtime optimization is functionally validated on one isolated CPU-only host; extend validation to other host classes when appropriate, without making this a dev4 prerequisite;
 - adding the L2 read/retrieval path to context assembly only after that optimization boundary is stable;
 - long-term routing quality;
 - faithful-but-useful frontier synthesis;
