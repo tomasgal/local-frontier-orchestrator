@@ -51,6 +51,16 @@ if ($loggedPolicy -ne $expectedPolicy) {
     throw ("Local policy mismatch: config expected {0}, trace reported {1}" -f
         $expectedPolicy,$loggedPolicy)
 }
+$expectedRole = $(if ([bool]$cfg.LocalGeneration.LowerTrustL2EvidenceEnabled) { 'user-data' } else { 'system-context' })
+$loggedRole = $(if ($null -ne $t.PSObject.Properties['dev5_l2_evidence_role']) {
+    [string]$t.dev5_l2_evidence_role
+} else {
+    'system-context'
+})
+if ($loggedRole -ne $expectedRole) {
+    throw ("L2 evidence role mismatch: config expected {0}, trace reported {1}" -f
+        $expectedRole,$loggedRole)
+}
 $expectedMode = $(if ([bool]$cfg.LocalGeneration.CompactReadSchemaEnabled) { 'compact-read' } else { 'full' })
 if ([string]$t.dev5_local_output_mode -ne $expectedMode) {
     throw ("Local output schema mode mismatch: config expected {0}, trace reported {1}." -f
@@ -83,7 +93,7 @@ if ($answer -notmatch '(?i)Debian\s+13' -or
     throw 'LOCAL answer did not satisfy the four current ORION facts without distractors.'
 }
 Write-Host '===== TURN AND GUARD ====='
-$t | Select-Object turn_id,route,answer_seconds,dev5_local_output_mode,dev5_read_policy_mode,l2_status,l2_applied_count,l2_rejected_count,l2_ops_model_valid_count,l2_ops_model_rejected_count,l2_ops_suppressed_valid_count,l2_ops_suppressed_rejected_count,l2_read_write_guard_active,l2_read_write_guard_reason,l1_model_note_suppressed,memory_note_appended | Format-List
+$t | Select-Object turn_id,route,answer_seconds,dev5_local_output_mode,dev5_read_policy_mode,dev5_l2_evidence_role,l2_status,l2_applied_count,l2_rejected_count,l2_ops_model_valid_count,l2_ops_model_rejected_count,l2_ops_suppressed_valid_count,l2_ops_suppressed_rejected_count,l2_read_write_guard_active,l2_read_write_guard_reason,l1_model_note_suppressed,memory_note_appended | Format-List
 Write-Host '===== CONTEXT ====='
 $t.dev4_context | Format-List
 Write-Host '===== MODEL PHASES ====='
