@@ -102,7 +102,8 @@ if (@(Get-LfoTurnPhases | Where-Object { $_.phase -eq 'l2_retrieval' }).Count -n
 $writer = Open-LfoMemoryStore $dbPath
 try {
     Invoke-LfoSqliteNonQuery $writer 'INSERT INTO entities(entity_type, created_turn) VALUES (?1, ?2);' @('server',4)
-    $otherId = [int64]@(Invoke-LfoSqliteQuery $writer 'SELECT last_insert_rowid() AS id;')[0].id
+    $insertedIds = @(Invoke-LfoSqliteQuery $writer 'SELECT last_insert_rowid() AS id;')
+    $otherId = [int64]$insertedIds[0].id
     Invoke-LfoSqliteNonQuery $writer 'INSERT INTO entity_names(entity_id,name,normalized_name,source_turn) VALUES (?1,?2,?3,?4);' @($otherId,'ORION','orion',4)
 } finally { Close-LfoSqliteDatabase $writer }
 $reader = Open-LfoMemoryReadOnly $dbPath
