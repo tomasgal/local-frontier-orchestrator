@@ -138,6 +138,8 @@ The script separately asserts FRONTIER model-independent write ops are preserved
 
 ## Candidate C — role-separated lower-trust L2 evidence (IMPLEMENTED, UNVALIDATED)
 
+**First Lenovo offline attempt 2026-10-09: FAIL in test harness, before any C validation.** `Test-Dev5CompactRead.ps1` attempted to assert that C cannot activate when B is disabled, but the preceding candidate B assertions had left `LeanReadPolicyEnabled=$true`. With A+B active, C's positive eligibility was correct; the supposedly negative test condition was invalid. The script terminated at `Candidate C must require B, not merely candidate A` before any other test in the six-suite command could run. Corrected test setup in commit `5233b50`: explicitly set `LeanReadPolicyEnabled=$false` for the negative C assertion, then re-enable B for the positive C check. **The fix has not yet been rerun on Lenovo**. All six earlier pre-C suite results remain historical PASS but cannot be treated as a PASS of the new C changes.
+
 **Motivation:** at the validated A+B checkpoint, the `CURRENT STRUCTURED FACTS (L2)` block is interpolated into a high-priority `system` message, including arbitrary values from stored text fields. The ten-case offline matrix confirmed that an instruction-like value can reach the prompt, but did not test whether Qwen obeys it. This is a *trust-boundary defect*, not a demonstrated successful attack.
 
 **Independent opt-in only**, `LocalGeneration.LowerTrustL2EvidenceEnabled=$false` in the shared config. C can activate only when A and B are both enabled, L2 read is active, and the current frozen retrieval snapshot contains nonempty selected L2 evidence. The original A, B, full-schema, FRONTIER synthesis and declarative-write paths remain unchanged when C is off.
