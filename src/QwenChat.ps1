@@ -519,6 +519,9 @@ function Invoke-LfoChatApi([string]$Phase, [string]$Body) {
 }
 
 function Invoke-QwenLocalApi {
+    # Distinguish PowerShell prompt/schema construction from the HTTP model
+    # request. Both FULL and COMPACT share identical instrumentation.
+    $prepareSw = [Diagnostics.Stopwatch]::StartNew()
     $bodyObj = @{
         model      = $Model
         messages   = @(Get-QwenConversationMessages)
@@ -540,6 +543,9 @@ function Invoke-QwenLocalApi {
     }
 
     $body = $bodyObj | ConvertTo-Json -Depth 12 -Compress
+    $prepareSw.Stop()
+    Add-LfoTurnPhase -Phase 'local_request_build' -Kind 'prepare' `
+        -WallSeconds $prepareSw.Elapsed.TotalSeconds -InputChars $body.Length
     return Invoke-LfoChatApi -Phase 'local_generation' -Body $body
 }
 
@@ -734,6 +740,7 @@ function Invoke-Qwen([string]$Prompt) {
         # Qwen routes and answers in one schema-constrained generation. On
         # LOCAL the same generation also carries the bounded memory micro-note.
         $r = Invoke-QwenLocalApi
+        $localPostSw = [Diagnostics.Stopwatch]::StartNew()
         Show-QwenThinking $r
         $candidate = Get-CleanQwenContent $r
         $localRaw = $candidate
@@ -792,6 +799,9 @@ function Invoke-Qwen([string]$Prompt) {
             $finalContent = $candidate
             $inlineMemoryNote = $structured.MemoryNote
         }
+        $localPostSw.Stop()
+        Add-LfoTurnPhase -Phase 'local_response_processing' -Kind 'prepare' `
+            -WallSeconds $localPostSw.Elapsed.TotalSeconds
     }
 
     if ($route -eq 'FRONTIER') {
