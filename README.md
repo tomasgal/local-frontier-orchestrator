@@ -1,6 +1,6 @@
 # Local Frontier Orchestrator
 
-**Status:** experimental / research prototype (`v0.1-alpha`) · **Main build:** `v9.3` · **Development branch:** `v9.4-dev5-compact-read` (experimental; unvalidated) · **Dev3 and dev4 stage 1+2:** isolated functional validation PASS on the constrained CPU-only reference host (2026-10-09); selective L2 reads remain opt-in
+**Status:** experimental / research prototype (`v0.1-alpha`) · **Main build:** `v9.3` · **Development branch:** `v9.4-dev5-compact-read` (experimental; candidate A functional PASS, candidate B not yet tested on reference host) · **Dev3 and dev4 stage 1+2:** isolated functional validation PASS on the constrained CPU-only reference host (2026-10-09); selective L2 reads remain opt-in
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
