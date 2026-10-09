@@ -33,6 +33,12 @@
         # v9.4 L2 structured factual state. L0/L1 remain authoritative for
         # evidence and conversational continuity.
         StructuredEnabled = $true
+
+        # Dev4 read path is opt-in until isolated extraction/semantic validation.
+        # Applies only to current L2 facts in this conversation epoch.
+        StructuredReadEnabled = $false
+        StructuredReadMaxItems = 6
+        StructuredReadMaxChars = 800
     }
 
     ResearchLogging = @{
