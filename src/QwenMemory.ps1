@@ -544,7 +544,9 @@ function Get-LfoL2MentionKeys([string]$Query) {
     $informative = @(Get-SearchTermsFromText $Query)
     $seen = @{}
     $keys = @()
-    foreach ($size in @(4,3,2,1)) {
+    # Prioritize exact single-token names, then common multiword aliases.
+    # A long question must not fill the candidate budget before reaching ORION.
+    foreach ($size in @(1,2,3,4)) {
         for ($i = 0; $i -le ($tokens.Count - $size); $i++) {
             $span = @($tokens[$i..($i + $size - 1)])
             $hasInformativeWord = $false
