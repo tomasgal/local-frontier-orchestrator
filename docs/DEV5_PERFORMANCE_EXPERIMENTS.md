@@ -1,6 +1,6 @@
 # v9.4-dev5 — architecture-first performance experiments
 
-Status: **candidate A functional LIVE PASS; candidate B lean read-policy five-suite offline PASS; B isolated LIVE test pending** (2026-10-09).
+Status: **candidate A and A+B single-fixture isolated LIVE functional PASS; B token/prefill savings observed, repeated and project-wide net performance validation pending** (2026-10-09).
 Parent checkpoint: `v9.4-dev4-observability` — stage 1 and stage 2 functionally PASS on the reference CPU-only host.
 Baseline `main` remains v9.3; nothing in this plan is a release/default-performance claim.
 
@@ -86,11 +86,34 @@ Candidate A shortened the output schema but kept the full validated ~2458-charac
 
 - `LocalGeneration.LeanReadPolicyEnabled = $false` is a second experimental switch, OFF by default. It becomes effective only if candidate A is enabled, structured L2 reads are enabled, and the turn's frozen context actually includes L2 facts. Thus normal four-field writes, corrections (which bypass read side), FRONTIER synthesis and A-only control turns keep the original full L2 policy unchanged.
 - When B is explicitly enabled, `Get-QwenConversationMessages` replaces the long WRITE extraction policy with a short read-only evidence policy, while preserving the original orchestrator policy, actual L2 scoped/provenance facts, the two-field `route + answer` JSON schema, and **the independent deterministic dev4 persistence guard**.
-- Research trace now records `dev5_read_policy_mode=full|lean-read`. The TEMP-only `Start-Dev4L2LiveFixture.ps1` accepts `-CompactReadSchema -LeanReadPolicy` together; strict checker validates the selected mode, including backward compatibility for older traces. A separate read-only `tests/Compare-Dev5ReadPolicy.ps1` compares independently validated A-only versus A+B trace tokens and timings without invoking Ollama or opening production memory. Offline `Test-Dev5CompactRead.ps1` now asserts A-only parity, A+B policy reduction, unchanged retrieval context, missing/disabled L2 fallback, and full normal-write path. **All five offline suites have now PASSed on Lenovo (2026-10-09); B has no live semantic or performance result yet.**
-- **Offline checkpoint 2026-10-09:** the user pulled `53d8bc9..31d570c` on the clean `v9.4-dev5-compact-read` branch and ran `Test-Dev5CompactRead.ps1`, `Test-Dev4L2Retrieval.ps1`, `Test-Dev4Observability.ps1`, `Test-PromptPolicyOptimization.ps1`, and `Test-LfoMemoryStore.ps1`: **all PASS**, no Ollama and no production memory access. The B policy replaced **2522 prompt characters** in the synthetic actual-L2 read path, on top of the already measured candidate A schema reduction (1198 to 247 characters). `AOnlyPolicyPreserved=True` and `BOptOutAndNormalWritePreserved=True`; prior guard, scope, SQLite, frontier and normal write regressions remained PASS. The read-only historical comparer also PASSed and now correctly renders nonexistent request/response phase durations as *missing*, not as 0. B prompt-token, prefill and answer-quality outcomes have **not** been measured live.
-- **Next:** run exactly one fresh isolated A+B ORION fixture with `-CompactReadSchema -LeanReadPolicy` and the strict semantic/SQLite checker; then compare its trace read-only against the existing A-only compact fixture. Record incoming token count, prefill time, generated tokens, decode, and whole-turn latency individually. Reject if routing, answer, memory isolation or persistence regresses. Any reduction is limited to the opt-in L2-assisted read path.
+- Research trace now records `dev5_read_policy_mode=full|lean-read`. The TEMP-only `Start-Dev4L2LiveFixture.ps1` accepts `-CompactReadSchema -LeanReadPolicy` together; strict checker validates the selected mode, including backward compatibility for older traces. A separate read-only `tests/Compare-Dev5ReadPolicy.ps1` compares independently validated A-only versus A+B trace tokens and timings without invoking Ollama or opening production memory. Offline `Test-Dev5CompactRead.ps1` now asserts A-only parity, A+B policy reduction, unchanged retrieval context, missing/disabled L2 fallback, and full normal-write path. **All five offline suites PASSed on Lenovo (2026-10-09), and the first A+B LOCAL live test subsequently passed strict answer/SQLite/guard validation.**
+- **Offline checkpoint 2026-10-09:** the user pulled `53d8bc9..31d570c` on the clean `v9.4-dev5-compact-read` branch and ran `Test-Dev5CompactRead.ps1`, `Test-Dev4L2Retrieval.ps1`, `Test-Dev4Observability.ps1`, `Test-PromptPolicyOptimization.ps1`, and `Test-LfoMemoryStore.ps1`: **all PASS**, no Ollama and no production memory access. The B policy replaced **2522 prompt characters** in the synthetic actual-L2 read path, on top of the already measured candidate A schema reduction (1198 to 247 characters). `AOnlyPolicyPreserved=True` and `BOptOutAndNormalWritePreserved=True`; prior guard, scope, SQLite, frontier and normal write regressions remained PASS. The read-only historical comparer also PASSed and now correctly renders nonexistent request/response phase durations as *missing*, not as 0. The first A+B LIVE trial now provides prompt-token/prefill observations; see the dedicated checkpoint below. These are not statistically repeatable performance claims.
+- **Next:** expand the semantic coverage beyond the one four-fact ORION question (explicit correction, no L2 hit, scope ambiguity, misleading instructions in stored content, and FRONTIER route continuity), then collect repeated/alternating A-only versus A+B observations if warranted. The architecture-wide dev5 performance criterion remains separate: these optimizations only affect opted-in L2-assisted reads, not all dev3 turns.
 - Do not promote A or B to defaults on a single small synthetic workload. Measure normal dev3-path performance and permanent dev4/dev5 overhead on representative workloads before claiming the project-wide required net improvement.
 
+
+
+
+## Candidate B first isolated LIVE A+B read-side checkpoint — 2026-10-09
+
+User-run fresh TEMP-only ORION fixture, model `qwen3.5:4b-q4_K_M` (Ollama 0.34.4), context hint 5120, exactly the same question and synthetic seven-row SQLite dataset as A-only. Both switches enabled **only in the isolated config**: `CompactReadSchemaEnabled=$true`, `LeanReadPolicyEnabled=$true`. The independent `Test-Dev4L2LiveTrace.ps1` returned **PASS** for correct LOCAL response (Debian 13, 64 GB RAM, PostgreSQL 16, nightly backups enabled), four current L2 items / 336 chars, source-turn/scope filtering, `dev5_local_output_mode=compact-read`, `dev5_read_policy_mode=lean-read`, active deterministic guard, zero model-proposed/persisted L2 ops, no L1 micro-note and seven untouched DB rows. No other REPL turns.
+
+`Compare-Dev5ReadPolicy.ps1` independently accepted the prior A-only and new A+B traces as semantically comparable. **A+B minus A-only** (one independent run each):
+
+| Metric | A-only compact with full L2 write policy | A+B compact with lean read policy | Delta |
+| --- | ---: | ---: | ---: |
+| Prompt tokens | 1641 | 1042 | **-599 (-36.5%)** |
+| Output tokens | 45 | 46 | +1 (+2.2%) |
+| Prefill | 112.4917 s | 75.5314 s | **-36.9603 s (-32.9%)** |
+| Decode | 13.0807 s | 11.1494 s | -1.9313 s (-14.8%) |
+| Ollama model wall | 153.0422 s | 110.0576 s | **-42.9846 s (-28.1%)** |
+| Turn-to-answer wall | 154.549 s | 111.614 s | **-42.935 s (-27.8%)** |
+
+Additional B-phase timing: `context_assembly=1.1370s` (nested `l2_retrieval=1.0579s`), `local_request_build=0.0397s`, `local_response_processing=0.2705s`. Residual `answer_seconds - (assembly + request build + model + processing)` is **0.1092s**. L2 write 0.0627s and L1 persistence 0.0381s, with **no facts or notes persisted**. The prior 110.953s unexplained FULL outlier did not recur in this turn; its historical cause remains unknown.
+
+This experiment directly demonstrates removal of **599 input tokens** on the scoped read question alongside correct semantics. Relative to the most recent clean instrumented FULL trial (1588 input / 294 output / 203.140s answer), the A+B turn observed 46 output / 111.614s answer, but conditions were not counterbalanced and this **must not** be presented as a measured 45% project-wide speedup.
+
+**Interpretation:** promising architecture-level reduction in redundant model work without hardware specialization, supported by isolated functional tests and one sample for A+B. Confounds: CPU availability, paging, model warmness, request serialization, context caching, and run order. Evaluation of additional question classes, repeated alternating trials, cross-host transfer, impacts on read-enabled deployment defaults, and the mandatory net dev5-over-dev3 total workload accounting remain **OPEN**. Production flags must remain OFF until those criteria pass.
 
 
 ## Acceptance gates
