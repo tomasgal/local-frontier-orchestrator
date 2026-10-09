@@ -433,15 +433,15 @@ The structured **write** boundary is now validated across two materially differe
 - the notebook also reproduced the narrow Qwen integer serialization quirk (`"{32}"`) already seen on the desktop host, and the deterministic brace-wrapped-integer normalization handled it as designed;
 - measured SQLite write time remains negligible compared with local-model inference, so current optimization work targets prompt/model overhead rather than storage.
 
-A **post-dev3 optimization candidate** is implemented on the development branch but is not yet a validated checkpoint:
+**Post-dev3 optimization checkpoint — isolated CPU-only end-to-end PASS (2026-10-09):**
 
 - LOCAL generation temperature is reduced from `0.20` to `0.10`;
 - the originally validated full L2 extraction policy is retained: compact policy variants failed the unchanged extraction battery, including typed validation and semantic fidelity;
 - an additional 871-character duplicated LOCAL structured-output instruction block is removed;
 - a conservative wrapper detector permits a deterministic acknowledgement instead of a second full local inference only when a pure declarative state update already produced a non-empty, fully valid L2 operation set;
-- an offline regression script checks syntax, restored full-policy contract anchors, temperature, and positive/negative declarative-fallback fixtures.
+- the offline regression checks syntax, restored full-policy contract anchors, temperature, and positive/negative declarative-fallback fixtures; it passed on the reference host.
 
-Evidence boundary: two shorter L2 policy variants failed extraction; the original full policy passed all five cases by valid/rejected counts when run as an isolated override against the same model/schema. The post-FRONTIER CPU-model predicate remained less specific than ideal, so numeric PASS alone is not sufficient semantic proof. The original policy has been restored in the branch; this rollback and the remaining optimization candidate still require local deterministic regression, extraction recheck and an isolated same-fixture live benchmark before promotion. L2 reads are not yet supplied to prompt construction.
+**Validation evidence (2026-10-09):** both shorter L2-policy candidates failed the unchanged extraction battery, so the original full policy was restored with exact Git blob identity to the validated baseline. Offline regression PASS; extraction counts PASS for multi-attribute 4/0, relation 3/0, correction 1/0, no-L2 0/0, and post-FRONTIER 3/0 (valid/rejected). The post-FRONTIER CPU-model predicate ambiguity remains an observed semantic limitation of the baseline rather than a new regression. An isolated CPU-only 5120-context two-turn live test stayed LOCAL, wrote 4 typed facts followed by 1 corrected OS value, and verified the SQLite state: 5 total historical rows, 4 current rows, original OS closed at turn 2, and the other 3 facts preserved. On the first turn the model returned an invalid answer; `local-declarative-ack` supplied `OK.` without launching a second answer-only inference. The first turn measured 169.006 s, 1488 prompt tokens, 269 generated tokens and 1.471 s L2 write versus prior 185.81 s, 1674 prompt tokens, and 1.189 s L2 write. The correction measured 25.845 s and 0.028 s L2 write versus prior 34.14 s and 0.031 s. Production memory was not used. These are single-run end-to-end observations, not statistically reliable throughput/speedup estimates; cross-host performance transfer remains untested. L2 reads into prompt construction and phase-level observability remain dev4 work.
 
 
 ### Non-goals for v9.4
