@@ -113,6 +113,8 @@ Acceptance boundary:
 
 #### v9.4-dev5 — measured performance tuning
 
+**Started 2026-10-09 — candidate A implementation on separate branch `v9.4-dev5-compact-read` (UNVALIDATED).** The first experiment targets wasted single-pass LOCAL generation: dev4's L2-assisted read turn correctly answered the four ORION facts but Qwen emitted four `memory_ops[]` that the deterministic guard suppressed. Candidate A conditionally asks for only `route` and `answer` on precisely this read-only path, eliminating unused schema fields and their generation cost; all other paths retain the validated four-field schema. Both `LocalGeneration.CompactReadSchemaEnabled` and `Memory.StructuredReadEnabled` remain **false by default**. An offline parser/schema/route regression `tests/Test-Dev5CompactRead.ps1` and an isolated fixture comparison toggle have been committed but have **not yet been executed on the reference host**. Promotion requires correct read semantics, verified unchanged SQLite/L1, lower generated tokens, and *repeatable* end-to-end gains—not schema-size savings alone. Full experiment plan: [DEV5_PERFORMANCE_EXPERIMENTS.md](DEV5_PERFORMANCE_EXPERIMENTS.md).
+
 Purpose:
 
 - optimize only after dev4 can show where time and context are actually spent;
