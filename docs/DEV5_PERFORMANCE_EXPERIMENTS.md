@@ -163,8 +163,8 @@ The script separately asserts FRONTIER model-independent write ops are preserved
 ## Later experiments, not implemented
 
 - **B — prompt traffic (first isolated LIVE PASS, generalization pending)**: independently opt-in to replacing redundant L2 write-extraction policy with a small read-only evidence policy in A-eligible protected turns; benchmark prefill and prompt counts, preserving all default write contracts and persistence guard.
-- **C — stable-prefix / context traffic**: evaluate prompt-prefix reuse and bounded changes to volatile context placement, ensuring evidence precedence, memory scope and safe guard semantics. Consider actual Ollama prompt-eval cache behavior before assumptions.
-- **D — scheduling/redundant work**: evaluate whether compaction can leave the interactive critical path, and whether repeated history access, inference or serialization can be eliminated.
+- **D — stable-prefix / context traffic**: evaluate prompt-prefix reuse and bounded changes to volatile context placement, ensuring evidence precedence, memory scope and safe guard semantics. Consider actual Ollama prompt-eval cache behavior before assumptions.
+- **E — scheduling/redundant work**: evaluate whether compaction can leave the interactive critical path, and whether repeated history access, inference or serialization can be eliminated.
 - Keep host-specific thread, affinity, accelerators and quantization in runtime profiles; they are secondary comparisons, not the expected reason for architectural speedups.
 
 ## Reporting and dissemination
