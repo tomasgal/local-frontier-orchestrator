@@ -15,7 +15,7 @@ $db = Open-LfoMemoryStore $dbPath
 function Assert-LfoTest([bool]$Ok, [string]$Why) { if (-not $Ok) { throw $Why } }
 function New-LfoTestInteger([string]$Value) {
     $raw = @([pscustomobject]@{op='SET_INTEGER';subject='ORION';subject_type='server';predicate='ram_gb';target=$Value;target_entity_type=''})
-    return ConvertFrom-LfoStructuredMemoryOps -RawOps $raw -MaxOps 6
+    return (ConvertFrom-LfoStructuredMemoryOps -RawOps $raw -MaxOps 6)
 }
 function Get-LfoTestRam($Connection, [string]$Scope = 'conversation:1') {
     return @(Invoke-LfoSqliteQuery $Connection @'
