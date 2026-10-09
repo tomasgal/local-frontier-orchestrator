@@ -2,7 +2,7 @@
 # Offline only. Never opens SQLite or production files, and never calls Ollama.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-foreach ($relative in @('src\QwenChat.ps1','src\QwenMemory.ps1','src\LfoStructuredMemory.ps1')) {
+foreach ($relative in @('src\QwenChat.ps1','src\QwenMemory.ps1','src\LfoStructuredMemory.ps1','tests\Start-Dev4L2LiveFixture.ps1','tests\Test-Dev4L2LiveTrace.ps1','tests\Compare-Dev5CompactRead.ps1')) {
     $tokens = $null
     $errors = $null
     [void][Management.Automation.Language.Parser]::ParseFile(
@@ -39,6 +39,7 @@ $script:Config = Import-PowerShellDataFile -LiteralPath (Join-Path $root 'config
 $script:MemoryNoteMaxChars = 40
 $script:L2ReadEnabled = $true
 $script:Config.LocalGeneration.CompactReadSchemaEnabled = $false
+$script:Config.LocalGeneration.LeanReadPolicyEnabled = $false
 $script:LfoTurnContext = [pscustomobject]@{
     Query = 'What is the stored OS for ORION?'
     MemoryBlock = "STATE:`nPENDING:`nCURRENT STRUCTURED FACTS (L2):`nORION.os = Debian 13 [scope=conversation:1; source_turn=2]"
@@ -76,7 +77,32 @@ $messages = @(Get-QwenConversationMessages)
 if ([string]$messages[0].content -notmatch 'DEV5 READ-ONLY OUTPUT OVERRIDE' -or
     [string]$messages[0].content -notmatch 'VALIDATED L2 EVIDENCE POLICY' -or
     [string]$messages[0].content -notmatch 'ORION.os = Debian 13' -or
+    (Test-LfoDev5LeanReadPolicyEligible) -or
     $messages.Count -ne $baselineMessages.Count) { throw 'Read output policy assembly FAILED' }
+
+# Candidate B removes only the UNUSED L2 write-extraction policy on an
+# actual L2-assisted, compact route+answer turn; it must not touch the schema,
+# retrieved data, or the authoritative read/write persistence guard.
+$script:Config.LocalGeneration.LeanReadPolicyEnabled = $true
+$lean = @(Get-QwenConversationMessages)
+$leanChars = ([string]$lean[0].content).Length
+$fullPolicyChars = ([string]$messages[0].content).Length
+if (-not (Test-LfoDev5LeanReadPolicyEligible) -or
+    $lean.Count -ne $messages.Count -or
+    $leanChars -ge $fullPolicyChars -or
+    ($fullPolicyChars - $leanChars) -lt 800 -or
+    [string]$lean[0].content -notmatch 'DEV5 READ-ONLY L2 POLICY' -or
+    [string]$lean[0].content -match 'VALIDATED L2 EVIDENCE POLICY' -or
+    [string]$lean[0].content -notmatch 'ORION.os = Debian 13' -or
+    [string]$lean[0].content -notmatch 'DEV5 READ-ONLY OUTPUT OVERRIDE' -or
+    (Get-QwenLocalOutputFormat).required.Count -ne 2) {
+    throw 'Candidate B read-only policy reduction contract FAILED'
+}
+$script:Config.LocalGeneration.LeanReadPolicyEnabled = $false
+if ((Test-LfoDev5LeanReadPolicyEligible) -or
+    [string](@(Get-QwenConversationMessages)[0].content) -ne [string]$messages[0].content) {
+    throw 'Candidate B OFF is not equivalent to validated candidate A'
+}
 
 # The same parser must still understand route+answer with missing memory fields.
 $parsed = ConvertFrom-QwenStructuredContent '{"route":"LOCAL","answer":"ORION runs Debian 13."}' -ExpectRoute
@@ -94,18 +120,27 @@ if (-not $frontier.Success -or $frontier.Route -ne 'FRONTIER' -or
 # Zero L2 hits, disabled L2 retrieval, or disabled feature must all retain the
 # complete, validated memory schema. No implicit model-write behavior changes.
 $script:LfoTurnContext.Stats.l2_read_items = 0
-if ((Test-LfoDev5CompactReadEligible) -or (Get-QwenLocalOutputFormat).required.Count -ne 4) {
-    throw 'No-L2-hit fell into compact schema'
+$script:Config.LocalGeneration.LeanReadPolicyEnabled = $true
+if ((Test-LfoDev5CompactReadEligible) -or
+    (Test-LfoDev5LeanReadPolicyEligible) -or
+    (Get-QwenLocalOutputFormat).required.Count -ne 4 -or
+    [string](@(Get-QwenConversationMessages)[0].content) -notmatch 'VALIDATED L2 EVIDENCE POLICY') {
+    throw 'No-L2-hit changed the validated policy/schema'
 }
 $script:LfoTurnContext.Stats.l2_read_items = 4
 $script:L2ReadEnabled = $false
-if ((Test-LfoDev5CompactReadEligible) -or (Get-QwenLocalOutputFormat).required.Count -ne 4) {
-    throw 'L2-disabled mode fell into compact schema'
+if ((Test-LfoDev5CompactReadEligible) -or
+    (Test-LfoDev5LeanReadPolicyEligible) -or
+    (Get-QwenLocalOutputFormat).required.Count -ne 4) {
+    throw 'L2-disabled mode changed schema or policy'
 }
 $script:L2ReadEnabled = $true
 $script:Config.LocalGeneration.CompactReadSchemaEnabled = $false
-if ((Test-LfoDev5CompactReadEligible) -or (Get-QwenLocalOutputFormat).required.Count -ne 4) {
-    throw 'Feature-disabled mode fell into compact schema'
+if ((Test-LfoDev5CompactReadEligible) -or
+    (Test-LfoDev5LeanReadPolicyEligible) -or
+    (Get-QwenLocalOutputFormat).required.Count -ne 4 -or
+    [string](@(Get-QwenConversationMessages)[0].content) -notmatch 'VALIDATED L2 EVIDENCE POLICY') {
+    throw 'Candidate B must never change normal full write path'
 }
 
 [pscustomobject]@{
@@ -119,5 +154,8 @@ if ((Test-LfoDev5CompactReadEligible) -or (Get-QwenLocalOutputFormat).required.C
     ExistingParserAcceptsCompact = $true
     OllamaCalled = $false
     TimingPhasesDeclared = 2
+    LeanReadPolicyCharsRemoved = ($fullPolicyChars - $leanChars)
+    AOnlyPolicyPreserved = $true
+    BOptOutAndNormalWritePreserved = $true
     ProductionMemoryTouched = $false
 } | Format-List
