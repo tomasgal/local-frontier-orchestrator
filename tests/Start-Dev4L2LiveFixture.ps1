@@ -6,6 +6,7 @@ param(
     [int]$ContextLengthHint = 5120,
     [switch]$CompactReadSchema,
     [switch]$LeanReadPolicy,
+    [switch]$LowerTrustL2Evidence,
     [switch]$SetupOnly
 )
 $ErrorActionPreference = 'Stop'
@@ -16,6 +17,10 @@ $anchorData = "DataDirectory = '%LOCALAPPDATA%\LocalFrontierOrchestrator'"
 $anchorRead = 'StructuredReadEnabled = $false'
 $anchorCompact = 'CompactReadSchemaEnabled = $false'
 $anchorLean = 'LeanReadPolicyEnabled = $false'
+$anchorRole = 'LowerTrustL2EvidenceEnabled = $false'
+if ($LowerTrustL2Evidence -and (-not $LeanReadPolicy -or -not $CompactReadSchema)) {
+    throw 'Lower-trust L2 evidence requires both CompactReadSchema and LeanReadPolicy.'
+}
 if ($LeanReadPolicy -and -not $CompactReadSchema) {
     throw 'Lean read policy requires CompactReadSchema for a valid A+B experiment.'
 }
@@ -31,6 +36,10 @@ if ($LeanReadPolicy -and
     $template.Split([string[]]@($anchorLean),[StringSplitOptions]::None).Count -ne 2) {
     throw 'Dev5 lean policy config anchor missing or ambiguous.'
 }
+if ($LowerTrustL2Evidence -and
+    $template.Split([string[]]@($anchorRole),[StringSplitOptions]::None).Count -ne 2) {
+    throw 'Dev5 evidence-role config anchor missing or ambiguous.'
+}
 $root = Join-Path $env:TEMP ('LFO-dev4-live-read-' + [guid]::NewGuid().ToString('N'))
 $state = Join-Path $root 'state'
 New-Item -ItemType Directory -Force -Path $state | Out-Null
@@ -43,6 +52,9 @@ if ($CompactReadSchema) {
 if ($LeanReadPolicy) {
     $isolatedConfig = $isolatedConfig.Replace($anchorLean,'LeanReadPolicyEnabled = $true')
 }
+if ($LowerTrustL2Evidence) {
+    $isolatedConfig = $isolatedConfig.Replace($anchorRole,'LowerTrustL2EvidenceEnabled = $true')
+}
 [IO.File]::WriteAllText($testConfig,$isolatedConfig,(New-Object Text.UTF8Encoding($false)))
 $configData = Import-PowerShellDataFile -LiteralPath $testConfig
 if ($configData.Memory.DataDirectory -ne $root -or
@@ -51,6 +63,7 @@ if ($configData.Memory.DataDirectory -ne $root -or
     -not $configData.Memory.StructuredReadEnabled -or
     [bool]$configData.LocalGeneration.CompactReadSchemaEnabled -ne [bool]$CompactReadSchema -or
     [bool]$configData.LocalGeneration.LeanReadPolicyEnabled -ne [bool]$LeanReadPolicy -or
+    [bool]$configData.LocalGeneration.LowerTrustL2EvidenceEnabled -ne [bool]$LowerTrustL2Evidence -or
     -not $configData.ResearchLogging.Enabled) {
     throw 'Isolated L2-read config validation FAILED'
 }
@@ -105,6 +118,7 @@ Write-Host "DEV4 READ TEST DATA: $root"
 Write-Host "Isolated config: enabled; L0/L1 empty; 4 current ORION facts: PASS"
 Write-Host ("Dev5 compact read schema: {0}" -f [bool]$CompactReadSchema)
 Write-Host ("Dev5 lean read policy: {0}" -f [bool]$LeanReadPolicy)
+Write-Host ("Dev5 lower-trust L2 evidence role: {0}" -f [bool]$LowerTrustL2Evidence)
 Write-Host "Test prompt: What are the stored OS, RAM, database and nightly backup facts for ORION?"
 Write-Host "After the answer, enter /exit; inspect logs and database independently."
 if (-not $SetupOnly) {
