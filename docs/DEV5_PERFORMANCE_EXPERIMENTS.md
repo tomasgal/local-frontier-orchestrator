@@ -1,6 +1,6 @@
 # v9.4-dev5 — architecture-first performance experiments
 
-Status: **started; candidate A implemented; all five offline suites PASS on Windows CPU-only reference host; isolated live A/B pending** (2026-10-09).
+Status: **candidate A first isolated compact-read LIVE correctness/PERSISTENCE PASS, promising single-run performance observation; matched full-schema control still pending** (2026-10-09).
 Parent checkpoint: `v9.4-dev4-observability` — stage 1 and stage 2 functionally PASS on the reference CPU-only host.
 Baseline `main` remains v9.3; nothing in this plan is a release/default-performance claim.
 
