@@ -29,6 +29,25 @@ Hypothesis, **not yet measured**: eliminating model generation of redundant `mem
 
 The user recovered the OneDrive-hosted Git checkout from an interrupted automatic repack using `git fsck --connectivity-only --no-reflogs` (integrity PASS), then checked out `v9.4-dev5-compact-read` with Git auto-maintenance disabled for that switch. All five suites PASS, no production memory: `Test-Dev5CompactRead.ps1` (**full schema 1198 chars, compact 247 chars, 951 chars removed**; unchanged LOCAL/FRONTIER parser and full write fallback), `Test-Dev4L2Retrieval.ps1` (four scoped facts, 336 L2 context chars, four echoed model ops suppressed, singleton valid/rejected suppression, zero SQLite writes), `Test-Dev4Observability.ps1`, `Test-PromptPolicyOptimization.ps1`, and `Test-LfoMemoryStore.ps1` (SQLite 3.51.1 / schema 3). Working tree clean; branch tracking correct. These are structural/semantic unit tests, **not live performance measurements**.
 
+## First isolated LIVE compact-read trial — 2026-10-09
+
+The user ran an isolated ORION read-only fixture with `-CompactReadSchema` on the constrained Windows CPU-only reference host: `qwen3.5:4b-q4_K_M`, Ollama 0.34.4, context hint 5120, four current ORION L2 facts / 336 injected context characters, no old L0 items, no L1. The checker `Test-Dev4L2LiveTrace.ps1` **PASS**, including correct LOCAL answer (Debian 13, 64 GB RAM, PostgreSQL 16, nightly backups enabled), `dev5_local_output_mode=compact-read`, zero proposed memory ops, zero applied/rejected L2 ops, guard active, no L1 note, seven unchanged SQLite rows. This is a **functional validation of candidate A, not a confirmed performance gain**.
+
+| Metric | Validated dev4 full (historical isolated sample) | Dev5 compact (first isolated sample) | Compact minus full |
+| --- | ---: | ---: | ---: |
+| Prompt tokens | 1588 | 1641 | +53 (+3.34%) |
+| Generated tokens | 294 | 45 | -249 (-84.69%) |
+| Prefill seconds | 104.3436 | 112.4917 | +8.1481 (+7.81%) |
+| Decode seconds | 65.4042 | 13.0807 | -52.3235 (-80.00%) |
+| Model wall seconds | 189.9054 | 153.0422 | -36.8632 (-19.41%) |
+| Answer wall seconds | 191.062 | 154.549 | -36.513 (-19.11%) |
+| L2 retrieval seconds | 0.7748 | 0.7252 | -0.0496 |
+| Context assembly seconds | 0.8566 | 0.8132 | -0.0434 |
+
+The mechanism has direct evidence: the compact output emits no L2 ops, whereas the full output generated four unused ops that dev4 had to suppress. The **prompt grew by 53 tokens**, likely because the initial compact experiment adds a dedicated system-policy override while leaving full L2 extraction policy in place. Prefill and wall-minus-prefill/decode increased, partially offsetting decode savings. Backend cold-start, caching, CPU load and memory contention were not controlled across these historical samples; avoid claiming that the 19.11% total reduction is causal or repeatable. Notably the compact trial's reported l2_write (0.4074 s) and l1_persistence (0.8599 s) were unusually larger than the full trial (0.0487 s and 0.0249 s) despite no actual writes. This reinforces the need for controlled repeats and phase decomposition.
+
+Next acceptance step: run a **fresh full-schema control under the same dev5 code branch**, using the same isolated fixture but without `-CompactReadSchema`, and invoke the strict trace/SQLite checker immediately after `/exit`. Save the previous compact root separately. Then run `tests/Compare-Dev5CompactRead.ps1 -FullRoot <full root> -CompactRoot <compact root>` to enforce equal model/context/expected answer and display token/time differences without rerunning Ollama. This one fresh A/B pair remains exploratory; alternate and repeat only if meaningful variance estimation is warranted.
+
 ## Acceptance gates
 
 1. Run `tests/Test-Dev5CompactRead.ps1` (no Ollama or production files): default full schema, two-field schema, unchanged parser and routing, full fallback with no L2 hits/disabled feature/disabled L2 read, unchanged provenance policy text, and character count difference.
