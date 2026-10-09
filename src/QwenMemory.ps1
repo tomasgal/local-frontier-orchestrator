@@ -959,6 +959,10 @@ function Persist-TurnAndMemory(
         }
     }
     $l2Sw.Stop()
+    if ($script:StructuredMemoryEnabled) {
+        Add-LfoTurnPhase -Phase 'l2_write' -Kind 'store' `
+            -WallSeconds $l2Sw.Elapsed.TotalSeconds -Success ($l2Status -ne 'failed')
+    }
 
     $memoryNote = $InlineMemoryNote
     $memoryError = $null
@@ -1015,6 +1019,10 @@ function Persist-TurnAndMemory(
     }
 
     $memorySw.Stop()
+    if ($script:MemoryEnabled) {
+        Add-LfoTurnPhase -Phase 'l1_persistence' -Kind 'store' `
+            -WallSeconds $memorySw.Elapsed.TotalSeconds -Success ([string]::IsNullOrWhiteSpace($memoryError))
+    }
 
     $memoryAfter = if ($script:MemoryEnabled) {
         Get-MemoryContextBlock $Prompt
