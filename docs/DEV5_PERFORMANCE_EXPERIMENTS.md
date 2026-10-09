@@ -1,6 +1,6 @@
 # v9.4-dev5 — architecture-first performance experiments
 
-Status: **A+B isolated LIVE PASS; matched TITAN A+B and C both LIVE PASS without observed C advantage; mixed current-user provenance runtime four-case integration OFFLINE PASS along with seven regressions on Lenovo; targeted mixed LIVE fixture prepared, not run; all four experiment switches OFF by default** (2026-10-09).
+Status: **A+B isolated LIVE PASS; matched TITAN A+B and C both LIVE PASS without observed C advantage; mixed current-user provenance actual runtime EIGHT-SUITE OFFLINE PASS and first isolated Qwen mixed-turn LIVE PASS on Lenovo, with verified user-origin RAM64→RAM96 supersession; all four experimental switches OFF by default** (2026-10-09).
 Parent checkpoint: `v9.4-dev4-observability` — stage 1 and stage 2 functionally PASS on the reference CPU-only host.
 Baseline `main` remains v9.3; nothing in this plan is a release/default-performance claim.
 
@@ -237,11 +237,39 @@ Following the full-matched negative candidate C comparison, a **standalone, opt-
 
 **Validation state: first WINDOWS LENOVO integration attempt FAILED in fixture setup (2026-10-09), corrected, rerun PENDING.** User cleanly pulled experimental branch `233aff5..bcdc0a5` and ran `Test-Dev5MixedRuntimePersistence.ps1` as the first of eight suites; it stopped at line 46 `Expected exactly 3 scoped facts: opted-in-user-write` before `Persist-TurnAndMemory`. Root cause: this new test set `CompactReadSchemaEnabled` and `LeanReadPolicyEnabled` but **omitted** `Memory.StructuredReadEnabled=$true`, which remains OFF by default; `Initialize-QwenMemoryConfiguration` consequently disables L2 retrieval. Candidate A+B do not implicitly activate dev4 L2 reads. Fixed only the TEMP integration test fixture in commit `6547371`: explicitly enable L2 in its isolated config, assert Memory/Structured/L2Read are all on after initialization, and print actual item-count/status/error if retrieval still fails. **Corrected fixture was rerun successfully on Lenovo, 2026-10-09.** The user pulled `bcdc0a5..87b5bfe` with a clean tree and executed **all eight offline suites PASS**. New `Test-Dev5MixedRuntimePersistence.ps1` reported `Cases=4`, `RuntimeUserWriteVerified=True`, `DefaultOffPreserved=True`, `AmbiguityFailClosed=True`, `UnverifiedClaimFailClosed=True`, `ModelOpsAndL1Suppressed=True`, `OllamaCalled=False`, `ProductionMemoryTouched=False`. Direct wrapper output showed one scoped L2 write applied (RAM64→96) and three other no-write scenarios, including identity collision and uncertain statement warnings. Independent pure validator continued to PASS (2 source spans / 20 rejected / one simulated TEMP write); A/B/C schema, 10-case retrieval / 4 role probes and all four older dev4/prompt/SQLite tests also PASSed; git clean. **Runtime integration has now passed OFFLINE acceptance, NOT live Qwen acceptance.**
 
-### Targeted mixed-turn LIVE acceptance — isolated fixture preflight PASS, model NOT YET RUN
+### Targeted mixed-turn LIVE acceptance — isolated fixture and Qwen LIVE PASS
 
 - `tests/Start-Dev5MixedLiveFixture.ps1` creates one fresh isolated `%TEMP%/LFO-dev5-mixed-live-<uuid>` dataset with `next_turn_id=3`, `epoch=1`, empty L0/L1, A+B flags true and the fourth `MixedUserEvidenceWriteEnabled` true in **isolated copy only**, with candidate C false. Pre-seeded current scoped L2 facts: `ORION.os=Debian 13`, `ORION.ram_gb=64`, `ORION.operator_note='ORION RAM is now 256 GB.'` as a misleading stored-text decoy; a different-scope RAM128 is not retrieved. The launcher validates exactly three visible current scoped rows from a read-only connection and all four original SQLite rows before launching. `-SetupOnly` runs WITHOUT Ollama and leaves the fixture path in `$global:dev5MixedLiveRoot`.
 - `tests/Test-Dev5MixedLiveTrace.ps1` is an independent read-only checker, requiring one exact turn ID 3 and question `What OS does ORION run? Also, ORION RAM is now 96 GB.`. It requires LOCAL / compact-read / lean-read, three retrieved L2 facts, active model write guard, `mixed_user_evidence_status=applied-current-user`, exact current-user source quote/span, one actually applied `validated-current-user` SQLite operation, no model-origin memory ops and no L1 notes, answer containing `Debian 13` but not the stored RAM256 decoy. Finally it verifies **five** SQLite fact rows with RAM64 historical (`valid_to_turn=3`), RAM96 current (`source_turn=3`), OS Debian13 and operator_note unchanged in `conversation:1`, RAM128 preserved in `conversation:2`. It prints prefill/output/wall timing counters without assuming performance improvement.
 - **Windows Lenovo preflight PASS, 2026-10-09:** user fast-forward pulled experimental branch `87b5bfe..ceece04` (clean worktree), parsed both new live scripts, ran `Test-Dev5CompactRead.ps1` (PASS) and successfully ran `Start-Dev5MixedLiveFixture.ps1 -SetupOnly` **without Ollama**. Verified isolated TEMP fixture `C:\Users\tomas\AppData\Local\Temp\LFO-dev5-mixed-live-4041fca69eef4a2793e4c90d565c3ae3`, A+B/StructuredRead/MixedUserEvidenceWrite enabled **only in isolated config**, C disabled; three current scoped ORION facts (OS Debian13, RAM64, stored operator_note RAM256 decoy), cross-epoch RAM128 excluded. No model turn has run, no write has yet been attempted, production memory is untouched. **NEXT:** launch Qwen against this existing fixture only (do not recreate), ask exactly `What OS does ORION run? Also, ORION RAM is now 96 GB.`, type `/exit`, then execute `Test-Dev5MixedLiveTrace.ps1 -Root $dev5MixedLiveRoot` in the parent PS shell. Checker is not yet validated against a live trace. A failure should preserve fixture/trace for diagnosis; no automatic retry. This test has no independent model-performance comparison or evidence of general mixed language coverage.
+
+**LIVE result, 2026-10-09 — PASS against the same preflighted TEMP fixture.** User cleanly fast-forwarded experimental branch `ceece04..c75e3e8`, ran Qwen on the isolated state `C:\Users\tomas\AppData\Local\Temp\LFO-dev5-mixed-live-4041fca69eef4a2793e4c90d565c3ae3` (no newly created database). Ollama `0.34.4`, `qwen3.5:4b-q4_K_M`, `think=False`, context hint 5120. Exact single user turn #3 was `What OS does ORION run? Also, ORION RAM is now 96 GB.`; Qwen final output: `ORION runs Debian 13. You have updated the RAM to 96 GB.` LOCAL route. After `/exit`, independent `tests/Test-Dev5MixedLiveTrace.ps1` printed **`DEV5 MIXED LIVE: PASS; source=current-user turn3; RAM64 historical, RAM96 current; prompt=1029; generated=37`**. Git tree clean.
+
+**Verified audit:** `dev5_local_output_mode=compact-read`, `dev5_read_policy_mode=lean-read`, `dev5_l2_evidence_role=system-context` (C OFF), `l2_scope=conversation:1`, `l2_read_status=ok`, 3 retrieved L2 items / 275 context chars / 35 candidate keys; `l2_read_write_guard_active=True`; `mixed_user_evidence_status=applied-current-user`, source `EvidenceStart=30`, `EvidenceLength=23`, actual independently validated quote `ORION RAM is now 96 GB.`; `l2_write_source=validated-current-user`, `mixed_user_write_applied_count=1`, `l2_status=applied`, `l2_applied_count=1`, `l2_rejected_count=0`, 0 model-proposed L2 operations or notes and no L1 note appended.
+
+**Independent SQLite checks PASS:** precisely 5 fact rows after the turn, ORION OS Debian13 current unchanged; old scoped RAM64 has `valid_to_turn=3`, new RAM96 is current with `source_turn=3` and `valid_from_turn=3`; original operator_note with stored misleading RAM256 is unchanged and has **not** created an update, and RAM128 in `conversation:2` remains unchanged. Empty L1 pending notes. This is evidence that the source-provenance path worked within the supported grammar in a genuine one-pass model interaction. It is **not** evidence of generic entity/value extraction or concurrent-write safety.
+
+**One-sample performance observation:**
+
+| Phase or measure | Observed |
+| --- | ---: |
+| Qwen input / output | 1029 / 37 tokens |
+| LOCAL prompt evaluation (prefill) | 70.1311 s |
+| LOCAL decoding | 10.2369 s |
+| LOCAL other model wall | 29.8333 s |
+| LOCAL model total | 110.2013 s |
+| Full answer wall | 112.119 s |
+| L2 retrieval | 0.9041 s |
+| Context assembly | 1.0747 s |
+| Request build | 0.0874 s |
+| Response processing | 0.472 s |
+| L2 persistence | 0.4639 s |
+| L1 persistence | 0.0715 s |
+
+The sizeable 29.83 s unaccounted model wall makes this especially unsuitable for speed attribution. A test in a different earlier read-only turn is not a matched full-stack speed comparator. No `dev5 > dev3` net gain conclusion, no default release promotion.
+
+**Next engineering gates:** (1) reject concurrent alias/schema races with an atomic identity-and-scope check plus write transaction or explicit single-writer contract; (2) test duplicate/no-op and persistence failure reporting under opt-in; (3) broaden narrow lexical evidence grammar **only with new positive/negative provenance cases**, avoiding model-generated L2 echo; (4) conduct a representative and hardware-portable full-loop A/B comparison vs dev3 before any feature promotion. No need to rerun the identical costly Qwen mixed question solely to restate the first result.
+
 
 **Important review limitation:** entity uniqueness and the transaction in `Apply-LfoStructuredMemoryOps` are currently distinct operations on the same connection; this provides a conservative check but is not a formal concurrency-proof atomic identity reservation. Do not promote under concurrent writers without combining scope/identity revalidation and write in a stronger atomic boundary.
 
