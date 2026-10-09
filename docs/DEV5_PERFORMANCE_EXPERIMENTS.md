@@ -191,6 +191,23 @@ The user ran one independent TEMP-only baseline trial from `Start-Dev5Adversaria
 
 
 
+## Next correctness track — mixed read plus new user fact (DESIGN ONLY)
+
+The 10-scenario TEMP-only semantic suite confirmed an important limitation: an input like `What OS does ORION run? Also, ORION RAM is now 96 GB.` begins as a query, so `Test-DeclarativeStateUpdatePrompt` leaves L2 retrieval active; four existing L2 facts are injected. The dev4 read-side guard `Protect-LfoPersistenceFromReadSide` then suppresses **all** model-proposed L2 operations and L1 notes for LOCAL read turns, and dev5 A's two-field schema does not ask for any memory operations. Thus the user-supplied RAM=96 claim is **not persisted**. This protects against echoing stored facts as new evidence, but silently loses explicit mixed-turn updates. It is a real behavior limitation, not merely a performance problem.
+
+**Proposed architecture (not implemented):** for a *confidently detected* mixed read+declaration, maintain the frozen read-only L2 context for answer quality but select an **independent, richer memory contract** rather than A's two-field read-only schema. Any memory operation must carry a precisely attributable quote/span from the *current user turn*, not the read context, and wrapper-side validators should require subject/key/value consistency with that quote, acceptable literal type, scope and provenance. Only individually validated user-backed operations could bypass the guard; unrelated operations or ambiguous/unsupported claims must still fail closed. Never allow a stored L2 value, model answer, FRONTIER text or previous turn to qualify merely because the model emitted a corresponding operation. L1 notes should likewise be derived only from verified user-backed deltas. For all normal read-only questions, continue A+B behavior and the existing strict read guard unchanged. Do **not** add a second inference pass merely to persist mixed-turn facts; this could negate the portable performance gains.
+
+Required offline acceptance before any live inference:
+
+- Positive: a query plus an explicit **new** current-user assertion can answer from L2 and persist only the validated new fact; current RAM 64 becomes historical, RAM 96 becomes current, with correct source turn/scope. Retain the original turn for audit.
+- Negative: the same query with no assertion, an assertion mentioned only inside the retrieved L2 context, conflicting/missing value provenance, an uncertain referent, a user quote that merely asks about a value, or a malicious instruction in an L2 value must not create an L1/L2 update.
+- Regression: explicit corrections, write-only turns, no matching L2 entity, ambiguous alias, FRONTIER synthesis, A-only and A+B normal reads, and all feature-disabled defaults retain their previously validated contracts.
+- Instrument `mixed_intent_detected`, `current_user_ops_validated`, `current_user_ops_rejected` and incremental schema/prompt/output costs. If the intent classifier is uncertain, preserve fail-closed behavior and **make the limitation visible** rather than claiming the user update was stored.
+- All changes first on the experimental branch with a unique TEMP SQLite test suite, no Ollama and no production-memory touches; only after offline PASS run one targeted LIVE mixed-turn test and independently inspect actual DB rows and provenance.
+
+This is **design-only planning**, not a new implemented candidate, not a claim of correct mixed-turn persistence, and not grounds to relax the existing dev4 guard before the new validation mechanism exists.
+
+
 ## Acceptance gates
 
 1. Run `tests/Test-Dev5CompactRead.ps1` (no Ollama or production files): default full schema, two-field schema, unchanged parser and routing, full fallback with no L2 hits/disabled feature/disabled L2 read, unchanged provenance policy text, and character count difference.
