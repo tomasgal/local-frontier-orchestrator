@@ -1,6 +1,6 @@
 # v9.4-dev5 — architecture-first performance experiments
 
-Status: **candidate A and A+B single-fixture isolated LIVE functional PASS; B token/prefill savings observed, repeated and project-wide net performance validation pending** (2026-10-09).
+Status: **A and A+B isolated LIVE functional PASS; 10-case semantic boundary offline PASS; opt-in C evidence-role isolation code committed, not yet tested on reference host** (2026-10-09).
 Parent checkpoint: `v9.4-dev4-observability` — stage 1 and stage 2 functionally PASS on the reference CPU-only host.
 Baseline `main` remains v9.3; nothing in this plan is a release/default-performance claim.
 
@@ -117,7 +117,7 @@ This experiment directly demonstrates removal of **599 input tokens** on the sco
 
 
 
-## Dev5 semantic boundary stress matrix — added 2026-10-09, LOCAL RUN PENDING
+## Dev5 semantic boundary stress matrix — Windows reference-host offline PASS (2026-10-09)
 
 New deterministic and TEMP-only `tests/Test-Dev5SemanticReadBoundary.ps1` exercises A+B's actual SQLite L2 read path, turn-context assembly, conditional short/full policy, output schema selection, and independent dev4 read/write guard. It explicitly does **not** execute Ollama and does not assert that a model obeyed a policy. Ten cases:
 
@@ -132,7 +132,24 @@ New deterministic and TEMP-only `tests/Test-Dev5SemanticReadBoundary.ps1` exerci
 9. Retrieved operator note on TITAN that looks like a hostile instruction. The test verifies only that this is recorded data and selects the read-only path; **model resistance to prompt injection is explicitly NOT TESTED**. Stored free text currently enters model context and needs a dedicated adversarial/escaping review.
 10. Ambiguous ORION alias: fail closed with no arbitrary entity selection or compact path.
 
-The script separately asserts FRONTIER model-independent write ops are preserved and no original SQLite facts or L1 notes are changed. Its own output clearly distinguishes deterministic wrapper behavior from untested model semantic behavior. **Not yet executed on the constrained Windows reference host; do not label this matrix PASS without an actual run.** After passing, evaluate one targeted adversarial model trial or implement an explicit stored-data serialization boundary, rather than extrapolating from the ORION fact question. The existing default opt-out remains unchanged.
+The script separately asserts FRONTIER model-independent write ops are preserved and no original SQLite facts or L1 notes are changed. Its own output clearly distinguishes deterministic wrapper behavior from untested model semantic behavior. **Executed on the constrained Windows reference host: PASS (10/10 cases), with `FrontierWriteOpsRetained=1`, `MixedReadClaimStored=False`, `SqliteFacts=8`, `OllamaCalled=False` and `ProductionMemoryTouched=False`. The other five previously validated offline suites also PASSed and the working tree was clean.** After passing, evaluate one targeted adversarial model trial or implement an explicit stored-data serialization boundary, rather than extrapolating from the ORION fact question. The existing default opt-out remains unchanged.
+
+
+
+## Candidate C — role-separated lower-trust L2 evidence (IMPLEMENTED, UNVALIDATED)
+
+**Motivation:** at the validated A+B checkpoint, the `CURRENT STRUCTURED FACTS (L2)` block is interpolated into a high-priority `system` message, including arbitrary values from stored text fields. The ten-case offline matrix confirmed that an instruction-like value can reach the prompt, but did not test whether Qwen obeys it. This is a *trust-boundary defect*, not a demonstrated successful attack.
+
+**Independent opt-in only**, `LocalGeneration.LowerTrustL2EvidenceEnabled=$false` in the shared config. C can activate only when A and B are both enabled, L2 read is active, and the current frozen retrieval snapshot contains nonempty selected L2 evidence. The original A, B, full-schema, FRONTIER synthesis and declarative-write paths remain unchanged when C is off.
+
+- `Start-LfoTurnContext` now records an unmodified `L1MemoryBlock` and a separate `L2EvidenceText` while preserving the original combined `MemoryBlock` for logs/retrieval compatibility.
+- On the opted-in C path, `Get-QwenConversationMessages` puts **L1 state and the read-only evidence policy** in the `system` message, and **the actual L2 fact/value text in a separate, explicitly labeled JSON-quoted `user`-role data message**, immediately before the real user's latest request. The actual user request remains last, not the synthetic data message.
+- The `system` policy identifies this preceding message as untrusted data, never a source of procedural authority; trace records `dev5_l2_evidence_role=user-data|system-context`. JSON quoting protects the record framing from literal quotes/newlines; it is **NOT proof of resistance** to a language model treating embedded commands as instructions.
+- The existing deterministic LOCAL read/write guard and seven-row SQLite baseline are unchanged. Normal A+B message order/policy remain byte-for-byte identical when C is disabled.
+- The TEMP-only live fixture can opt into `-CompactReadSchema -LeanReadPolicy -LowerTrustL2Evidence`; the strict trace checker verifies the selected evidence role, allowing missing historical role fields to mean the original system-context behavior.
+- New offline assertions added to `Test-Dev5CompactRead.ps1` (synthetic instruction-like JSON value and opt-out) and `Test-Dev5SemanticReadBoundary.ps1` (four real-SQLite role-placement probes: current scoped records, hostile TITAN note, unknown entity and correction). They **have not yet run on the reference host**. No C model inference or performance result exists yet.
+
+**Risk and acceptance boundary:** a separate `user` message is lower priority than `system`, but it may still contain an instruction that Qwen follows. It also changes input role/order and adds JSON/metadata tokens; it may regress answer quality and throughput, so it is not an automatic security release or performance optimization. Offline checks establish only source-to-role placement and fallback. A targeted, isolated model trial with a harmless adversarial sentinel should test (a) whether the correct stored OS value is answered instead of the attack marker, (b) routing stability, (c) unchanged read guard/SQLite state, and (d) prompt/prefill overhead against A+B without C. Follow with varied benign/adversarial inputs and different model profiles before any broader claim. If C fails, revisit provenance-aware structured data decoding or model-facing data handling instead of assuming quoted user text is safe.
 
 
 ## Acceptance gates
@@ -145,7 +162,7 @@ The script separately asserts FRONTIER model-independent write ops are preserved
 
 ## Later experiments, not implemented
 
-- **B — prompt traffic (implemented, unvalidated)**: independently opt-in to replacing redundant L2 write-extraction policy with a small read-only evidence policy in A-eligible protected turns; benchmark prefill and prompt counts, preserving all default write contracts and persistence guard.
+- **B — prompt traffic (first isolated LIVE PASS, generalization pending)**: independently opt-in to replacing redundant L2 write-extraction policy with a small read-only evidence policy in A-eligible protected turns; benchmark prefill and prompt counts, preserving all default write contracts and persistence guard.
 - **C — stable-prefix / context traffic**: evaluate prompt-prefix reuse and bounded changes to volatile context placement, ensuring evidence precedence, memory scope and safe guard semantics. Consider actual Ollama prompt-eval cache behavior before assumptions.
 - **D — scheduling/redundant work**: evaluate whether compaction can leave the interactive critical path, and whether repeated history access, inference or serialization can be eliminated.
 - Keep host-specific thread, affinity, accelerators and quantization in runtime profiles; they are secondary comparisons, not the expected reason for architectural speedups.
