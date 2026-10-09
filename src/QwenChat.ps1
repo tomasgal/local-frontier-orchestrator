@@ -70,6 +70,10 @@ if (-not (Test-Path -LiteralPath $memoryStoreModule)) {
 }
 . $memoryStoreModule
 
+$telemetryModule = Join-Path $PSScriptRoot 'LfoTurnTelemetry.ps1'
+if (-not (Test-Path -LiteralPath $telemetryModule)) { throw "Dev4 telemetry module not found: $telemetryModule" }
+. $telemetryModule
+
 $memoryModule = Join-Path $PSScriptRoot 'QwenMemory.ps1'
 if (-not (Test-Path -LiteralPath $memoryModule)) {
     throw "Qwen memory module not found: $memoryModule"
@@ -475,6 +479,23 @@ function ConvertFrom-QwenStructuredContent(
     }
 }
 
+# Measure the existing request, never add a second model call.
+function Invoke-LfoChatApi([string]$Phase, [string]$Body) {
+    $phaseSw = [Diagnostics.Stopwatch]::StartNew()
+    $response = $null
+    $success = $false
+    try {
+        $response = Invoke-RestMethod -Uri "$BaseUri/api/chat" -Method Post `
+            -ContentType 'application/json; charset=utf-8' -Body $Body -TimeoutSec 600
+        $success = $true
+        return $response
+    } finally {
+        $phaseSw.Stop()
+        Add-LfoTurnPhase -Phase $Phase -WallSeconds $phaseSw.Elapsed.TotalSeconds `
+            -Response $response -Success $success -InputChars $Body.Length
+    }
+}
+
 function Invoke-QwenLocalApi {
     $bodyObj = @{
         model      = $Model
@@ -497,20 +518,19 @@ function Invoke-QwenLocalApi {
     }
 
     $body = $bodyObj | ConvertTo-Json -Depth 12 -Compress
-    return Invoke-RestMethod -Uri "$BaseUri/api/chat" -Method Post `
-        -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 600
+    return Invoke-LfoChatApi -Phase 'local_generation' -Body $body
 }
 
 function Invoke-QwenAnswerRecovery([string]$Prompt) {
     # A rare answer-only retry. The first pass remains the sole source of
     # memory_note, and this call cannot route or invoke Codex.
     $systemText = 'Provide a complete user-facing answer to the most recent user message. Return only the answer field. If uncertain, say so plainly.'
-    $memoryBlock = Get-MemoryContextBlock $Prompt
+    $memoryBlock = Get-LfoTurnMemoryBlock $Prompt
     if (-not [string]::IsNullOrWhiteSpace($memoryBlock)) {
         $systemText += [Environment]::NewLine + [Environment]::NewLine +
             'PERSISTENT CONVERSATION CONTEXT:' + [Environment]::NewLine + $memoryBlock
     }
-    $recentMessages = @(Get-RecentConversationMessages)
+    $recentMessages = @(Get-LfoTurnRecentMessages)
     if ($recentMessages.Count -eq 0 -or [string]$recentMessages[-1].role -ne 'user') {
         $recentMessages += @{ role = 'user'; content = $Prompt }
     }
@@ -532,7 +552,7 @@ function Invoke-QwenAnswerRecovery([string]$Prompt) {
         }
     }
     $body = $bodyObj | ConvertTo-Json -Depth 12 -Compress
-    return Invoke-RestMethod -Uri "$BaseUri/api/chat" -Method Post -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 600
+    return Invoke-LfoChatApi -Phase 'answer_recovery' -Body $body
 }
 
 function Invoke-QwenSynthesis([string]$OriginalPrompt, [string]$FrontierResult) {
@@ -544,7 +564,7 @@ Do not behave as a passive pipe and do not mechanically store every frontier det
 '@
     $synthesisSystem += [Environment]::NewLine + [Environment]::NewLine +
         $script:L2StructuredMemoryTemplate.Replace('{{L2_EVIDENCE_SCOPE}}', $l2EvidenceScope.Trim())
-    $memoryBlock = Get-MemoryContextBlock $OriginalPrompt
+    $memoryBlock = Get-LfoTurnMemoryBlock $OriginalPrompt
     $recentConversation = Get-RecentConversationText -ExcludeLastUser
 
     $synthesisUser = @"
@@ -583,8 +603,7 @@ $FrontierResult
     }
 
     $body = $bodyObj | ConvertTo-Json -Depth 12 -Compress
-    return Invoke-RestMethod -Uri "$BaseUri/api/chat" -Method Post `
-        -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 600
+    return Invoke-LfoChatApi -Phase 'frontier_synthesis' -Body $body
 }
 
 function Show-QwenThinking($Response) {
@@ -663,6 +682,9 @@ function Invoke-Qwen([string]$Prompt) {
     Trim-Messages
 
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    Start-LfoTurnTelemetry
+    $script:LfoTurnContext = $null
+    Start-LfoTurnContext $Prompt
     $policyReason = Get-FrontierPolicyReason $Prompt
     $route = $null
     $r = $null
@@ -751,7 +773,7 @@ function Invoke-Qwen([string]$Prompt) {
     }
 
     if ($route -eq 'FRONTIER') {
-        $memoryBlock = Get-MemoryContextBlock $Prompt
+        $memoryBlock = Get-LfoTurnMemoryBlock $Prompt
         $recentConversation = Get-RecentConversationText -ExcludeLastUser
 
         $codexPrompt = @"
@@ -774,12 +796,20 @@ $recentContext
         }
 
         Write-Host ("[ask_codex; {0} characters]" -f $codexPrompt.Length) -ForegroundColor DarkCyan
+        $frontierSw = [Diagnostics.Stopwatch]::StartNew()
+        $frontierSuccess = $false
         try {
             $frontierResult = Invoke-CodexReadOnly $codexPrompt
+            $frontierSuccess = $true
             Write-Host ("[ask_codex -> Qwen; {0} characters]" -f $frontierResult.Length) -ForegroundColor DarkCyan
         } catch {
             $frontierResult = "ask_codex failed: $($_.Exception.Message)"
             Write-Host "[$frontierResult]" -ForegroundColor Yellow
+        } finally {
+            $frontierSw.Stop()
+            Add-LfoTurnPhase -Phase 'frontier_handoff' -Kind 'frontier' `
+                -WallSeconds $frontierSw.Elapsed.TotalSeconds `
+                -Success $frontierSuccess -InputChars $codexPrompt.Length
         }
 
         if ($frontierResult -like 'ask_codex failed:*') {
