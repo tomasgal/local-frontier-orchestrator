@@ -18,7 +18,7 @@ As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validatio
 
 As of **2026-10-05**, `v9.4-dev3` has completed the structured **write-side** validation boundary on both a desktop reference host and a constrained CPU-only 8 GB notebook. The schema-v3 SQLite fact store uses opaque `entity_id` identity, separate entity surface-name records, typed literals, entity relations, source-turn provenance, scope isolation, duplicate suppression, atomic fail-closed multi-op writes, and reconstructible supersession history. The notebook independently reproduced the same multi-delta extraction contract, including a four-fact dense turn, entity relations, scalar correction, an empty L2 set for a preference-only turn, and post-FRONTIER structured extraction. A live correction remained LOCAL and produced the expected historical supersession in SQLite.
 
-The branch now also contains a **post-dev3 prompt/policy optimization candidate**: LOCAL temperature is reduced to `0.10`; the L2 extraction policy was deterministically reduced from 2,414 to 917 characters; an additional duplicated LOCAL structured-output rule block was removed; and a narrow deterministic acknowledgement path avoids a second local inference when a pure declarative state update already produced a valid L2 operation set but an unusable answer. These optimization changes are implemented but **not yet runtime-validated on a host** and are therefore not a new validated checkpoint. L2 retrieval is still **not injected into the model prompt**; the next boundary is to validate the optimization candidate before starting the L2 read/retrieval path.
+The branch also contains a **post-dev3 runtime optimization candidate**: LOCAL temperature is reduced to `0.10`; an additional duplicated LOCAL structured-output rule block was removed; and a narrow deterministic acknowledgement path avoids a second local inference when a pure declarative state update has a fully valid non-empty L2 operation set but an unusable answer. Controlled extraction tests showed that shorter L2 policies broke the typed/predicate extraction contract, so the previously validated full L2 policy was restored. The remaining optimizations are **not yet validated end-to-end**. L2 retrieval is still **not injected into the model prompt**; finish regression and same-fixture live validation before starting read-side integration.
 
 ## Core architecture
 
@@ -270,7 +270,7 @@ local model -> ask_codex -> native Codex frontier -> local model
 Current work focuses on:
 
 - **v9.4-dev3 L2 structured-memory integration:** write-side semantics are validated across two host classes; typed facts/relations, multi-delta extraction, opaque entity identity plus surface-name resolution, deterministic current-state updates, atomic fail-closed turn writes, provenance/history, and relational queries sit behind a stable MemoryStore abstraction;
-- validating the post-dev3 prompt/policy optimization candidate (smaller LOCAL policy surface, LOCAL temperature 0.10, deterministic acknowledgement for pure declarative updates) without weakening structured extraction;
+- validating the post-dev3 runtime optimization candidate (deduplicated LOCAL instructions, LOCAL temperature 0.10, deterministic acknowledgement for pure declarative updates) without weakening structured extraction;
 - adding the L2 read/retrieval path to context assembly only after that optimization boundary is stable;
 - long-term routing quality;
 - faithful-but-useful frontier synthesis;
