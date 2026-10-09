@@ -51,6 +51,11 @@
         NumPredictNormal = 1024
         NumPredictThink  = 2048
         Temperature      = 0.10
+
+        # Dev5 candidate A: omit memory_note/memory_ops from the local output
+        # schema only when a read-only LOCAL turn received current L2 facts.
+        # Opt-in experiment, not a release default. Compare with dev4.
+        CompactReadSchemaEnabled = $false
     }
 
     SynthesisGeneration = @{
