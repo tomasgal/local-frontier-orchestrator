@@ -47,7 +47,9 @@ $script:LfoTurnContext = [pscustomobject]@{
     RecentMessages = @(@{ role='user'; content='What is the stored OS for ORION?' })
 }
 function Get-OrchestratorSystemPrompt { return 'ORCHESTRATOR TEST POLICY' }
-$script:L2StructuredMemoryTemplate = 'VALIDATED L2 EVIDENCE POLICY: {{L2_EVIDENCE_SCOPE}}'
+# Use the real validated extraction policy to measure prompt traffic; a tiny
+# synthetic stub would make the >=800-char candidate B budget assertion invalid.
+$script:L2StructuredMemoryTemplate = (Get-Content -LiteralPath (Join-Path $root 'policy\l2-structured-memory.txt') -Raw -Encoding UTF8).TrimEnd()
 $script:Messages = @(@{ role='system';content='TEST'},@{role='user';content='What is the stored OS for ORION?'})
 
 $full = Get-QwenLocalOutputFormat
@@ -75,7 +77,7 @@ if (-not (Test-LfoDev5CompactReadEligible) -or
     $compactChars -ge $fullChars) { throw 'Compact schema contract FAILED' }
 $messages = @(Get-QwenConversationMessages)
 if ([string]$messages[0].content -notmatch 'DEV5 READ-ONLY OUTPUT OVERRIDE' -or
-    [string]$messages[0].content -notmatch 'VALIDATED L2 EVIDENCE POLICY' -or
+    [string]$messages[0].content -notmatch 'You extract L2 structured factual memory operations' -or
     [string]$messages[0].content -notmatch 'ORION.os = Debian 13' -or
     (Test-LfoDev5LeanReadPolicyEligible) -or
     $messages.Count -ne $baselineMessages.Count) { throw 'Read output policy assembly FAILED' }
@@ -92,7 +94,7 @@ if (-not (Test-LfoDev5LeanReadPolicyEligible) -or
     $leanChars -ge $fullPolicyChars -or
     ($fullPolicyChars - $leanChars) -lt 800 -or
     [string]$lean[0].content -notmatch 'DEV5 READ-ONLY L2 POLICY' -or
-    [string]$lean[0].content -match 'VALIDATED L2 EVIDENCE POLICY' -or
+    [string]$lean[0].content -match 'You extract L2 structured factual memory operations' -or
     [string]$lean[0].content -notmatch 'ORION.os = Debian 13' -or
     [string]$lean[0].content -notmatch 'DEV5 READ-ONLY OUTPUT OVERRIDE' -or
     (Get-QwenLocalOutputFormat).required.Count -ne 2) {
@@ -124,7 +126,7 @@ $script:Config.LocalGeneration.LeanReadPolicyEnabled = $true
 if ((Test-LfoDev5CompactReadEligible) -or
     (Test-LfoDev5LeanReadPolicyEligible) -or
     (Get-QwenLocalOutputFormat).required.Count -ne 4 -or
-    [string](@(Get-QwenConversationMessages)[0].content) -notmatch 'VALIDATED L2 EVIDENCE POLICY') {
+    [string](@(Get-QwenConversationMessages)[0].content) -notmatch 'You extract L2 structured factual memory operations') {
     throw 'No-L2-hit changed the validated policy/schema'
 }
 $script:LfoTurnContext.Stats.l2_read_items = 4
@@ -139,7 +141,7 @@ $script:Config.LocalGeneration.CompactReadSchemaEnabled = $false
 if ((Test-LfoDev5CompactReadEligible) -or
     (Test-LfoDev5LeanReadPolicyEligible) -or
     (Get-QwenLocalOutputFormat).required.Count -ne 4 -or
-    [string](@(Get-QwenConversationMessages)[0].content) -notmatch 'VALIDATED L2 EVIDENCE POLICY') {
+    [string](@(Get-QwenConversationMessages)[0].content) -notmatch 'You extract L2 structured factual memory operations') {
     throw 'Candidate B must never change normal full write path'
 }
 
