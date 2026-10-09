@@ -1286,7 +1286,7 @@ function Persist-TurnAndMemory(
         } catch {
             $l2Status = 'failed'
             $l2Error = $_.Exception.Message
-            if ($mixedUserWriteStatus -eq 'validated-current-user') {
+            if ($mixedCandidate.Status -eq 'candidate') {
                 $mixedUserWriteStatus = 'failed'
             }
         } finally {
@@ -1301,6 +1301,15 @@ function Persist-TurnAndMemory(
         }
     }
     $l2Sw.Stop()
+    # The answer was already shown before storage. Never silently let an
+    # acknowledgement stand as evidence that persistence succeeded.
+    # L0 JSONL is authoritative and not part of this SQLite transaction.
+    if ($l2Status -eq 'failed') {
+        Write-Warning 'L2 persistence failed or could not be fully verified. The answer is not proof of a stored update; inspect the L2 error trace before relying on it.'
+    } elseif ($mixedCandidate.Status -eq 'candidate' -and
+        $mixedUserWriteStatus -notin @('applied-current-user','duplicate-current-user')) {
+        Write-Warning ("Current-user update was NOT stored (status: {0}). Model answer is not proof of persistence." -f $mixedUserWriteStatus)
+    }
     if ($script:StructuredMemoryEnabled) {
         Add-LfoTurnPhase -Phase 'l2_write' -Kind 'store' `
             -WallSeconds $l2Sw.Elapsed.TotalSeconds -Success ($l2Status -ne 'failed')
