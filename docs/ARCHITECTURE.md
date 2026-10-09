@@ -196,6 +196,12 @@ Research traces preserve raw intermediate/final text, retrieval context, timing/
 
 Durable factual/project memory should not be conflated with opaque model weights.
 
+### v9.4-dev4 observability / turn-context boundary (stage 1)
+
+The `v9.4-dev4-observability` branch introduces an explicit pre-turn read-only L0/L1/recent-messages snapshot, keyed to the current prompt and reused by LOCAL generation, answer-only recovery, FRONTIER handoff and synthesis. This prevents repeated equivalent L0 scans within a turn while retaining the post-persistence memory snapshot as a separate read, because L1/L0 state can change after the write. The cache is reset at the start of each new turn.
+
+The new `LfoTurnTelemetry.ps1` module records one in-memory, bounded-by-actual-phases entry per model/frontier/retrieval/write phase. Each Ollama request retains its original body and remains a single HTTP call. When the Ollama response exposes counts and durations, research traces record `prompt_eval_count`, `eval_count`, `prompt_eval_seconds`, `decode_seconds` and a wall-minus-model-duration residual alongside `wall_seconds`; missing counters remain null. Turn context stats record L0 retrieved item/character counts, bounded L1 context, recent message count/characters and assembly time. No raw private text is added to these new telemetry fields. L2 read-side context inclusion is **not yet enabled**, and correctness, overhead and portability require offline plus isolated runtime validation before promotion.
+
 ## 8. Synthesis policy
 
 The current prototype uses non-zero sampling during frontier synthesis because the local layer is intentionally allowed to act as an editor and critic rather than a byte-for-byte pipe.
