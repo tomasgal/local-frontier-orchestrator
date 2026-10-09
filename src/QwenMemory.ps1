@@ -997,8 +997,19 @@ function Protect-LfoPersistenceFromReadSide(
     $ParsedOps,
     $InlineNote
 ) {
-    $valid = if ($null -ne $ParsedOps) { @($ParsedOps.Valid) } else { @() }
-    $rejected = if ($null -ne $ParsedOps) { @($ParsedOps.Rejected) } else { @() }
+    # Windows PowerShell 5.1 may unwrap a single emitted object from an
+    # if-expression, so .Count on that scalar can be $null. Always keep these
+    # explicitly typed as arrays: zero, one and many items are all supported.
+    [object[]]$valid = @()
+    [object[]]$rejected = @()
+    if ($null -ne $ParsedOps) {
+        if ($null -ne $ParsedOps.Valid) {
+            $valid = @($ParsedOps.Valid)
+        }
+        if ($null -ne $ParsedOps.Rejected) {
+            $rejected = @($ParsedOps.Rejected)
+        }
+    }
 
     $readItems = 0
     if ($null -ne $script:LfoTurnContext -and
@@ -1015,10 +1026,10 @@ function Protect-LfoPersistenceFromReadSide(
         })
         Note = $(if ($enforce) { $null } else { $InlineNote })
         GuardActive = $enforce
-        ModelValidCount = $valid.Count
-        ModelRejectedCount = $rejected.Count
-        SuppressedValidCount = $(if ($enforce) { $valid.Count } else { 0 })
-        SuppressedRejectedCount = $(if ($enforce) { $rejected.Count } else { 0 })
+        ModelValidCount = @($valid).Count
+        ModelRejectedCount = @($rejected).Count
+        SuppressedValidCount = $(if ($enforce) { @($valid).Count } else { 0 })
+        SuppressedRejectedCount = $(if ($enforce) { @($rejected).Count } else { 0 })
         NoteSuppressed = ($enforce -and $null -ne $InlineNote -and
             -not [string]::IsNullOrWhiteSpace([string]$InlineNote.Text))
         Reason = $(if ($enforce) { 'local-l2-retrieval-is-not-new-evidence' } else { $null })
