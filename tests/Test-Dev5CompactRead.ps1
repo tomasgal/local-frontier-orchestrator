@@ -17,6 +17,17 @@ foreach ($relative in @('src\QwenChat.ps1','src\QwenMemory.ps1','src\LfoStructur
 $chat = Get-Content -LiteralPath (Join-Path $root 'src\QwenChat.ps1') -Raw -Encoding UTF8
 $schemaDefinition = [regex]::Match(
     $chat,'(?ms)^function Get-QwenLocalOutputFormat \{.*?(?=^function Get-QwenSynthesisOutputFormat \{)')
+# Both compact and full requests must pass through identical low-overhead
+# timing markers. Static verification avoids invoking the interactive CLI.
+foreach ($requiredMarker in @(
+    "Add-LfoTurnPhase -Phase 'local_request_build'",
+    "Add-LfoTurnPhase -Phase 'local_response_processing'",
+    "return Invoke-LfoChatApi -Phase 'local_generation'"
+)) {
+    if (-not $chat.Contains($requiredMarker)) {
+        throw "Dev5 LOCAL timing invariant missing: $requiredMarker"
+    }
+}
 if (-not $schemaDefinition.Success) { throw 'Cannot isolate LOCAL schema declaration' }
 Invoke-Expression $schemaDefinition.Value
 $parseDefinition = [regex]::Match(
@@ -107,5 +118,6 @@ if ((Test-LfoDev5CompactReadEligible) -or (Get-QwenLocalOutputFormat).required.C
     FrontierRoutingPreserved = $true
     ExistingParserAcceptsCompact = $true
     OllamaCalled = $false
+    TimingPhasesDeclared = 2
     ProductionMemoryTouched = $false
 } | Format-List
