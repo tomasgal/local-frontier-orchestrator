@@ -988,6 +988,43 @@ function Clear-PersistentConversationMemory {
     }
 }
 
+# L2 retrieval is orientation/read evidence, not evidence of a NEW user fact.
+# A model may nevertheless echo retrieved facts into memory_ops or memory_note.
+# Fail closed at persistence: every LOCAL turn with actual L2 injection is read-only
+# for derived durable memory. Declarative updates do not receive L2 injection.
+function Protect-LfoPersistenceFromReadSide(
+    [string]$Route,
+    $ParsedOps,
+    $InlineNote
+) {
+    $valid = if ($null -ne $ParsedOps) { @($ParsedOps.Valid) } else { @() }
+    $rejected = if ($null -ne $ParsedOps) { @($ParsedOps.Rejected) } else { @() }
+
+    $readItems = 0
+    if ($null -ne $script:LfoTurnContext -and
+        $null -ne $script:LfoTurnContext.Stats) {
+        $readItems = [int]$script:LfoTurnContext.Stats.l2_read_items
+    }
+    $enforce = $Route -eq 'LOCAL' -and $readItems -gt 0
+
+    return [pscustomobject]@{
+        Ops = $(if ($enforce) {
+            [pscustomobject]@{ Valid = @(); Rejected = @() }
+        } else {
+            $ParsedOps
+        })
+        Note = $(if ($enforce) { $null } else { $InlineNote })
+        GuardActive = $enforce
+        ModelValidCount = $valid.Count
+        ModelRejectedCount = $rejected.Count
+        SuppressedValidCount = $(if ($enforce) { $valid.Count } else { 0 })
+        SuppressedRejectedCount = $(if ($enforce) { $rejected.Count } else { 0 })
+        NoteSuppressed = ($enforce -and $null -ne $InlineNote -and
+            -not [string]::IsNullOrWhiteSpace([string]$InlineNote.Text))
+        Reason = $(if ($enforce) { 'local-l2-retrieval-is-not-new-evidence' } else { $null })
+    }
+}
+
 function Persist-TurnAndMemory(
     [string]$Prompt,
     [string]$FinalContent,
@@ -1020,6 +1057,13 @@ function Persist-TurnAndMemory(
         $turnId = 0
         $epoch = 0
     }
+
+    # This boundary must run before both L2 writes and L1 micro-note storage.
+    # Keep raw model output in LocalRaw for debugging; trace effective operations
+    # and suppression counters separately.
+    $readGuard = Protect-LfoPersistenceFromReadSide $Route $InlineMemoryOps $InlineMemoryNote
+    $InlineMemoryOps = $readGuard.Ops
+    $InlineMemoryNote = $readGuard.Note
 
     $timestamp = (Get-Date).ToString('o')
     $memoryBefore = if ($script:MemoryEnabled) {
@@ -1184,6 +1228,13 @@ function Persist-TurnAndMemory(
             l2_status = $l2Status
             l2_applied_count = $l2AppliedCount
             l2_rejected_count = $l2RejectedCount
+            l2_ops_model_valid_count = [int]$readGuard.ModelValidCount
+            l2_ops_model_rejected_count = [int]$readGuard.ModelRejectedCount
+            l2_ops_suppressed_valid_count = [int]$readGuard.SuppressedValidCount
+            l2_ops_suppressed_rejected_count = [int]$readGuard.SuppressedRejectedCount
+            l2_read_write_guard_active = [bool]$readGuard.GuardActive
+            l2_read_write_guard_reason = $readGuard.Reason
+            l1_model_note_suppressed = [bool]$readGuard.NoteSuppressed
             l2_seconds = [Math]::Round($l2Sw.Elapsed.TotalSeconds, 3)
             l2_error = $l2Error
             memory_compacted = $compacted
