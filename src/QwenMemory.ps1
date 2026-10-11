@@ -1318,11 +1318,17 @@ function Persist-TurnAndMemory(
     # without a directly evidenced current-user assertion.
     $modelWriteAuthority=Get-LfoLocalModelWriteAuthorization -Prompt $Prompt -Route $Route -ParsedOps $InlineMemoryOps
     $modelOpsBlockedByAuthority=0
+    $authorityNoteSuppressed=$false
     if(-not $modelWriteAuthority.Allowed) {
         if($null -ne $InlineMemoryOps -and $null -ne $InlineMemoryOps.Valid) {
             $modelOpsBlockedByAuthority=@($InlineMemoryOps.Valid).Count
         }
+        $authorityNoteSuppressed=($null -ne $InlineMemoryNote -and
+            -not [string]::IsNullOrWhiteSpace([string]$InlineMemoryNote.Text))
+        # An unauthorized L2 operation must not leave its companion model note
+        # behind as an apparently durable L1 fact.
         $InlineMemoryOps=[pscustomobject]@{Valid=@();Rejected=@()}
+        $InlineMemoryNote=$null
     }
 
     # Pure current-user provenance remains independent of model proposals.
@@ -1550,7 +1556,8 @@ function Persist-TurnAndMemory(
             mixed_user_evidence_length = [int]$mixedCandidate.EvidenceLength
             mixed_user_write_applied_count = [int]$mixedUserApplied
             l2_write_source = $(if ($mixedUserApplied -gt 0) { 'validated-current-user' } elseif ($readGuard.GuardActive) { 'read-guard-no-model-writes' } elseif ($modelOpsBlockedByAuthority -gt 0) { 'model-write-not-authorized' } else { 'model-unmodified' })
-            l1_model_note_suppressed = [bool]$readGuard.NoteSuppressed
+            l1_model_note_suppressed = [bool]($readGuard.NoteSuppressed -or $authorityNoteSuppressed)
+            l1_note_suppressed_by_write_authority = [bool]$authorityNoteSuppressed
             l2_seconds = [Math]::Round($l2Sw.Elapsed.TotalSeconds, 3)
             l2_error = $l2Error
             memory_compacted = $compacted
