@@ -1,6 +1,9 @@
 # TEMP-only preparation, no inference, no branch checkout or production memory.
-# This is a CAPABILITY-AWARE pilot, not identical-input causal attribution:
-# dev3 sees the facts in L1; dev5 also retrieves identical facts from L2.
+# This is a CONTROLLED, CAPABILITY-AWARE read mechanism pilot, NOT the
+# representative five-case natural workload or identical-input causal result.
+# dev3 sees the facts in L1; dev5 may additionally retrieve L2, enabling A+B.
+# Read/write routing is a first-class measured outcome; never silently rewrite
+# the frozen system-wide benchmark prompts to activate optimizations.
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot
 $baseline='a34658b81742596520da844618b5bb39f3329279'
@@ -17,8 +20,12 @@ if(-not ([IO.Path]::GetFullPath($root)).StartsWith($temp+'\',[StringComparison]:
 [void](New-Item -ItemType Directory -Path $root)
 $utf8=New-Object Text.UTF8Encoding($false)
 $memory='BENCH_SERVER runs Synthetic OS 13; RAM 96 GB; disk 512 GB; 8 CPUs.'
-$prompt='State BENCH_SERVER operating system, RAM in GB, disk in GB and CPU count. Reply in one short sentence.'
-$manifest=[ordered]@{schema='lfo-dev3-dev5-pilot-preflight-v1';dev3_commit=$baseline;dev5_commit=$dev5;model='qwen3.5:4b-q4_K_M';think=$false;num_ctx=5120;prompt=$prompt;common_l1=$memory;design='common L1 evidence, extra dev5 scoped L2 retrieval; capability-aware, not identical prompts';runs=@()}
+$prompt='What operating system, RAM size in GB, disk size in GB and CPU count does BENCH_SERVER have? Answer in one concise sentence.'
+# This is a separate, explicitly eligible read *mechanism* cohort; do not
+# pretend it is the frozen representative five-workload full-system benchmark.
+. (Join-Path $repo 'src\QwenMemory.ps1')
+if(Test-DeclarativeStateUpdatePrompt $prompt){throw 'Pilot query accidentally classified as a write-only declaration'}
+$manifest=[ordered]@{schema='lfo-dev3-dev5-pilot-preflight-v1';dev3_commit=$baseline;dev5_commit=$dev5;model='qwen3.5:4b-q4_K_M';think=$false;num_ctx=5120;prompt=$prompt;common_l1=$memory;design='controlled eligible read mechanism, separate from five-case system-wide workload; common L1 evidence, dev5 optional extra scoped L2; not identical model prompt payloads';cohort='controlled-eligible-scoped-read';strictly_not_representative_net_gain=$true;runs=@()}
 foreach($variant in @('dev3','dev5')){
     $rev=if($variant -eq 'dev3'){$baseline}else{$dev5}
     $work=Join-Path $root $variant
@@ -59,5 +66,5 @@ foreach($variant in @('dev3','dev5')){
 $manifestPath=Join-Path $root 'pilot-manifest.json'
 [IO.File]::WriteAllText($manifestPath,($manifest|ConvertTo-Json -Depth 6),$utf8)
 Write-Host "PILOT PREFLIGHT PREPARED: $manifestPath"
-Write-Host 'NO INFERENCE. Do not treat dev3 and dev5 as identical prompt input.'
+Write-Host 'NO INFERENCE. Controlled scoped-read mechanism cohort only, not the frozen representative workload.'
 [pscustomobject]@{PASS=$true;Variants=2;IsolatedStores=2;SeedFactsPerVariant=4;NoModelCalls=$true;ProductionMemoryTouched=$false;Manifest=$manifestPath}|Format-List
