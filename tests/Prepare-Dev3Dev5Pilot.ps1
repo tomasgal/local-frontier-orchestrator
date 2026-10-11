@@ -65,6 +65,10 @@ foreach($variant in @('dev3','dev5')){
 }
 $manifestPath=Join-Path $root 'pilot-manifest.json'
 [IO.File]::WriteAllText($manifestPath,($manifest|ConvertTo-Json -Depth 6),$utf8)
+# No costly model call is allowed until the separately archived dev5 snapshot
+# proves it actually reads four scoped facts and activates A+B offline.
+& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $repo 'tests\Test-Dev3Dev5PilotPreflight.ps1') -ManifestPath $manifestPath
+if($LASTEXITCODE -ne 0){throw 'Offline pilot eligibility audit failed; do NOT launch inference'}
 Write-Host "PILOT PREFLIGHT PREPARED: $manifestPath"
 Write-Host 'NO INFERENCE. Controlled scoped-read mechanism cohort only, not the frozen representative workload.'
 [pscustomobject]@{PASS=$true;Variants=2;IsolatedStores=2;SeedFactsPerVariant=4;NoModelCalls=$true;ProductionMemoryTouched=$false;Manifest=$manifestPath}|Format-List
