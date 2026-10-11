@@ -1,5 +1,7 @@
 # Roadmap
 
+> **2026-10-11 selective-refactoring goal:** start with [DEV5_DELPHI_REFACTOR_HANDOFF.md](DEV5_DELPHI_REFACTOR_HANDOFF.md) for the staged roadmap and next-chat instructions. The user-requested L2 extraction policy is now a **2040-character candidate** (previously 2414, LF-normalized). Static text checks completed; current Windows/model acceptance and net performance remain PENDING. Historical full-policy validation below is preserved for its original revisions. All experimental defaults remain OFF.
+
 This roadmap describes engineering directions, not release commitments.
 
 ## Baseline reached — 2026-09-29

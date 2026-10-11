@@ -1,5 +1,7 @@
 # G2 handoff — v9.4-dev5-compact-read
 
+> **New chat entry point — 2026-10-11:** read [DEV5_DELPHI_REFACTOR_HANDOFF.md](DEV5_DELPHI_REFACTOR_HANDOFF.md) first for the selective-refactoring goal, four-stage roadmap and user-authorized **2040-character policy candidate**. The historical G2 evidence below remains valid only for its recorded source pins. Current policy acceptance is PENDING; the next step is the cheap offline gate. This supersedes the older restart ordering for the new candidate.
+
 **Checkpoint:** 2026-10-11 · **Status:** RESUMED; Core offline write-authority hardening and 12-suite acceptance PASS, still no post-hardening live dev3/dev5 net benchmark. Prior Lenovo live pilot remains exploratory. No feature promotion. This document is the starting point for the next session; do not restart the validation journey or silently run costly Ollama calls.
 
 ## 1. Scope, frozen evidence and boundaries
