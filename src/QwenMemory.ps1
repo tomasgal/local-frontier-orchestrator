@@ -239,10 +239,11 @@ function Get-LfoLocalModelWriteAuthorization([string]$Prompt,[string]$Route,$Par
     # (or an explicit correction/remember preamble followed by that form) qualifies.
     $assertion=[regex]::Replace($assertion,'(?i)^\s*(?:correction|oprava)\s*:\s*','')
     $assertion=[regex]::Replace($assertion,'(?i)^\s*(?:please\s+)?remember(?:\s+this)?\s*:\s*','')
-    $assertion=[regex]::Replace($assertion,'(?i)^\s*zapam[aä]taj\s+si\s*:\s*','')
+    # Unicode escapes keep the trust-boundary regex stable under Windows PowerShell 5.1 ANSI source decoding.
+    $assertion=[regex]::Replace($assertion,'(?i)^\s*zapam[a\u00E4]taj\s+si\s*:\s*','')
     $subject=[string]$(if($valid.Count -gt 0){$valid[0].Subject}else{''})
     if([string]::IsNullOrWhiteSpace($subject) -or
-       $assertion -notmatch ('(?i)^\s*'+[regex]::Escape($subject)+'\s+(?:now\s+|teraz\s+)?(?:runs|uses|has|is|are|be[zž][ií]|pou[zž][ií]va|m[aá]|je|s[uú])\b')) {
+       $assertion -notmatch ('(?i)^\s*'+[regex]::Escape($subject)+'\s+(?:now\s+|teraz\s+)?(?:runs|uses|has|is|are|be[z\u017E][i\u00ED]|pou[z\u017E][i\u00ED]va|m[a\u00E1]|je|s[u\u00FA])\b')) {
         return [pscustomobject]@{Allowed=$false;Reason='no-leading-subject-assertion'}
     }
     if($rejected.Count -gt 0 -or $valid.Count -eq 0) {
