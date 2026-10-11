@@ -40,7 +40,7 @@ $cases=@(
     [pscustomobject]@{Name='imperative-with-values';Prompt='State BENCH_SERVER runs Synthetic OS 13 and has 96 GB RAM.';Ops=$pilotOps;Allowed=$false},
     [pscustomobject]@{Name='pure-read-question';Prompt='What is ORION OS?';Ops=$dense;Allowed=$false},
     [pscustomobject]@{Name='positive-dense-declaration';Prompt='ORION runs Ubuntu 24.04, uses PostgreSQL 16, has 64 GB RAM, and nightly backups are enabled.';Ops=$dense;Allowed=$true},
-    [pscustomobject]@{Name='explicit-correction';Prompt='Correction: ORION now runs Debian 13 instead of Ubuntu 24.04.';Ops=$correction;Allowed=$false},
+    [pscustomobject]@{Name='explicit-correction';Prompt='Correction: ORION now runs Debian 13 instead of Ubuntu 24.04.';Ops=$correction;Allowed=$true},
     [pscustomobject]@{Name='direct-correction';Prompt='Correction: ORION runs Debian 13 instead of Ubuntu 24.04.';Ops=$correction;Allowed=$true},
     [pscustomobject]@{Name='remember-declaration';Prompt='Zapamätaj si: ORION beží na Debian 13.';Ops=$correction;Allowed=$true},
     [pscustomobject]@{Name='direct-relation';Prompt='Core has a GTX1050 graphics card. Core has 32 GB RAM.';Ops=$relation;Allowed=$true},
