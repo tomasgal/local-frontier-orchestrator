@@ -285,7 +285,8 @@ function Get-LfoLocalModelWriteAuthorization([string]$Prompt,[string]$Route,$Par
             # In 'now Debian instead of Ubuntu', only the current side may
             # justify an L2 write; the superseded side is not write evidence.
             $currentSide=[string]([regex]::Split([string]$clause,'(?i)\b(?:instead\s+of|rather\s+than)\b')[0])
-            if($currentSide -notmatch $targetPattern){continue}
+            # Boolean truth is evidenced by enabled/disabled vocabulary, not by literal 'true'/'false'.
+            if([string]$op.Op -ne 'SET_BOOLEAN' -and $currentSide -notmatch $targetPattern){continue}
             if([string]$op.Op -eq 'SET_BOOLEAN') {
                 $truth=[bool]$op.TypedValue
                 $words=@(([string]$op.Predicate -split '_') |
@@ -307,7 +308,7 @@ function Get-LfoLocalModelWriteAuthorization([string]$Prompt,[string]$Route,$Par
             if([string]$op.Op -eq 'SET_INTEGER' -and [string]$op.Predicate -eq 'ram_gb') {
                 # Prevent borrowing a CPU count or other integer as RAM.
                 $num=[regex]::Escape($opTarget)
-                $ramEvidence='(?i)(?<![0-9])'+$num+'(?![0-9])\s*GB\s*(?:of\s+)?RAM\b|(?i)\bRAM\s*(?:(?:is|=|:)\s*)?(?<![0-9])'+$num+'(?![0-9])\s*GB\b'
+                $ramEvidence='(?i)(?:(?<![0-9])'+$num+'(?![0-9])\s*GB\s*(?:of\s+)?RAM\b|\bRAM\s*(?:(?:is|=|:)\s*)?(?<![0-9])'+$num+'(?![0-9])\s*GB\b)'
                 if($currentSide -notmatch $ramEvidence){continue}
             }
             $grounded=$true
