@@ -1,6 +1,6 @@
 # Local Frontier Orchestrator
 
-**Development status (2026-10-09): `v9.4-dev5-compact-read` — experimental Dev5 A+B / G2 variant, testing PAUSED after first dev3-vs-dev5 pilot.** Dev3 structured writes, Dev4 observability/opt-in L2 reads, and Dev5 G2 offline transactional regression gates have PASS evidence. **Dev5 full-loop net speedup over dev3 is NOT established; experimental features remain OFF by default.** The `main` branch remains at the validated v9.3 baseline; no experimental dev5 feature was promoted or merged.
+**Development status (2026-10-11): `v9.4-dev5-compact-read` — G2 resumed, Core 12/12 offline acceptance PASS at `370827f`, including fail-closed LOCAL model-write authorization, 14 adversarial rejection cases and 6 positive controls.** Dev3 structured writes, Dev4 observability/opt-in L2 reads, and Dev5 scoped SQLite hardening have Windows validation. **Dev5 full-loop net speedup over dev3 is NOT established; experimental read/mixed features remain OFF by default.** The `main` branch remains the v9.3 baseline; no experimental feature was promoted or merged.
 
 **Restart here:** [G2 handoff and known limitations](docs/DEV5_G2_HANDOFF.md) · [Dev5 experiments and timings](docs/DEV5_PERFORMANCE_EXPERIMENTS.md) · [dev3/dev5 benchmark protocol](docs/DEV5_VS_DEV3_BENCHMARK_PROTOCOL.md) · [roadmap](docs/ROADMAP.md).
 
@@ -18,7 +18,7 @@ For the rationale behind the conversational-memory architecture, trade-offs agai
 
 As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validation scope on the constrained reference hardware. It preserves v9.2 single-pass micro-memory as the normal path, adds pressure-triggered compaction at `>=4` pending notes or `>=108` pending-note characters, and uses at most one focused memory-only recovery when the user explicitly asks the system to remember something but the single-pass note is empty. Invalid final-answer sentinels are also recovered without regenerating memory, and correction-prefix normalization is hardened across `CORR`, `CORR:` and `CORR :` variants. Isolated end-to-end tests passed both count-pressure and char-pressure compaction, while ordinary implicit memory remains single-pass. Raw JSONL history remains authoritative; rolling memory remains a lossy orientation layer.
 
-## v9.4 experimental status — Dev3 → Dev4 → Dev5 (checkpoint 2026-10-09)
+## v9.4 experimental status — Dev3 → Dev4 → Dev5 (checkpoint 2026-10-11)
 
 **Dev3: functional L2 structured memory validated.** The scoped SQLite fact store provides typed attributes/relations, multi-fact updates, supersession history, source-turn provenance, correction, alias isolation, fail-closed atomic turn writes and restart continuity. Tests covered two Windows host classes and isolated live Qwen writing/correction on the constrained reference host. Dev3's post-write prompt/runtime optimization showed one-sample latency reductions; cross-host/repeated gains were not established.
 
@@ -34,6 +34,20 @@ As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validatio
 - **G2 Windows offline hardening:** **9/9 regression suites PASS**, including SQLite `BEGIN IMMEDIATE` guarded alias/scope authorization, writer lock, duplicate replay, cross-scope rejection, rollback under SQL failure and mixed-wrapper persistence failure reporting. This does not make the SQLite + L0 JSONL stores a single distributed transaction.
 - **Comparator contract:** synthetic-only comparator self-test PASS, including eight negative contract cases. It does not count as actual performance evidence.
 - **Measured model-free component pilot:** 4 matched AB/BA repetitions (pinned dev3 `a34658b8...` / dev5 `75e0b4b8...`) passed correctness. Five of six shared PowerShell/SQLite operations had dev5 medians ~12–17% slower, but subsequent paired-sign analysis found **none of the six consistently slower or faster over all 4 pairs**; absolute differences were millisecond-scale. This result does not establish either a stable regression or a net system gain.
+
+### Core 2026-10-11 offline acceptance and write-authority boundary
+
+**Twelve deterministic offline test scripts PASS** on the Core Windows host at exactly dev5 commit **370827f6793b59062aae841c9cf1cc439dadf6de**, with zero Ollama calls and no production-memory changes. This includes ten prior regression/comparator suites and two new LOCAL model-write safety suites: **14/14 unsafe statements blocked**, **6/6 representative valid statements retained**, and **11/11 original authorization scenarios**; the original unrecognized imperative read triggered **zero** new TEMP SQLite writes while a four-fact user assertion wrote **four**.
+
+The persistence boundary now rejects model-sourced LOCAL L2 operations without current-user assertion and subject/clause/value grounding, independently of the read/declaration routing heuristic. Refused model proposals also lose the accompanying untrusted L1 micro-note; trace records the authorization reason and rejected count. The policy remains **conservative lexical containment, not semantic verification**: nuanced valid statements may be rejected and unknown edge cases may remain. This does not establish live correctness with Qwen after the patch, transactional integrity across L0 JSONL + L2 SQLite, or production-grade security.
+
+An earlier Core 4-pair model-free benchmark pinned dev5 **581288e69f473c7f4a3ec346b96c48c24718fcab** (before the safety changes), versus pinned dev3 **a34658b81742596520da844618b5bb39f3329279**. Core descriptive signs: **2/6** operations consistently slower in all four pairs, **4/6** mixed signs, with millisecond-scale overhead and no end-to-end inference. These historic component timings must not be attributed to the newer acceptance commit.
+
+On Windows PowerShell and a clean experimental branch, run the one-command offline gate:
+
+    & .\tests\Invoke-Dev5OfflineRegressions.ps1
+
+This creates a TEMP-only JSON acceptance report and individual logs. The next stage is a frozen natural-language, correctness-gated, isolated dev3/dev5 live workload with explicit routing/authorization and model digest provenance; start with one controlled pair, not an automatic batch. See [G2 handoff](docs/DEV5_G2_HANDOFF.md) and [benchmark protocol](docs/DEV5_VS_DEV3_BENCHMARK_PROTOCOL.md).
 
 ### First live dev3/dev5 pilot: useful diagnosis, **not A+B acceptance**
 
