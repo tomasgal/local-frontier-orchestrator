@@ -1,5 +1,7 @@
 # Selective refactoring goal and chat handoff
 
+Tracking goal: [GitHub issue #3](https://github.com/tomasgal/local-frontier-orchestrator/issues/3).
+
 Updated: 2026-10-11. Working branch: `v9.4-dev5-compact-read`.
 Source reviewed before this change: `6f02466b47c4d08153503bc0707263f2ad58be0b`.
 Historical DEV3 reference: `a34658b81742596520da844618b5bb39f3329279`.
