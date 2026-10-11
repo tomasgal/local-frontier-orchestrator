@@ -242,7 +242,7 @@ function Get-LfoLocalModelWriteAuthorization([string]$Prompt,[string]$Route,$Par
     $assertion=[regex]::Replace($assertion,'(?i)^\s*zapam[aä]taj\s+si\s*:\s*','')
     $subject=[string]$(if($valid.Count -gt 0){$valid[0].Subject}else{''})
     if([string]::IsNullOrWhiteSpace($subject) -or
-       $assertion -notmatch ('(?i)^\s*'+[regex]::Escape($subject)+'\s+(?:runs|uses|has|is|are|be[zž][ií]|pou[zž][ií]va|m[aá]|je|s[uú])\b')) {
+       $assertion -notmatch ('(?i)^\s*'+[regex]::Escape($subject)+'\s+(?:now\s+|teraz\s+)?(?:runs|uses|has|is|are|be[zž][ií]|pou[zž][ií]va|m[aá]|je|s[uú])\b')) {
         return [pscustomobject]@{Allowed=$false;Reason='no-leading-subject-assertion'}
     }
     if($rejected.Count -gt 0 -or $valid.Count -eq 0) {
