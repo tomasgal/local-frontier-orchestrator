@@ -1,5 +1,7 @@
 # Selective refactoring goal and chat handoff
 
+> **Current programme update (2026-10-11):** DEV3 remains the frozen semantic comparison and selective improvement workstream; DEV5 is the active experimental refactoring branch. Testing exposed substantial opportunities to simplify development and validation. See [ROADMAP.md](ROADMAP.md) for R0–R6 and the retained L3/L4 milestones. No claim of general speedup, model acceptance, or automatic production promotion is made.
+
 Tracking goal: [GitHub issue #3](https://github.com/tomasgal/local-frontier-orchestrator/issues/3).
 
 Updated: 2026-10-11. Working branch: `v9.4-dev5-compact-read`.
