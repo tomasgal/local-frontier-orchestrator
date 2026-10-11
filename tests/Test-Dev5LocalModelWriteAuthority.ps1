@@ -42,7 +42,9 @@ $cases=@(
     [pscustomobject]@{Name='positive-dense-declaration';Prompt='ORION runs Ubuntu 24.04, uses PostgreSQL 16, has 64 GB RAM, and nightly backups are enabled.';Ops=$dense;Allowed=$true},
     [pscustomobject]@{Name='explicit-correction';Prompt='Correction: ORION now runs Debian 13 instead of Ubuntu 24.04.';Ops=$correction;Allowed=$true},
     [pscustomobject]@{Name='direct-correction';Prompt='Correction: ORION runs Debian 13 instead of Ubuntu 24.04.';Ops=$correction;Allowed=$true},
-    [pscustomobject]@{Name='remember-declaration';Prompt='Zapamätaj si: ORION beží na Debian 13.';Ops=$correction;Allowed=$true},
+    # Build real Unicode scalars without depending on WinPS 5.1's ANSI .ps1 reader.
+    [pscustomobject]@{Name='remember-declaration';Prompt=('Zapam'+[char]0x00E4+'taj si: ORION be'+[char]0x017E+[char]0x00ED+' na Debian 13.');Ops=$correction;Allowed=$true},
+    [pscustomobject]@{Name='remember-ascii';Prompt='Zapamataj si: ORION bezi na Debian 13.';Ops=$correction;Allowed=$true},
     [pscustomobject]@{Name='direct-relation';Prompt='Core has a GTX1050 graphics card. Core has 32 GB RAM.';Ops=$relation;Allowed=$true},
     [pscustomobject]@{Name='model-hallucinated-target';Prompt='ORION runs Ubuntu 24.04, uses PostgreSQL 16, has 64 GB RAM, and nightly backups are enabled.';Ops=$pilotOps;Allowed=$false},
     [pscustomobject]@{Name='mixed-read-question';Prompt='What OS does ORION run? Also, ORION RAM is now 96 GB.';Ops=$pilotOps;Allowed=$false}
