@@ -83,10 +83,11 @@ foreach($scenario in @('misrouted-read','positive-declaration')){
     $isWrite=$scenario -eq 'positive-declaration'
     $prompt=if($isWrite){'ORION runs Ubuntu 24.04, uses PostgreSQL 16, has 64 GB RAM, and nightly backups are enabled.'}else{'State BENCH_SERVER operating system, RAM in GB, disk in GB and CPU count. Reply in one short sentence.'}
     $ops=if($isWrite){$dense}else{$pilotOps}
+    $note=if($isWrite){$null}else{[pscustomobject]@{Text='UNTRUSTED MODEL FACT';Raw='UNTRUSTED MODEL FACT'}}
     $script:LfoTurnContext=$null
     $script:Messages=@(@{role='system';content='TEST'},@{role='user';content=$prompt})
     Start-LfoTurnTelemetry
-    Persist-TurnAndMemory -Prompt $prompt -FinalContent 'offline result' -Route 'LOCAL' -PolicyReason 'offline' -LocalRaw '{}' -FrontierResult '' -Response $null -AnswerSeconds 0 -InlineMemoryNote $null -InlineMemoryOps $ops
+    Persist-TurnAndMemory -Prompt $prompt -FinalContent 'offline result' -Route 'LOCAL' -PolicyReason 'offline' -LocalRaw '{}' -FrontierResult '' -Response $null -AnswerSeconds 0 -InlineMemoryNote $note -InlineMemoryOps $ops
     $read=Open-LfoMemoryReadOnly $script:StructuredMemoryPath
     try {
         $rows=@(Invoke-LfoSqliteQuery $read 'SELECT predicate,source_turn,scope_id FROM facts ORDER BY id;')
@@ -101,8 +102,14 @@ foreach($scenario in @('misrouted-read','positive-declaration')){
        [bool]$trace[0].l2_model_write_authorized -ne $isWrite -or
        [int]$trace[0].l2_model_ops_unauthorized_count -ne $(if($isWrite){0}else{4}) -or
        [int]$trace[0].l2_applied_count -ne $(if($isWrite){4}else{0}) -or
-       [bool]$trace[0].l2_read_write_guard_active){
+       [bool]$trace[0].l2_read_write_guard_active -or
+       [bool]$trace[0].l1_note_suppressed_by_write_authority -ne (-not $isWrite) -or
+       [bool]$trace[0].l1_model_note_suppressed -ne (-not $isWrite)){
         throw "Authorization audit failed: $scenario"
+    }
+    if(-not $isWrite -and
+       -not [string]::IsNullOrWhiteSpace((Get-Content -LiteralPath $script:PendingNotesPath -Raw -Encoding UTF8))){
+        throw 'Unauthorized model note was persisted in L1'
     }
     $results+=[pscustomobject]@{Scenario=$scenario;ActualSqliteWrites=$new.Count;Authorization=[string]$trace[0].l2_model_write_authorization_reason}
 }
