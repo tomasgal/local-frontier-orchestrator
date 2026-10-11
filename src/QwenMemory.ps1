@@ -212,6 +212,73 @@ function Test-DeclarativeStateUpdatePrompt([string]$Prompt) {
     return $true
 }
 
+# Independent durable-write authorization for model-proposed LOCAL L2 ops.
+# Conservative v1: explicit first-party assertion at the START of the user turn
+# plus per-operation subject/value evidence from the same raw user text.
+# A classifier mistake may cause an unnecessary full model output, never
+# by itself an authorization to promote recalled/model-generated facts to L2.
+# Complex/ambiguous phrasing deliberately fails closed; not a semantic proof.
+function Get-LfoLocalModelWriteAuthorization([string]$Prompt,[string]$Route,$ParsedOps) {
+    if($Route -ne 'LOCAL') {
+        return [pscustomobject]@{Allowed=$true;Reason='non-local-synthesis-separate-policy'}
+    }
+    [object[]]$valid=@()
+    [object[]]$rejected=@()
+    if($null -ne $ParsedOps) {
+        if($null -ne $ParsedOps.Valid){$valid=@($ParsedOps.Valid)}
+        if($null -ne $ParsedOps.Rejected){$rejected=@($ParsedOps.Rejected)}
+    }
+    if($valid.Count -eq 0 -and $rejected.Count -eq 0) {
+        return [pscustomobject]@{Allowed=$true;Reason='no-model-ops'}
+    }
+    if([string]::IsNullOrWhiteSpace($Prompt) -or $Prompt.Contains('?')) {
+        return [pscustomobject]@{Allowed=$false;Reason='no-pure-current-user-assertion'}
+    }
+    $assertion=$Prompt.Trim()
+    # Permissive intent routing is NOT used here. Only a narrow assertion form
+    # (or an explicit correction/remember preamble followed by that form) qualifies.
+    $assertion=[regex]::Replace($assertion,'(?i)^\s*(?:correction|oprava)\s*:\s*','')
+    $assertion=[regex]::Replace($assertion,'(?i)^\s*(?:please\s+)?remember(?:\s+this)?\s*:\s*','')
+    $assertion=[regex]::Replace($assertion,'(?i)^\s*zapam[aä]taj\s+si\s*:\s*','')
+    $subject=[string]$(if($valid.Count -gt 0){$valid[0].Subject}else{''})
+    if([string]::IsNullOrWhiteSpace($subject) -or
+       $assertion -notmatch ('(?i)^\s*'+[regex]::Escape($subject)+'\s+(?:runs|uses|has|is|are|be[zž][ií]|pou[zž][ií]va|m[aá]|je|s[uú])\b')) {
+        return [pscustomobject]@{Allowed=$false;Reason='no-leading-subject-assertion'}
+    }
+    if($rejected.Count -gt 0 -or $valid.Count -eq 0) {
+        return [pscustomobject]@{Allowed=$false;Reason='incomplete-or-invalid-model-ops'}
+    }
+    foreach($op in $valid) {
+        $opSubject=[string]$op.Subject
+        $opTarget=[string]$op.Target
+        if([string]::IsNullOrWhiteSpace($opSubject) -or [string]::IsNullOrWhiteSpace($opTarget) -or
+           $Prompt -notmatch ('(?i)(?<![\p{L}\p{N}])'+[regex]::Escape($opSubject)+'(?![\p{L}\p{N}])')) {
+            return [pscustomobject]@{Allowed=$false;Reason='model-subject-absent-from-user-turn'}
+        }
+        if([string]$op.Op -eq 'SET_BOOLEAN') {
+            $truth=[bool]$op.TypedValue
+            $words=@(([string]$op.Predicate -split '_')|Where-Object{$_ -notin @('is','has','enabled','active','true','false')})
+            foreach($word in $words) {
+                if($Prompt -notmatch ('(?i)(?<!\p{L})'+[regex]::Escape($word)+'(?!\p{L})')) {
+                    return [pscustomobject]@{Allowed=$false;Reason='boolean-predicate-evidence-missing'}
+                }
+            }
+            $boolMatch=if($truth){$Prompt -match '(?i)\b(?:enabled|active|true|on)\b'}else{$Prompt -match '(?i)\b(?:disabled|inactive|false|off)\b'}
+            if(-not $boolMatch){return [pscustomobject]@{Allowed=$false;Reason='boolean-value-evidence-missing'}}
+        } else {
+            $targetPattern=if([string]$op.Op -in @('SET_INTEGER','SET_REAL')) {
+                '(?<![0-9])'+[regex]::Escape($opTarget)+'(?![0-9])'
+            } else {
+                '(?i)(?<![\p{L}\p{N}])'+[regex]::Escape($opTarget)+'(?![\p{L}\p{N}])'
+            }
+            if($Prompt -notmatch $targetPattern) {
+                return [pscustomobject]@{Allowed=$false;Reason='model-target-absent-from-user-turn'}
+            }
+        }
+    }
+    return [pscustomobject]@{Allowed=$true;Reason='matched-user-assertion-and-operation-values'}
+}
+
 function Normalize-MemoryNoteForPrompt([string]$Note, [string]$Prompt) {
     if ([string]::IsNullOrWhiteSpace($Note)) { return '' }
 
@@ -1204,6 +1271,18 @@ function Persist-TurnAndMemory(
     $InlineMemoryOps = $readGuard.Ops
     $InlineMemoryNote = $readGuard.Note
 
+    # This second gate is independent of L2 retrieval/classifier eligibility.
+    # A LOCAL read mislabeled as a declaration still cannot promote model ops
+    # without a directly evidenced current-user assertion.
+    $modelWriteAuthority=Get-LfoLocalModelWriteAuthorization -Prompt $Prompt -Route $Route -ParsedOps $InlineMemoryOps
+    $modelOpsBlockedByAuthority=0
+    if(-not $modelWriteAuthority.Allowed) {
+        if($null -ne $InlineMemoryOps -and $null -ne $InlineMemoryOps.Valid) {
+            $modelOpsBlockedByAuthority=@($InlineMemoryOps.Valid).Count
+        }
+        $InlineMemoryOps=[pscustomobject]@{Valid=@();Rejected=@()}
+    }
+
     # Pure current-user provenance remains independent of model proposals.
     # Candidate is applied only after checking entity uniqueness/scope
     # against the same SQLite connection used by normal structured memory.
@@ -1421,11 +1500,14 @@ function Persist-TurnAndMemory(
             l2_ops_suppressed_rejected_count = [int]$readGuard.SuppressedRejectedCount
             l2_read_write_guard_active = [bool]$readGuard.GuardActive
             l2_read_write_guard_reason = $readGuard.Reason
+            l2_model_write_authorized = [bool]$modelWriteAuthority.Allowed
+            l2_model_write_authorization_reason = [string]$modelWriteAuthority.Reason
+            l2_model_ops_unauthorized_count = [int]$modelOpsBlockedByAuthority
             mixed_user_evidence_status = $mixedUserWriteStatus
             mixed_user_evidence_start = [int]$mixedCandidate.EvidenceStart
             mixed_user_evidence_length = [int]$mixedCandidate.EvidenceLength
             mixed_user_write_applied_count = [int]$mixedUserApplied
-            l2_write_source = $(if ($mixedUserApplied -gt 0) { 'validated-current-user' } elseif ($readGuard.GuardActive) { 'read-guard-no-model-writes' } else { 'model-unmodified' })
+            l2_write_source = $(if ($mixedUserApplied -gt 0) { 'validated-current-user' } elseif ($readGuard.GuardActive) { 'read-guard-no-model-writes' } elseif ($modelOpsBlockedByAuthority -gt 0) { 'model-write-not-authorized' } else { 'model-unmodified' })
             l1_model_note_suppressed = [bool]$readGuard.NoteSuppressed
             l2_seconds = [Math]::Round($l2Sw.Elapsed.TotalSeconds, 3)
             l2_error = $l2Error
