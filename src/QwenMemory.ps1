@@ -218,6 +218,12 @@ function Test-DeclarativeStateUpdatePrompt([string]$Prompt) {
 # A classifier mistake may cause an unnecessary full model output, never
 # by itself an authorization to promote recalled/model-generated facts to L2.
 # Complex/ambiguous phrasing deliberately fails closed; not a semantic proof.
+# Conservative authorization for model-proposed LOCAL L2 operations.
+# This is independent of the model/heuristic's read-vs-declaration routing.
+# We require directly visible subject/value evidence in the same assertion
+# clause; a mere mention somewhere in the prompt is insufficient.
+# Uncertain, negated, reported and historical claims fail closed.
+# This is a bounded lexical trust gate, NOT general natural-language entailment.
 function Get-LfoLocalModelWriteAuthorization([string]$Prompt,[string]$Route,$ParsedOps) {
     if($Route -ne 'LOCAL') {
         return [pscustomobject]@{Allowed=$true;Reason='non-local-synthesis-separate-policy'}
@@ -234,47 +240,81 @@ function Get-LfoLocalModelWriteAuthorization([string]$Prompt,[string]$Route,$Par
     if([string]::IsNullOrWhiteSpace($Prompt) -or $Prompt.Contains('?')) {
         return [pscustomobject]@{Allowed=$false;Reason='no-pure-current-user-assertion'}
     }
-    $assertion=$Prompt.Trim()
-    # Permissive intent routing is NOT used here. Only a narrow assertion form
-    # (or an explicit correction/remember preamble followed by that form) qualifies.
-    $assertion=[regex]::Replace($assertion,'(?i)^\s*(?:correction|oprava)\s*:\s*','')
-    $assertion=[regex]::Replace($assertion,'(?i)^\s*(?:please\s+)?remember(?:\s+this)?\s*:\s*','')
-    # Unicode escapes keep the trust-boundary regex stable under Windows PowerShell 5.1 ANSI source decoding.
-    $assertion=[regex]::Replace($assertion,'(?i)^\s*zapam[a\u00E4]taj\s+si\s*:\s*','')
-    $subject=[string]$(if($valid.Count -gt 0){$valid[0].Subject}else{''})
-    if([string]::IsNullOrWhiteSpace($subject) -or
-       $assertion -notmatch ('(?i)^\s*'+[regex]::Escape($subject)+'\s+(?:now\s+|teraz\s+)?(?:runs|uses|has|is|are|be[z\u017E][i\u00ED]|pou[z\u017E][i\u00ED]va|m[a\u00E1]|je|s[u\u00FA])\b')) {
-        return [pscustomobject]@{Allowed=$false;Reason='no-leading-subject-assertion'}
-    }
     if($rejected.Count -gt 0 -or $valid.Count -eq 0) {
         return [pscustomobject]@{Allowed=$false;Reason='incomplete-or-invalid-model-ops'}
     }
+
+    $assertion=$Prompt.Trim()
+    $assertion=[regex]::Replace($assertion,'(?i)^\s*(?:correction|oprava)\s*:\s*','')
+    $assertion=[regex]::Replace($assertion,'(?i)^\s*(?:please\s+)?remember(?:\s+this)?\s*:\s*','')
+    # Escapes are stable under Windows PowerShell 5.1 ANSI script decoding.
+    $assertion=[regex]::Replace($assertion,'(?i)^\s*zapam[a\u00E4]taj\s+si\s*:\s*','')
+    # Strictly disallow quoted/attributed, uncertain and negated evidence.
+    # Users can rephrase as a direct factual assertion before persistence.
+    if($assertion -match "[\u0022\u0027\u0060\u2018\u2019\u201C\u201D]" -or
+       $assertion -match '(?i)\b(?:not|no|never|without|maybe|perhaps|might|possibly|allegedly|reportedly|according|previously|formerly|historically|old|earlier|used\s+to|was|were|nie|nikdy|mozno|m[o\u00F4]\u017Eno|p[o\u00F4]vodne|predt[y\u00FD]m)\b') {
+        return [pscustomobject]@{Allowed=$false;Reason='ambiguous-negated-historical-or-reported-claim'}
+    }
+
+    $verb='(?:runs|uses|has|is|are|be[z\u017E][i\u00ED]|pou[z\u017E][i\u00ED]va|m[a\u00E1]|je|s[u\u00FA])'
+    $subject=[string]$valid[0].Subject
+    $firstSubjectPrefix='(?i)^\s*'+[regex]::Escape($subject)+'\s+(?:now\s+|teraz\s+)?'+$verb+'\b'
+    if([string]::IsNullOrWhiteSpace($subject) -or $assertion -notmatch $firstSubjectPrefix) {
+        return [pscustomobject]@{Allowed=$false;Reason='no-leading-subject-assertion'}
+    }
+    # A sentence is a conservative evidence boundary. Decimal points without
+    # whitespace are intentionally not sentence separators (Ubuntu 24.04).
+    [object[]]$clauses=@([regex]::Split($assertion,'(?<=[.!?])\s+(?=\p{Lu})|;\s*') |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $secondSubject='(?i)(?:,\s*|\s+and\s+)\b[A-Z][A-Z0-9_-]{2,39}\s+(?:now\s+)?(?:runs|uses|has|is|are)\b'
     foreach($op in $valid) {
         $opSubject=[string]$op.Subject
         $opTarget=[string]$op.Target
-        if([string]::IsNullOrWhiteSpace($opSubject) -or [string]::IsNullOrWhiteSpace($opTarget) -or
-           $Prompt -notmatch ('(?i)(?<![\p{L}\p{N}])'+[regex]::Escape($opSubject)+'(?![\p{L}\p{N}])')) {
-            return [pscustomobject]@{Allowed=$false;Reason='model-subject-absent-from-user-turn'}
+        if([string]::IsNullOrWhiteSpace($opSubject) -or [string]::IsNullOrWhiteSpace($opTarget)) {
+            return [pscustomobject]@{Allowed=$false;Reason='missing-model-operation-evidence'}
         }
-        if([string]$op.Op -eq 'SET_BOOLEAN') {
-            $truth=[bool]$op.TypedValue
-            $words=@(([string]$op.Predicate -split '_')|Where-Object{$_ -notin @('is','has','enabled','active','true','false')})
-            foreach($word in $words) {
-                if($Prompt -notmatch ('(?i)(?<!\p{L})'+[regex]::Escape($word)+'(?!\p{L})')) {
-                    return [pscustomobject]@{Allowed=$false;Reason='boolean-predicate-evidence-missing'}
-                }
-            }
-            $boolMatch=if($truth){$Prompt -match '(?i)\b(?:enabled|active|true|on)\b'}else{$Prompt -match '(?i)\b(?:disabled|inactive|false|off)\b'}
-            if(-not $boolMatch){return [pscustomobject]@{Allowed=$false;Reason='boolean-value-evidence-missing'}}
+        $clausePrefix='(?i)^\s*'+[regex]::Escape($opSubject)+'\s+(?:now\s+|teraz\s+)?'+$verb+'\b'
+        $targetPattern=if([string]$op.Op -in @('SET_INTEGER','SET_REAL')) {
+            '(?<![0-9])'+[regex]::Escape($opTarget)+'(?![0-9])'
         } else {
-            $targetPattern=if([string]$op.Op -in @('SET_INTEGER','SET_REAL')) {
-                '(?<![0-9])'+[regex]::Escape($opTarget)+'(?![0-9])'
-            } else {
-                '(?i)(?<![\p{L}\p{N}])'+[regex]::Escape($opTarget)+'(?![\p{L}\p{N}])'
+            '(?i)(?<![\p{L}\p{N}])'+[regex]::Escape($opTarget)+'(?![\p{L}\p{N}])'
+        }
+        $grounded=$false
+        foreach($clause in $clauses) {
+            if($clause -notmatch $clausePrefix -or $clause -match $secondSubject){continue}
+            # In 'now Debian instead of Ubuntu', only the current side may
+            # justify an L2 write; the superseded side is not write evidence.
+            $currentSide=[string]([regex]::Split([string]$clause,'(?i)\b(?:instead\s+of|rather\s+than)\b')[0])
+            if($currentSide -notmatch $targetPattern){continue}
+            if([string]$op.Op -eq 'SET_BOOLEAN') {
+                $truth=[bool]$op.TypedValue
+                $words=@(([string]$op.Predicate -split '_') |
+                    Where-Object {$_ -notin @('is','has','enabled','active','true','false')})
+                $predicateSupported=$true
+                foreach($word in $words) {
+                    if($currentSide -notmatch ('(?i)(?<!\p{L})'+[regex]::Escape($word)+'(?!\p{L})')) {
+                        $predicateSupported=$false
+                        break
+                    }
+                }
+                $boolSupported=if($truth) {
+                    $currentSide -match '(?i)\b(?:enabled|active|true|on)\b'
+                } else {
+                    $currentSide -match '(?i)\b(?:disabled|inactive|false|off)\b'
+                }
+                if(-not $predicateSupported -or -not $boolSupported){continue}
             }
-            if($Prompt -notmatch $targetPattern) {
-                return [pscustomobject]@{Allowed=$false;Reason='model-target-absent-from-user-turn'}
+            if([string]$op.Op -eq 'SET_INTEGER' -and [string]$op.Predicate -eq 'ram_gb') {
+                # Prevent borrowing a CPU count or other integer as RAM.
+                $num=[regex]::Escape($opTarget)
+                $ramEvidence='(?i)(?<![0-9])'+$num+'(?![0-9])\s*GB\s*(?:of\s+)?RAM\b|(?i)\bRAM\s*(?:(?:is|=|:)\s*)?(?<![0-9])'+$num+'(?![0-9])\s*GB\b'
+                if($currentSide -notmatch $ramEvidence){continue}
             }
+            $grounded=$true
+            break
+        }
+        if(-not $grounded) {
+            return [pscustomobject]@{Allowed=$false;Reason='model-op-not-grounded-in-subject-clause'}
         }
     }
     return [pscustomobject]@{Allowed=$true;Reason='matched-user-assertion-and-operation-values'}
