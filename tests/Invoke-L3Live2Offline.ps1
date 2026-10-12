@@ -111,6 +111,13 @@ $index3 = Invoke-LfoL3PostTurnIndex 'RETRO_ARCHIVE contains the fictional HALCYO
 foreach($x in @($index1,$index2,$index3)) { if($x.Status -ne 'ok') { throw ('Index failed: ' + ($x | ConvertTo-Json -Compress)) } }
 
 function Invoke-Probe([string]$Question,[string]$Variant) {
+  $classDb = Open-LfoL3ReadOnly $script:L3Path
+  try {
+    $classification = Get-LfoL3Classification $classDb $Question
+    $predicateKeys = @($classification.Predicates | ForEach-Object { [string]$_.ValueKey })
+  } finally {
+    if ($null -ne $classDb) { Close-LfoSqliteDatabase $classDb }
+  }
   $script:L3ReadEnabled = ($Variant -ceq 'l3')
   $script:Messages = @(@{role='user';content=$Question})
   $script:LfoTurnContext = $null
@@ -129,6 +136,7 @@ function Invoke-Probe([string]$Question,[string]$Variant) {
     l3_status=[string]$stats.l3_status
     l3_candidates=[int]$stats.l3_candidates
     l3_selected=[int]$stats.l3_selected
+    predicate_keys=@($predicateKeys)
     context_assembly_seconds=[double]$stats.assembly_seconds
   }
 }
@@ -147,7 +155,7 @@ foreach($d in $definitions) {
   if($d.ContainsKey('current_marker')) { $row.current_marker=$d.current_marker }
   if($d.ContainsKey('historical_marker')) { $row.historical_marker=$d.historical_marker }
   $cases += [pscustomobject]$row
-  Write-Host ("SHAPE {0}: baseline L2={1}; L3 {2}/{3}, L2={4}, L0={5}, chars={6}/{7}" -f $d.id,$b.l2_items,$l.l3_used,$l.l3_status,$l.l2_items,$l.l0_items,$b.model_visible_chars,$l.model_visible_chars)
+  Write-Host ("SHAPE {0}: baseline L2={1}; L3 {2}/{3}, predicates={4}, L2={5}, L0={6}, chars={7}/{8}" -f $d.id,$b.l2_items,$l.l3_used,$l.l3_status,(@($l.predicate_keys) -join ','),$l.l2_items,$l.l0_items,$b.model_visible_chars,$l.model_visible_chars)
 }
 $report=[pscustomobject]@{
   fixture_root=$root; production_memory_touched=$false; model_calls=0; model=$Model
