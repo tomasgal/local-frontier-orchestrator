@@ -632,7 +632,7 @@ Acceptance gates:
 
 Wall-clock latency is reported but is **exploratory**, not a universal-speedup acceptance criterion for this small paired pilot.
 
-This live gate is **IMPLEMENTED / VALIDATION PENDING**.
+This live gate is **PASS** on `458ea93e20280ea87dd410ecd6199bcf2893980c` with user-supplied Windows/Ollama evidence.
 
 
 ### Live comparison first-run correction — invalid read-intent fixture
@@ -655,3 +655,54 @@ Fix at `4a24c1fa9e5026b7c147012c43d35c67674b6816`:
 - print L2/L3 activation status beside each measured live sample.
 
 The live gate remains **IMPLEMENTED / VALIDATION PENDING**.
+
+
+### Bounded live comparison result — PASS
+
+Environment:
+
+- Ollama 0.34.4;
+- model `qwen3.5:4b-q4_K_M`;
+- 2 paired repetitions per variant;
+- TEMP-only fixture;
+- automatic L3 indexing enabled;
+- production memory untouched;
+- frontier calls = 0.
+
+Pre-inference retrieval shape:
+
+- baseline: `L2Items=4`, model-visible chars = 5519;
+- L3: `L3Used=True`, `L3Status=ok`, candidates = 5, selected = 1, `L2Items=1`, model-visible chars = 4618.
+
+Measured model input:
+
+- baseline average prompt tokens = **1165**;
+- L3 average prompt tokens = **973**;
+- prompt-token reduction = **16.48%**;
+- model-visible character reduction = **16.33%**.
+
+Correctness:
+
+- all 4 live answers correct;
+- route remained LOCAL in every sample;
+- the requested current OS value was preserved.
+
+Latency:
+
+- baseline wall times: 75.85 s, 35.95 s;
+- L3 wall times: 24.38 s, 6.08 s;
+- arithmetic mean delta = -72.75%.
+
+This latency delta is **not accepted as a general L3 speedup claim**. Prompt-eval durations (68.79 s, 18.85 s, 0.51 s, 30.35 s) show strong model-load / prompt-cache / warm-state effects that dominate the small paired sample. The accepted finding is therefore the deterministic reduction in model-visible context and measured prompt tokens at matched correctness.
+
+### Next gate
+
+Before investing in L0 source-locator/I/O optimization, expand the live corpus. The next experiment should cover multiple retrieval shapes:
+
+1. single current fact from an entity with several L2 facts;
+2. two-fact answer from the same entity;
+3. corrected/current fact with historical predecessor excluded;
+4. topic-only L0 retrieval;
+5. unclassified/no-match query requiring exact baseline fallback.
+
+Primary acceptance remains correctness plus per-case prompt-token behavior. Latency remains secondary until cache/warm-state effects are explicitly controlled.
