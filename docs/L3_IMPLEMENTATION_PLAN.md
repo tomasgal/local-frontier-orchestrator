@@ -597,4 +597,39 @@ Fix checkpoints:
 - valid restored regression: `6a2a53ef2ff5ccbfcab1606dc680759db93acc0e`;
 - suite-wide parser preflight: `b2a6a0df3f2c7467c8074ad27d1ca83e08dd84f3`.
 
-Automatic indexing remains **IMPLEMENTED / VALIDATION PENDING** until the seven-suite runner passes on this checkpoint or later.
+Automatic indexing is **PASS**. User-supplied Windows PowerShell 5.1 evidence on `6c15b22c6c80ce8c68609a15532d45f68e2d571f` completed 7/7 suites with `ModelCalls=0` and `ProductionMemoryTouched=False`.
+
+
+## 18. Bounded live model comparison
+
+With storage, tagging, planning, runtime assembly and automatic indexing all offline-validated, the next gate measures the complete local-model effect.
+
+Implemented at commit `ccca178507ffaf38c86a760f24f1d15a4fd9b204` as `tests/Invoke-L3LiveComparison.ps1`.
+
+The live fixture is TEMP-only and uses automatic L3 indexing. It creates one synthetic `BENCH_SERVER` with four current L2 facts:
+
+- OS = Synthetic OS 13;
+- RAM = 96 GB;
+- disk = 512 GB;
+- CPU count = 8.
+
+The test query asks only for the operating system.
+
+Expected retrieval shape:
+
+- baseline frozen-style read: all four current L2 facts plus ordinary L0 retrieval;
+- L3: one selected current OS fact, using the automatically materialized topic/entity/kind index.
+
+The same local model and structured `route + answer` schema are used for both variants. The paired order alternates between repetitions to reduce simple run-order bias.
+
+Acceptance gates:
+
+1. all baseline and L3 answers must be correct and route LOCAL;
+2. L3 prompt token count must be lower than baseline in every paired repetition;
+3. L3 model-visible character count must be lower than baseline in every paired repetition;
+4. baseline must expose 4 L2 facts while L3 exposes 1;
+5. production memory and frontier remain unused.
+
+Wall-clock latency is reported but is **exploratory**, not a universal-speedup acceptance criterion for this small paired pilot.
+
+This live gate is **IMPLEMENTED / VALIDATION PENDING**.
