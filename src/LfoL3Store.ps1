@@ -214,6 +214,22 @@ LIMIT 1;
     return $rows[0]
 }
 
+function Set-LfoL3ExclusiveFacet(
+    $Connection,
+    [int64]$ItemId,
+    [string]$Dimension,
+    [string]$Value,
+    [int]$Polarity,
+    [string]$RuleId
+) {
+    $dimensionKey = Assert-LfoL3FacetDimension $Dimension
+    Invoke-LfoSqliteNonQuery $Connection @'
+DELETE FROM l3_facets
+WHERE item_id = ?1 AND dimension = ?2;
+'@ @($ItemId, $dimensionKey)
+    return Set-LfoL3Facet $Connection $ItemId $dimensionKey $Value $Polarity $RuleId
+}
+
 function Set-LfoL3Facet(
     $Connection,
     [int64]$ItemId,
