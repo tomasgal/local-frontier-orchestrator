@@ -164,6 +164,7 @@ function New-LfoL3ContextPlan(
         DroppedChars = 0
         DuplicateDrops = 0
         LexicalNarrowDrops = 0
+        AuthorityShadowDrops = 0
         BudgetDrops = 0
     }
     if ($null -eq $Connection -or [string]::IsNullOrWhiteSpace($ScopeId) -or
@@ -271,9 +272,11 @@ function New-LfoL3ContextPlan(
     # such as os, ram or cpu_count suppress sibling facts from the same entity.
     # L0 evidence is never removed by this step.
     $lexicalNarrowDrops = 0
+    $authorityShadowDrops = 0
     $l0Deduped = @($deduped | Where-Object { $_.SourceLayer -ne 'L2' })
     $l2Deduped = @($deduped | Where-Object { $_.SourceLayer -eq 'L2' })
     $narrowedL2 = @()
+    $narrowedSignatures = @{}
     foreach ($group in @($l2Deduped | Group-Object -Property {
         '{0}|{1}|{2}' -f $_.TopicMatches,$_.EntityMatches,$_.KindMatches
     })) {
@@ -288,12 +291,27 @@ function New-LfoL3ContextPlan(
             if ($keep.Count -gt 0) {
                 $narrowedL2 += $keep
                 $lexicalNarrowDrops += ($items.Count - $keep.Count)
+                $narrowedSignatures[[string]$group.Name] = $true
                 continue
             }
         }
         $narrowedL2 += $items
     }
-    $deduped = @($l0Deduped) + @($narrowedL2)
+
+    # When an explicit predicate signal has already narrowed current L2 facts,
+    # equally-faceted L0 narration is redundant for that read and may carry an
+    # obsolete predecessor value.  Shadow it only for signatures where lexical
+    # narrowing actually fired; topic-only/broad L0 retrieval remains intact.
+    $keptL0 = @()
+    foreach ($item in $l0Deduped) {
+        $signature = '{0}|{1}|{2}' -f $item.TopicMatches,$item.EntityMatches,$item.KindMatches
+        if ($narrowedSignatures.ContainsKey($signature)) {
+            $authorityShadowDrops++
+            continue
+        }
+        $keptL0 += $item
+    }
+    $deduped = @($keptL0) + @($narrowedL2)
 
     $ranked = @(
         $deduped |
@@ -327,6 +345,7 @@ function New-LfoL3ContextPlan(
         $empty.Status = 'budget_empty'
         $empty.DuplicateDrops = $duplicateDrops
         $empty.LexicalNarrowDrops = $lexicalNarrowDrops
+        $empty.AuthorityShadowDrops = $authorityShadowDrops
         $empty.BudgetDrops = $budgetDrops
         return $empty
     }
@@ -344,6 +363,7 @@ function New-LfoL3ContextPlan(
         DroppedChars = [Math]::Max(0,$candidateChars - $packet.Length)
         DuplicateDrops = $duplicateDrops
         LexicalNarrowDrops = $lexicalNarrowDrops
+        AuthorityShadowDrops = $authorityShadowDrops
         BudgetDrops = $budgetDrops
     }
 }
