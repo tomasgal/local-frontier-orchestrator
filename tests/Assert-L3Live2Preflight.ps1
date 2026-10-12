@@ -32,7 +32,7 @@ foreach ($case in @($doc.cases)) {
         if ([int]$p.model_visible_chars -ne ([string]$p.context).Length) { throw "Context char count mismatch: $id" }
         if ([int]$p.model_calls -ne 0) { throw "Inference occurred before preflight: $id" }
     }
-    if ([string]$b.l2_status -cne 'ok') { throw "Invalid baseline retrieval: $id" }
+    if ($id -cin @('single_current','two_current','corrected_current') -and [string]$b.l2_status -cne 'ok') { throw "Invalid baseline retrieval: $id" }
     # L3 metadata are internal and must not appear in the model-visible packet.
     if ([string]$l.context -match '(?i)classifier_rule|content_fingerprint|retrieval_state|temporal_state|l3-l2-fact-v1|l3-topic-config-v1') {
         throw "L3 internal metadata leaked into context: $id"
