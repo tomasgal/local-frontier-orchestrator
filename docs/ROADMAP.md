@@ -8,7 +8,7 @@ See the [canonical closure record](https://github.com/tomasgal/local-frontier-or
 
 **DEV5 dissemination (2026-10-12):** a citable technical note, *Reducing Context and Generation Traffic in a Local-First LLM Orchestrator: A Transferability Case Study*, has been published on Zenodo (DOI [10.5281/zenodo.23318551](https://doi.org/10.5281/zenodo.23318551)). It documents the bounded cross-environment transferability result and preserves the frozen baseline's limitations; it does not reopen L2 or establish a universal performance claim.
 
-Next: specify L3 semantic retrieval, entity resolution and selective reranking against the frozen L2 contract; then scope L4 epistemic mediation separately. Neither is implemented by this closure.
+Next: implement and validate the [L3 selective tagged SQL retrieval plan](L3_IMPLEMENTATION_PLAN.md) against the frozen L2 contract. L3 is now scoped as a separate reconstructible SQLite metadata/index and context-planning layer: bounded topic/entity/kind tagging, candidate narrowing, deduplication and context reduction before inference, with no mandatory extra LLM call. L4 remains a separate annotation/research layer over the interaction log.
 
 ## Historical roadmap â€” superseded by the closure above
 
@@ -92,10 +92,10 @@ The planned layer model is:
 L0  raw JSONL history          authoritative evidence/provenance
 L1  semantic working memory    v9.3 micro-notes + pressure compaction
 L2  structured factual state   v9.4 typed facts/relations + deterministic queries
-L3  optional semantic index    future embeddings/entity linking/reranking only if measured need justifies it
+L3  selective tagged SQL index/context planner    deterministic topic/entity/kind narrowing; optional FTS5; semantic escalation only if measured need justifies it
 ```
 
-L3 is a possible future retrieval layer, not a v9.4 commitment and not an authoritative replacement mechanism.
+L3 is the next planned retrieval/context-optimization layer, with its implementation contract defined in [L3_IMPLEMENTATION_PLAN.md](L3_IMPLEMENTATION_PLAN.md). It is not an authoritative replacement mechanism.
 
 Initial acceptance targets include multi-delta extraction, typed values and relations, deterministic correction/deduplication, source-turn provenance, restart persistence, a simple multi-relation query, coexistence with L1, and no regression of the validated v9.3 path.
 

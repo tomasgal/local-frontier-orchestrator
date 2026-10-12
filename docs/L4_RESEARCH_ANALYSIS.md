@@ -69,20 +69,11 @@ L4 answers **what analytical interpretation is being proposed from that evidence
 
 This separation matters because retrieval relevance and analytical validity are different questions.
 
-## 3. L3 retrieval & resolution fabric
+## 3. L3 selective tagged retrieval / context planner
 
-L3 should be understood broadly as a retrieval/resolution fabric, not necessarily as a vector database.
+The L3 implementation direction is now defined in [L3_IMPLEMENTATION_PLAN.md](L3_IMPLEMENTATION_PLAN.md). L3 is a separate reconstructible SQLite metadata/index layer that uses bounded topic/entity/kind metadata to narrow L0/L2 retrieval, deduplicate model-visible context and move expensive maintenance outside the critical turn. Its online path should add no mandatory LLM call.
 
-Possible L3 mechanisms include:
-
-- exact lexical retrieval from L0;
-- selective L2 entity/predicate lookup;
-- alias resolution;
-- fuzzy entity matching;
-- entity linking;
-- reranking;
-- embeddings if real retrieval failures justify them;
-- read-only adapters to external knowledge sources.
+FTS5, fuzzy matching, embeddings or reranking are optional retrieval mechanisms only when measured failures justify them; they are not the definition of L3. Neutral L3 topic/entity grouping may later help L4 select comparable events, but L3 must not store bias interpretations.
 
 External sources remain external. For example:
 
