@@ -325,7 +325,7 @@ function New-LfoL3ContextPlan(
             continue
         }
         $range = $items | Measure-Object -Property LexicalScore -Minimum -Maximum
-        if ([int]$range.Maximum -gt [int]$range.Minimum) {
+        if (-not $predicateSpecific -and [int]$range.Maximum -gt [int]$range.Minimum) {
             $keep = @($items | Where-Object { [int]$_.LexicalScore -gt [int]$range.Minimum })
             if ($keep.Count -gt 0) {
                 $narrowedL2 += $keep
