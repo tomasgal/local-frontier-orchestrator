@@ -1,0 +1,85 @@
+{
+  "schema": "lfo-l3-frozen-manifest-v1",
+  "closure_date": "2026-10-12",
+  "milestone": "L3 selective faceted retrieval",
+  "status": "frozen",
+  "planned_tag": "v9.5-l3-frozen",
+  "accepted_runtime_commit": "d8f6c7522eeacda9044453fdeb4b0558352ec798",
+  "closure_document": "docs/L3_FROZEN_BASELINE.md",
+  "development_branch": "v9.5-l3-selective-index",
+  "l2_dependency_tag": "v9.4-l2-frozen",
+  "l3_schema_version": 4,
+  "final_offline": {
+    "pass": true,
+    "completed_tests": 8,
+    "model_calls": 0,
+    "production_memory_touched": false
+  },
+  "live2": {
+    "five_shape_preflight_pass": true,
+    "paired_live_model_calls": 20,
+    "semantically_correct_all_cases": true,
+    "focused_no_match_retest_calls": 4,
+    "focused_no_match_pass": true,
+    "production_memory_touched": false
+  },
+  "prompt_token_results": {
+    "single_current": {
+      "baseline": 1113,
+      "l3": 972,
+      "delta_pct": -12.67
+    },
+    "two_current": {
+      "baseline": 1119,
+      "l3": 999,
+      "delta_pct": -10.72
+    },
+    "corrected_current": {
+      "baseline": 1115,
+      "l3": 974,
+      "delta_pct": -12.65
+    },
+    "topic_l0": {
+      "baseline": 1522,
+      "l3": 1522,
+      "delta_pct": 0
+    },
+    "no_match": {
+      "baseline": 1492,
+      "l3": 1492,
+      "delta_pct": 0
+    }
+  },
+  "l0_locator_microbenchmark": {
+    "corpus_turns": 20000,
+    "jsonl_mib": 4.794,
+    "repetitions": 3,
+    "median_scan_ms": 9879.59,
+    "median_locator_ms": 28.52,
+    "median_saved_ms": 9851.07,
+    "median_speedup_x": 346.41,
+    "exact_evidence_parity": true,
+    "interpretation": "source-resolution microbenchmark only; not a complete-turn speedup claim"
+  },
+  "focused_topic_l0_live": {
+    "model_calls": 4,
+    "correct": true,
+    "exact_prompt_parity": true,
+    "baseline_prompt_tokens": 1522,
+    "l3_prompt_tokens": 1522,
+    "l0_locator_present": true,
+    "production_memory_touched": false
+  },
+  "invariants": [
+    "L2 remains authoritative for current structured facts",
+    "L0 raw JSONL remains authoritative evidence/provenance",
+    "L3 is reconstructible and non-authoritative",
+    "internal L3 metadata is not model-visible",
+    "unknown/unclassified queries fall back to baseline retrieval",
+    "L3 adds no mandatory model call",
+    "L3 remains default-OFF unless explicitly enabled",
+    "stale/missing L0 locators fall back to authoritative JSONL scan"
+  ],
+  "reopen_policy": "Do not reopen frozen L3 tuning by default. Reopen only for a demonstrated material defect or a new explicitly versioned research scope.",
+  "next_milestone": "L4 / Local Epistemic Balancer"
+}
