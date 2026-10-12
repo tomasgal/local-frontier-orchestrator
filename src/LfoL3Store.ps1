@@ -349,8 +349,11 @@ function Get-LfoL3TextKeys(
         return @()
     }
 
+    # Tokens must start and end in a letter/number. Keep punctuation only
+    # inside a token (for example foo.bar or a:b), never sentence-final
+    # punctuation such as "passed." or "failed?".
     $tokens = @(
-        [regex]::Matches($Text, '[\p{L}\p{N}][\p{L}\p{N}._:+-]*') |
+        [regex]::Matches($Text, '[\p{L}\p{N}](?:[\p{L}\p{N}._:+-]*[\p{L}\p{N}])?') |
         ForEach-Object { $_.Value } |
         Select-Object -First 48
     )
