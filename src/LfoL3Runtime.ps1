@@ -31,19 +31,93 @@ function Format-LfoL3RuntimeL2Fact($Fact) {
 function Get-LfoL3RuntimeL0Evidence(
     [object[]]$Candidates,
     [string]$LogDir,
-    [int]$Epoch
+    [int]$Epoch,
+    $L3Connection = $null
 ) {
-    $wanted = @{}
-    foreach ($candidate in @($Candidates | Where-Object { $_.SourceLayer -eq 'L0' })) {
-        if ([string]$candidate.SourceRef -match '^turn:(\d+)$') {
-            $wanted[[int64]$matches[1]] = [string]$candidate.SourceRef
-        }
-    }
-    if ($wanted.Count -eq 0 -or -not (Test-Path -LiteralPath $LogDir -PathType Container)) {
+    $l0Candidates = @($Candidates | Where-Object { $_.SourceLayer -eq 'L0' })
+    if ($l0Candidates.Count -eq 0 -or -not (Test-Path -LiteralPath $LogDir -PathType Container)) {
         return @()
     }
 
+    $locatorByItem = @{}
+    if ($null -ne $L3Connection -and
+        $null -ne (Get-Command Get-LfoL3L0Locators -ErrorAction SilentlyContinue)) {
+        $itemIds = @($l0Candidates | ForEach-Object { [int64]$_.Id } | Where-Object { $_ -gt 0 } | Sort-Object -Unique)
+        foreach ($loc in @(Get-LfoL3L0Locators $L3Connection $itemIds)) {
+            $locatorByItem[[string][int64]$loc.item_id] = $loc
+        }
+    }
+
     $out = @()
+    $wanted = @{}
+    $utf8Strict = New-Object System.Text.UTF8Encoding($false,$true)
+
+    foreach ($candidate in $l0Candidates) {
+        $ref = [string]$candidate.SourceRef
+        if ($ref -notmatch '^turn:(\d+)$') { continue }
+        $turnId = [int64]$matches[1]
+        $resolved = $false
+        $locKey = [string][int64]$candidate.Id
+
+        if ($locatorByItem.ContainsKey($locKey)) {
+            $loc = $locatorByItem[$locKey]
+            $rawFile = [string]$loc.source_file
+            $fileName = [IO.Path]::GetFileName($rawFile)
+            $offset = [int64]$loc.byte_offset
+            $length = [int64]$loc.byte_length
+            if (-not [string]::IsNullOrWhiteSpace($fileName) -and
+                $rawFile -ceq $fileName -and
+                $offset -ge 0 -and $length -gt 0 -and $length -le 1048576) {
+                $path = Join-Path $LogDir $fileName
+                if (Test-Path -LiteralPath $path -PathType Leaf) {
+                    $info = Get-Item -LiteralPath $path
+                    if (($offset + $length) -le [int64]$info.Length) {
+                        $stream = $null
+                        try {
+                            $stream = [IO.File]::Open($path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+                            [void]$stream.Seek($offset,[IO.SeekOrigin]::Begin)
+                            $bytes = New-Object byte[] ([int]$length)
+                            $read = 0
+                            while ($read -lt $bytes.Length) {
+                                $n = $stream.Read($bytes,$read,$bytes.Length-$read)
+                                if ($n -le 0) { break }
+                                $read += $n
+                            }
+                            if ($read -eq $bytes.Length) {
+                                $line = $utf8Strict.GetString($bytes).TrimEnd([char[]]@([char]13,[char]10))
+                                $row = $line | ConvertFrom-Json -ErrorAction Stop
+                                if ([string]$row.event -eq 'turn' -and
+                                    [int]$row.epoch -eq $Epoch -and
+                                    [int64]$row.turn_id -eq $turnId) {
+                                    $u = Get-LfoL3RuntimeBoundedText ([string]$row.user) 620
+                                    $a = Get-LfoL3RuntimeBoundedText ([string]$row.assistant) 360
+                                    $out += [pscustomobject]@{
+                                        SourceLayer = 'L0'
+                                        SourceRef = $ref
+                                        Text = ("T{0} U:{1} A:{2}" -f $turnId,$u,$a)
+                                    }
+                                    $resolved = $true
+                                }
+                            }
+                        } catch {
+                            $resolved = $false
+                        } finally {
+                            if ($null -ne $stream) { $stream.Dispose() }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (-not $resolved) {
+            $wanted[$turnId] = $ref
+        }
+    }
+
+    if ($wanted.Count -eq 0) { return @($out) }
+
+    # Compatibility/correctness fallback for pre-v4 indexes, stale locators,
+    # moved/edited logs, or any locator validation failure.
     $files = @(Get-ChildItem -LiteralPath $LogDir -Filter 'conversation-*.jsonl' -File -ErrorAction SilentlyContinue | Sort-Object Name)
     foreach ($file in $files) {
         foreach ($line in (Get-Content -LiteralPath $file.FullName -Encoding UTF8)) {
@@ -60,7 +134,10 @@ function Get-LfoL3RuntimeL0Evidence(
                 SourceRef = [string]$wanted[$turnId]
                 Text = ("T{0} U:{1} A:{2}" -f $turnId,$u,$a)
             }
+            [void]$wanted.Remove($turnId)
+            if ($wanted.Count -eq 0) { break }
         }
+        if ($wanted.Count -eq 0) { break }
     }
     return @($out)
 }
@@ -166,7 +243,7 @@ function Get-LfoL3RuntimeContextPlan(
         }
 
         $evidence = @()
-        $evidence += @(Get-LfoL3RuntimeL0Evidence $candidates $LogDir $Epoch)
+        $evidence += @(Get-LfoL3RuntimeL0Evidence $candidates $LogDir $Epoch $connection)
         $evidence += @(Get-LfoL3RuntimeL2Evidence $candidates $L2Path $ScopeId)
 
         $plan = New-LfoL3ContextPlan $connection $ScopeId $Query $classification $evidence $MaxItems $MaxChars
