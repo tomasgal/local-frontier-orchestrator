@@ -58,6 +58,11 @@ function Get-LfoL3QueryFacets($Classification) {
             $facets += [pscustomobject]@{ Dimension='entity'; ValueKey=[string]$x.ValueKey; Weight=40 }
         }
     }
+    foreach ($x in @($Classification.Predicates)) {
+        if ($null -ne $x) {
+            $facets += [pscustomobject]@{ Dimension='predicate'; ValueKey=[string]$x.ValueKey; Weight=60 }
+        }
+    }
     if ($null -ne $Classification.Kind) {
         $facets += [pscustomobject]@{ Dimension='kind'; ValueKey=[string]$Classification.Kind.ValueKey; Weight=10 }
     }
@@ -91,6 +96,7 @@ function Get-LfoL3CandidateItems(
                     TopicMatches = 0
                     EntityMatches = 0
                     KindMatches = 0
+                    PredicateMatches = 0
                 }
             }
             $byId[$id].Score += [int]$q.Weight
@@ -98,6 +104,7 @@ function Get-LfoL3CandidateItems(
                 'topic' { $byId[$id].TopicMatches++ }
                 'entity' { $byId[$id].EntityMatches++ }
                 'kind' { $byId[$id].KindMatches++ }
+                'predicate' { $byId[$id].PredicateMatches++ }
             }
         }
         foreach ($row in @(Get-LfoL3ItemsByFacet $Connection $scope $q.Dimension $q.ValueKey -1)) {
@@ -130,7 +137,23 @@ function Get-LfoL3CandidateItems(
             TopicMatches = [int]$entry.TopicMatches
             EntityMatches = [int]$entry.EntityMatches
             KindMatches = [int]$entry.KindMatches
+            PredicateMatches = [int]$entry.PredicateMatches
             Priority = $priority.ContainsKey($id)
+        }
+    }
+
+    # Predicate is a high-specificity L2 axis. For a single recognized
+    # entity, an explicit predicate query may safely reject sibling L2 facts
+    # that do not match any requested predicate. Multi-entity queries retain
+    # ranking-only behavior because entity<->predicate pairing is ambiguous.
+    $predicateQueryCount = @($queryFacets | Where-Object { $_.Dimension -eq 'predicate' }).Count
+    $entityQueryCount = @($queryFacets | Where-Object { $_.Dimension -eq 'entity' }).Count
+    if ($predicateQueryCount -gt 0 -and $entityQueryCount -eq 1) {
+        $matchingL2 = @($out | Where-Object { $_.SourceLayer -eq 'L2' -and $_.PredicateMatches -gt 0 })
+        if ($matchingL2.Count -gt 0) {
+            $out = @($out | Where-Object {
+                $_.SourceLayer -ne 'L2' -or $_.PredicateMatches -gt 0
+            })
         }
     }
 
@@ -226,6 +249,7 @@ function New-LfoL3ContextPlan(
             TopicMatches = [int]$candidate.TopicMatches
             EntityMatches = [int]$candidate.EntityMatches
             KindMatches = [int]$candidate.KindMatches
+            PredicateMatches = [int]$candidate.PredicateMatches
             LexicalScore = [int]$lexical
             Score = ([int]$candidate.MetadataScore * 1000) + $layerAuthority + ([int]$lexical * 5)
             Priority = [bool]$candidate.Priority
@@ -275,6 +299,21 @@ function New-LfoL3ContextPlan(
     $authorityShadowDrops = 0
     $l0Deduped = @($deduped | Where-Object { $_.SourceLayer -ne 'L2' })
     $l2Deduped = @($deduped | Where-Object { $_.SourceLayer -eq 'L2' })
+
+    # A recognized predicate on one recognized entity gives current L2 a
+    # precise authority advantage over same-entity L0 narration. Preserve L0
+    # when no matching L2 fact exists.
+    $predicateSpecific = (@($Classification.Predicates).Count -gt 0 -and @($Classification.Entities).Count -eq 1)
+    if ($predicateSpecific) {
+        $specificL2 = @($l2Deduped | Where-Object { $_.EntityMatches -gt 0 -and $_.PredicateMatches -gt 0 })
+        if ($specificL2.Count -gt 0) {
+            $before = $l0Deduped.Count
+            $l0Deduped = @($l0Deduped | Where-Object {
+                -not ($_.EntityMatches -gt 0 -and $_.PredicateMatches -gt 0)
+            })
+            $authorityShadowDrops += ($before - $l0Deduped.Count)
+        }
+    }
     $narrowedL2 = @()
     $narrowedSignatures = @{}
     foreach ($group in @($l2Deduped | Group-Object -Property {
