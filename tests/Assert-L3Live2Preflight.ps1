@@ -78,10 +78,10 @@ foreach ($case in @($doc.cases)) {
             if ([int]$l.l2_items -ne 0) { throw 'Topic-only case unexpectedly selected L2.' }
         }
         'no_match' {
-            if ($l.l3_used -or [string]$l.l3_status -cin @('ok','selected') -or
+            if ($l.l3_used -or [string]$l.l3_status -cne 'no_query_facets' -or
                 [string]$l.context -cne [string]$b.context -or
                 [int]$l.model_visible_chars -ne [int]$b.model_visible_chars) {
-                throw 'Exact baseline fallback violated.'
+                throw 'Exact no_query_facets baseline fallback violated.'
             }
         }
     }
