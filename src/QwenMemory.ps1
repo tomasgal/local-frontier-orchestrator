@@ -91,6 +91,14 @@ function Initialize-QwenMemoryConfiguration(
     $script:L3ReadMaxChars = if ($script:Config.Memory.ContainsKey('L3ReadMaxChars')) {
         [Math]::Max(80, [Math]::Min(2500, [int]$script:Config.Memory.L3ReadMaxChars))
     } else { 1200 }
+    $script:L3IndexEnabled = $script:MemoryEnabled -and
+        $script:Config.Memory.ContainsKey('L3IndexEnabled') -and
+        [bool]$script:Config.Memory.L3IndexEnabled
+    $script:L3TopicRules = if ($script:Config.Memory.ContainsKey('L3TopicRules')) {
+        @($script:Config.Memory.L3TopicRules)
+    } else {
+        @()
+    }
 
     $script:Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 }
@@ -1521,6 +1529,25 @@ function Persist-TurnAndMemory(
             -WallSeconds $l2Sw.Elapsed.TotalSeconds -Success ($l2Status -ne 'failed')
     }
 
+    $l3IndexStatus = 'disabled'
+    $l3IndexError = $null
+    $l3IndexResult = $null
+    $l3IndexSw = [System.Diagnostics.Stopwatch]::StartNew()
+    if ($script:L3IndexEnabled -and (Get-Command Invoke-LfoL3PostTurnIndex -ErrorAction SilentlyContinue)) {
+        try {
+            $l3IndexResult = Invoke-LfoL3PostTurnIndex $Prompt $FinalContent $turnId $epoch $script:StructuredMemoryPath $script:L3Path $script:L3TopicRules
+            $l3IndexStatus = [string]$l3IndexResult.Status
+            $l3IndexError = $l3IndexResult.Error
+        } catch {
+            $l3IndexStatus = 'failed'
+            $l3IndexError = $_.Exception.Message
+        }
+    }
+    $l3IndexSw.Stop()
+    if ($script:L3IndexEnabled) {
+        Add-LfoTurnPhase -Phase 'l3_index' -Kind 'store' -WallSeconds $l3IndexSw.Elapsed.TotalSeconds -Success ($l3IndexStatus -ne 'failed')
+    }
+
     $memoryNote = $InlineMemoryNote
     $memoryError = $null
     $compacted = $false
@@ -1639,6 +1666,12 @@ function Persist-TurnAndMemory(
             l1_note_suppressed_by_write_authority = [bool]$authorityNoteSuppressed
             l2_seconds = [Math]::Round($l2Sw.Elapsed.TotalSeconds, 3)
             l2_error = $l2Error
+            l3_index_status = $l3IndexStatus
+            l3_index_seconds = [Math]::Round($l3IndexSw.Elapsed.TotalSeconds, 3)
+            l3_index_error = $l3IndexError
+            l3_turn_indexed = $(if ($null -ne $l3IndexResult) { [bool]$l3IndexResult.TurnIndexed } else { $false })
+            l3_l2_items_indexed = $(if ($null -ne $l3IndexResult) { [int]$l3IndexResult.L2ItemsIndexed } else { 0 })
+            l3_facets_written = $(if ($null -ne $l3IndexResult) { [int]$l3IndexResult.FacetsWritten } else { 0 })
             memory_compacted = $compacted
             memory_compaction_trigger = $memoryCompactionTrigger
             memory_note_appended = $memoryNoteAppended
