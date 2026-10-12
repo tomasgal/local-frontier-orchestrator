@@ -27,8 +27,12 @@ $l3Path = Join-Path $state 'l3-index.db'
 $topicRules = @([pscustomobject]@{ Topic='lfo'; Terms=@('LFO','Local Frontier Orchestrator'); Priority=100 })
 
 function Add-TestConversationTurn([int]$TurnId,[string]$User,[string]$Assistant) {
+    $path = Join-Path $logs 'conversation-2026-10.jsonl'
+    $offset = if (Test-Path -LiteralPath $path -PathType Leaf) { [int64](Get-Item -LiteralPath $path).Length } else { [int64]0 }
     $row = [ordered]@{ event='turn'; timestamp=(Get-Date).ToString('o'); turn_id=$TurnId; epoch=1; route='LOCAL'; user=$User; assistant=$Assistant }
-    [IO.File]::AppendAllText((Join-Path $logs 'conversation-2026-10.jsonl'),($row | ConvertTo-Json -Compress) + [Environment]::NewLine)
+    [IO.File]::AppendAllText($path,($row | ConvertTo-Json -Compress) + [Environment]::NewLine,[Text.UTF8Encoding]::new($false))
+    $length = [int64](Get-Item -LiteralPath $path).Length - $offset
+    return [pscustomobject]@{ File=[IO.Path]::GetFileName($path); Offset=$offset; Length=$length }
 }
 
 $l2 = Open-LfoMemoryStore $l2Path
@@ -38,8 +42,8 @@ try {
     $firstFact = @(Invoke-LfoSqliteQuery $l2 "SELECT id,subject_entity_id FROM current_facts WHERE scope_id='conversation:1' AND predicate='os';")[0]
 } finally { Close-LfoSqliteDatabase $l2 }
 
-Add-TestConversationTurn 1 'For LFO, ORION runs Debian 13.' 'Recorded.'
-$r1 = Invoke-LfoL3PostTurnIndex 'For LFO, ORION runs Debian 13.' 'Recorded.' 1 1 $l2Path $l3Path $topicRules
+$loc1 = Add-TestConversationTurn 1 'For LFO, ORION runs Debian 13.' 'Recorded.'
+$r1 = Invoke-LfoL3PostTurnIndex 'For LFO, ORION runs Debian 13.' 'Recorded.' 1 1 $l2Path $l3Path $topicRules $loc1.File $loc1.Offset $loc1.Length
 if ($r1.Status -ne 'ok' -or -not $r1.TurnIndexed -or $r1.L2ItemsIndexed -ne 1) { throw ('Turn1 L3 indexing failed: ' + ($r1 | ConvertTo-Json -Compress)) }
 
 $l3 = Open-LfoL3Store $l3Path
@@ -65,6 +69,12 @@ try {
     if (@($turnFacets | Where-Object { $_.dimension -eq 'entity' -and $_.value_key -eq $entityKey }).Count -ne 1) { throw 'L0 entity facet missing.' }
     if (@($factFacets | Where-Object { $_.dimension -eq 'temporal' -and $_.value_key -eq 'current' }).Count -ne 1) { throw 'L2 current temporal facet missing.' }
     if (@($factFacets | Where-Object { $_.dimension -eq 'predicate' -and $_.value_key -eq 'os' }).Count -ne 1) { throw 'L2 predicate facet missing.' }
+    $turnLocator = @(Get-LfoL3L0Locators $l3 @([int64]$turnItem[0].id))
+    if ($turnLocator.Count -ne 1 -or $turnLocator[0].source_file -cne $loc1.File -or
+        [int64]$turnLocator[0].byte_offset -ne [int64]$loc1.Offset -or
+        [int64]$turnLocator[0].byte_length -ne [int64]$loc1.Length) {
+        throw 'Automatic L0 locator indexing failed.'
+    }
 } finally { Close-LfoSqliteDatabase $l3 }
 
 $l2 = Open-LfoMemoryStore $l2Path
@@ -77,8 +87,8 @@ try {
     $newId = [int64]$factsAfter[1].id
 } finally { Close-LfoSqliteDatabase $l2 }
 
-Add-TestConversationTurn 2 'For LFO, ORION now runs Ubuntu 24.04.' 'Updated.'
-$r2 = Invoke-LfoL3PostTurnIndex 'For LFO, ORION now runs Ubuntu 24.04.' 'Updated.' 2 1 $l2Path $l3Path $topicRules
+$loc2 = Add-TestConversationTurn 2 'For LFO, ORION now runs Ubuntu 24.04.' 'Updated.'
+$r2 = Invoke-LfoL3PostTurnIndex 'For LFO, ORION now runs Ubuntu 24.04.' 'Updated.' 2 1 $l2Path $l3Path $topicRules $loc2.File $loc2.Offset $loc2.Length
 if ($r2.Status -ne 'ok' -or $r2.L2FactsTouched -ne 2 -or $r2.L2ItemsIndexed -ne 2) { throw ('Turn2 L3 indexing failed: ' + ($r2 | ConvertTo-Json -Compress)) }
 
 $l3 = Open-LfoL3Store $l3Path
@@ -96,8 +106,8 @@ try {
 $plan = Get-LfoL3RuntimeContextPlan 'For LFO, what OS does ORION run?' 'conversation:1' $l3Path $l2Path $logs 1 1 300
 if ($plan.Status -ne 'ok' -or $plan.L2Count -ne 1 -or $plan.L2Text -notmatch 'ORION\.os = Ubuntu 24\.04' -or $plan.L2Text -match 'Debian 13') { throw ('Current-state runtime plan failed: ' + ($plan | ConvertTo-Json -Compress)) }
 
-Add-TestConversationTurn 3 'Hello there.' 'Hello.'
-$r3 = Invoke-LfoL3PostTurnIndex 'Hello there.' 'Hello.' 3 1 $l2Path $l3Path $topicRules
+$loc3 = Add-TestConversationTurn 3 'Hello there.' 'Hello.'
+$r3 = Invoke-LfoL3PostTurnIndex 'Hello there.' 'Hello.' 3 1 $l2Path $l3Path $topicRules $loc3.File $loc3.Offset $loc3.Length
 if ($r3.Status -ne 'ok' -or $r3.TurnIndexed) { throw 'Unclassified turn should remain absent from L3.' }
 
 [pscustomobject]@{
@@ -107,6 +117,7 @@ if ($r3.Status -ne 'ok' -or $r3.TurnIndexed) { throw 'Unclassified turn should r
     TopicRulesSynced = $r2.TopicRulesSynced
     EntityRulesSynced = $r2.EntityRulesSynced
     PredicateRulesSynced = $r2.PredicateRulesSynced
+    L0LocatorWritten = $r2.L0LocatorWritten
     L2FactsTouchedOnCorrection = $r2.L2FactsTouched
     OldFactHistoricalExcluded = $true
     NewFactCurrent = $true
