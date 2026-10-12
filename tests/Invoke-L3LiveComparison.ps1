@@ -122,7 +122,7 @@ try {
     throw "Ollama is not responding at $($script:Config.BaseUri). Start Ollama before this live gate."
 }
 
-$query = 'For LFO, what operating system does BENCH_SERVER run? Answer in one concise sentence.'
+$query = 'For LFO, what OS does BENCH_SERVER run?'
 $format = @{
     type='object'
     properties=@{
@@ -131,6 +131,55 @@ $format = @{
     }
     required=@('route','answer')
     additionalProperties=$false
+}
+
+function Get-VariantContextProbe([string]$Variant) {
+    $script:L3ReadEnabled = ($Variant -eq 'l3')
+    $script:Messages = @(@{role='user';content=$query})
+    $script:LfoTurnContext = $null
+    Start-LfoTurnTelemetry
+    Start-LfoTurnContext $query
+
+    $stats = Get-LfoTurnContextStats
+    $messages = @(Get-QwenConversationMessages)
+    $visibleChars = [int](($messages | ForEach-Object { ([string]$_.content).Length } | Measure-Object -Sum).Sum)
+
+    return [pscustomobject]@{
+        Variant = $Variant
+        L2Items = [int]$stats.l2_read_items
+        L2Status = [string]$stats.l2_read_status
+        L3Used = [bool]$stats.l3_used
+        L3Status = [string]$stats.l3_status
+        L3Candidates = [int]$stats.l3_candidates
+        L3Selected = [int]$stats.l3_selected
+        MemoryBlockChars = [int]$stats.memory_block_chars
+        ModelVisibleChars = $visibleChars
+    }
+}
+
+# Mandatory no-inference preflight. A live test is invalid unless L3 has
+# actually changed the retrieval shape before the first model call.
+$baselineProbe = Get-VariantContextProbe 'baseline'
+$l3Probe = Get-VariantContextProbe 'l3'
+
+Write-Host ("PREFLIGHT baseline: L2={0} status={1} visible={2}" -f
+    $baselineProbe.L2Items,$baselineProbe.L2Status,$baselineProbe.ModelVisibleChars)
+Write-Host ("PREFLIGHT l3: L3Used={0} L3Status={1} candidates={2} selected={3} L2={4} visible={5}" -f
+    $l3Probe.L3Used,$l3Probe.L3Status,$l3Probe.L3Candidates,$l3Probe.L3Selected,
+    $l3Probe.L2Items,$l3Probe.ModelVisibleChars)
+
+if ($baselineProbe.L2Items -ne 4 -or $baselineProbe.L2Status -ne 'ok') {
+    throw ('Invalid live baseline retrieval shape: ' + ($baselineProbe | ConvertTo-Json -Compress))
+}
+if (-not $l3Probe.L3Used -or $l3Probe.L3Status -ne 'ok' -or
+    $l3Probe.L2Items -ne 1 -or $l3Probe.L3Selected -ne 1) {
+    throw ('Invalid L3 live preflight: ' + ($l3Probe | ConvertTo-Json -Compress))
+}
+if ($l3Probe.ModelVisibleChars -ge $baselineProbe.ModelVisibleChars -or
+    $l3Probe.MemoryBlockChars -ge $baselineProbe.MemoryBlockChars) {
+    throw ('L3 preflight did not reduce context before inference: baseline=' +
+        ($baselineProbe | ConvertTo-Json -Compress) + '; l3=' +
+        ($l3Probe | ConvertTo-Json -Compress))
 }
 
 function Invoke-LiveVariant([string]$Variant,[int]$Repetition) {
@@ -176,6 +225,7 @@ function Invoke-LiveVariant([string]$Variant,[int]$Repetition) {
         MemoryBlockChars=[int]$stats.memory_block_chars
         L2Items=[int]$stats.l2_read_items
         L3Used=[bool]$stats.l3_used
+        L3Status=[string]$stats.l3_status
         L3Candidates=[int]$stats.l3_candidates
         L3Selected=[int]$stats.l3_selected
         ContextAssemblyS=[double]$stats.assembly_seconds
@@ -195,7 +245,9 @@ for ($rep=1; $rep -le $Repetitions; $rep++) {
         Write-Host ("LIVE {0} repetition {1}/{2}" -f $variant,$rep,$Repetitions)
         $sample = Invoke-LiveVariant $variant $rep
         $samples += $sample
-        Write-Host ("  prompt={0} tok; visible={1} chars; wall={2:n2}s; correct={3}" -f $sample.PromptTokens,$sample.ModelVisibleChars,$sample.WallS,$sample.Correct)
+        Write-Host ("  prompt={0} tok; visible={1} chars; L2={2}; L3={3}/{4}; wall={5:n2}s; correct={6}" -f
+            $sample.PromptTokens,$sample.ModelVisibleChars,$sample.L2Items,
+            $sample.L3Used,$sample.L3Status,$sample.WallS,$sample.Correct)
     }
 }
 
@@ -250,6 +302,9 @@ $samples | Select-Object Variant,Repetition,Correct,L2Items,L3Used,ModelVisibleC
     BaselineL2Items = 4
     L3L2Items = 1
     AutomaticIndexingUsed = $true
+    PreInferenceRetrievalShapeValidated = $true
+    BaselinePreflightVisibleChars = $baselineProbe.ModelVisibleChars
+    L3PreflightVisibleChars = $l3Probe.ModelVisibleChars
     FrontierCalls = 0
     ProductionMemoryTouched = $false
     TempFixture = $root
