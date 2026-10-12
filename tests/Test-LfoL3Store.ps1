@@ -38,7 +38,7 @@ $l2HashBefore = (Get-FileHash -LiteralPath $l2Path -Algorithm SHA256).Hash
 $l3 = Open-LfoL3Store $l3Path
 try {
     $schema = @(Invoke-LfoSqliteQuery $l3 "SELECT value FROM l3_meta WHERE key='schema_version';")
-    if ($schema.Count -ne 1 -or $schema[0].value -ne '1') {
+    if ($schema.Count -ne 1 -or $schema[0].value -ne '2') {
         throw 'Unexpected L3 schema version.'
     }
 
@@ -131,7 +131,7 @@ try {
 
 [pscustomobject]@{
     PASS = $true
-    SchemaVersion = 1
+    SchemaVersion = 2
     PositiveTopicItems = $positive.Count
     NegativeTopicItems = $negative.Count
     ScopeIsolation = ($otherScope.Count -eq 1)

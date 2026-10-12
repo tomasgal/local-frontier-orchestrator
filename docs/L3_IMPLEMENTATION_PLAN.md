@@ -2,7 +2,7 @@
 
 ## Status
 
-**Design direction agreed 2026-10-12. L3-R1 storage implementation is present on branch `v9.5-l3-selective-index`; Windows offline acceptance is pending.**
+**Design direction agreed 2026-10-12. L3-R1 is offline-validated PASS; L3-R2 deterministic tagging is implemented on branch `v9.5-l3-selective-index` and awaits Windows offline acceptance.**
 
 L3 is the next milestone after the immutable L2 baseline `v9.4-l2-frozen`. It does not reopen L2 and it does not replace L0, L1 or L2 authority. L3 is a separate, reconstructible SQLite database and software layer whose job is to **reduce the amount of memory/context work that reaches the LLM**.
 
@@ -415,4 +415,55 @@ Not implemented yet:
 - no L3 production-data path;
 - no model calls.
 
-R1 is therefore **IMPLEMENTED / VALIDATION PENDING**, not PASS. PASS requires the Windows PowerShell 5.1 offline runner to complete on a clean checkout.
+R1 is **PASS**. User-supplied Windows PowerShell 5.1 evidence on commit `16836f5997dfc58eca3206b768710be527525c6c` completed all three bounded TEMP-only tests:
+
+- `Test-LfoMemoryStore.ps1`: PASS;
+- `Test-Dev4L2Retrieval.ps1`: PASS;
+- `Test-LfoL3Store.ps1`: PASS;
+- `ModelCalls=0`;
+- `ProductionMemoryTouched=False`.
+
+This accepts the physical L3 storage boundary without claiming any retrieval-quality gain yet.
+
+
+## 14. Implementation checkpoint — L3-R2
+
+R2 adds a controlled SQL-backed tag dictionary and deterministic bounded classifier.
+
+### Mechanism
+
+```text
+input text
+  -> bounded normalized 1-4-gram keys (max 96)
+  -> indexed l3_terms lookup
+  -> strongest controlled matches
+  -> max 2 topics / 3 entities / 1 kind
+  -> optional persistence as internal L3 facets
+```
+
+The classifier does not scan arbitrary conversation memory, does not generate free-form labels and does not call an LLM. Unknown remains absence. Automatic classification writes only positive matches; negative membership remains an explicit separate operation.
+
+Schema v2 adds `l3_terms(dimension,value_key,term_key,priority,rule_id,active)` with an index beginning on `term_key`. Rule vocabularies are data, not hard-coded topic ontologies; tests seed a small synthetic registry.
+
+R2 also deliberately does **not** carry an active-topic heuristic across turns yet. Elliptical follow-ups and topic continuity belong in later retrieval-planner evaluation because adding stateful topic carry-over can improve recall but can also create false routing.
+
+### R2 bounded corpus
+
+`tests/Test-LfoL3Tagger.ps1` uses a small explicit corpus covering:
+
+- one-topic + entity + configuration;
+- decision;
+- retrocomputing topic/entity;
+- result;
+- preference;
+- no-match/unknown;
+- two-topic selection;
+- entity + result;
+- Slovak diacritic normalization;
+- >2 topic candidates to verify the hard cap;
+- disabled-rule suppression;
+- persistence of only the selected facets.
+
+The corpus reports exact-case count and facet TP/FP/FN. These figures validate the deterministic fixture only; they are **not** claims about general-language classifier precision/recall.
+
+R2 is **IMPLEMENTED / VALIDATION PENDING** until `tests/Invoke-L3R2Offline.ps1` passes under Windows PowerShell 5.1.
