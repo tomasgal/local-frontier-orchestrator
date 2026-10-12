@@ -23,13 +23,26 @@ Accepted L3 properties:
 
 Final closure progress: **100/100**.
 
-### Next: L4 / Local Epistemic Balancer
+### Next: L4 / Epistemic Observatory & Balancer
 
-Define generic epistemic mediation, disagreement and uncertainty handling, control
-conditions, reliance/calibration metrics and research safeguards. Keep derived bias
-observations separate from ordinary L2 factual memory. L4 must build above the
-frozen L2/L3 contracts rather than reopening their tuning. No claim of
-bias-checker validation follows from memory/retrieval tests alone.
+The L4 design/scoping pass is now documented in
+[L4_EPISTEMIC_OBSERVATORY_DESIGN.md](L4_EPISTEMIC_OBSERVATORY_DESIGN.md).
+
+L4 is an epistemic event, analytics and rare-event policy layer above frozen L2/L3.
+Its canonical store is **SurrealDB** (`namespace=lfo`, `database=epistemic`).
+The default online mode is **write-mostly, read-rarely**: record
+`EpistemicObservation` events, keep authoritative conversation text in L0, and
+read L4 history only after explicit or otherwise rare triggers. Bias is one
+observation class, not the definition of the layer; framing or presupposition are
+not automatically biases. L4 observations are never factual evidence about the
+external world.
+
+Recommended first milestone: **L4-R1 Epistemic Observation Store** — SurrealDB
+runtime contract, `observations` records, source-turn provenance, actor/stage/type/
+confidence/detector metadata and basic analytic reads. Do not implement automatic
+response rewrites, graph/vector/plugin complexity or persistent user profiling in
+R1. Add Observatory analytics and Balancer interventions only after real
+observations justify them.
 
 ### Historical roadmap and evidence
 
