@@ -149,15 +149,12 @@ try {
     [void](Set-LfoL3Facet $db $atlasRam.id 'predicate' 'ram_gb' 1 'r3-seed')
     [void](Set-LfoL3Facet $db $atlasCpu.id 'predicate' 'cpu_count' 1 'r3-seed')
     [void](Set-LfoL3Facet $db $atlasDisk.id 'predicate' 'disk_gb' 1 'r3-seed')
-    foreach ($predicate in @('os','ram_gb','cpu_count','disk_gb')) {
-        [void](Set-LfoL3Facet $db $atlasNarrative.id 'predicate' $predicate 1 'r3-seed')
-    }
     $atlasEvidence = @(
         [pscustomobject]@{ SourceLayer='L2'; SourceRef='fact:atlas-os'; Text='ATLAS.os = Synthetic OS 13' },
         [pscustomobject]@{ SourceLayer='L2'; SourceRef='fact:atlas-ram'; Text='ATLAS.ram_gb = 96' },
         [pscustomobject]@{ SourceLayer='L2'; SourceRef='fact:atlas-cpu'; Text='ATLAS.cpu_count = 8' },
         [pscustomobject]@{ SourceLayer='L2'; SourceRef='fact:atlas-disk'; Text='ATLAS.disk_gb = 512' },
-        [pscustomobject]@{ SourceLayer='L0'; SourceRef='turn:20'; Text='Historical ATLAS narrative mentions Synthetic OS 11, RAM 96 and CPU 8.' }
+        [pscustomobject]@{ SourceLayer='L0'; SourceRef='turn:20'; Text='Historical ATLAS narrative mentions Synthetic OS 11, RAM 96, CPU 8, and firmware FW9.' }
     )
 
     $atlasSingleQuery = 'For LFO, what OS does ATLAS run?'
@@ -178,6 +175,17 @@ try {
         $atlasTwo.Packet -match 'ATLAS\.os|ATLAS\.disk_gb' -or
         $atlasTwo.LexicalNarrowDrops -ne 0 -or $atlasTwo.Packet -match 'Historical ATLAS') {
         throw ('R3 two-predicate lexical narrowing failed: ' + ($atlasTwo | ConvertTo-Json -Depth 5 -Compress))
+    }
+
+    # Incomplete predicate coverage must preserve same-entity L0 fallback.
+    Set-LfoL3TermRule $db 'predicate' 'firmware_version' 'firmware' 130 'r3-predicate' $true
+    $atlasIncompleteQuery = 'For LFO, what are the OS and firmware of ATLAS?'
+    $atlasIncompleteClass = Get-LfoL3Classification $db $atlasIncompleteQuery
+    $atlasIncomplete = New-LfoL3ContextPlan $db 'conversation:1' $atlasIncompleteQuery $atlasIncompleteClass $atlasEvidence 4 1000
+    if ($atlasIncomplete.Status -ne 'ok' -or
+        $atlasIncomplete.Packet -notmatch 'ATLAS\.os = Synthetic OS 13' -or
+        $atlasIncomplete.Packet -notmatch 'firmware FW9') {
+        throw ('R3 incomplete predicate coverage did not preserve L0 fallback: ' + ($atlasIncomplete | ConvertTo-Json -Depth 5 -Compress))
     }
 
     $atlasBroadQuery = 'For LFO, show the ATLAS configuration.'
