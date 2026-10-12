@@ -145,7 +145,7 @@ $definitions = @(
   @{ id='two_current'; query='For LFO, what are the RAM size and CPU count of BENCH_SERVER?'; current_marker='96' },
   @{ id='corrected_current'; query='For LFO what is the corrected current BENCH_SERVER OS?'; current_marker='Synthetic OS 13'; historical_marker='Synthetic OS 11' },
   @{ id='topic_l0'; query='What archival catalog token was noted for RETRO_ARCHIVE?' },
-  @{ id='no_match'; query='Tell me about QUASAR_NOMATCH_0928.' }
+  @{ id='no_match'; query='According to conversation memory, what is QUASAR_NOMATCH_0928? If it is absent, answer UNKNOWN.' }
 )
 $cases = @()
 foreach($d in $definitions) {
