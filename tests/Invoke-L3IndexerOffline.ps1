@@ -13,7 +13,7 @@ if ($LASTEXITCODE -ne 0 -or $head -cnotmatch '^[0-9a-f]{40}$') { throw 'Invalid 
 $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')
 $root = Join-Path $temp ('LFO-l3-indexer-offline-' + [guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $root)
-$tests = @('Test-LfoMemoryStore.ps1','Test-Dev4L2Retrieval.ps1','Test-LfoL3Store.ps1','Test-LfoL3Tagger.ps1','Test-LfoL3Planner.ps1','Test-LfoL3RuntimeContext.ps1','Test-LfoL3Indexer.ps1')
+$tests = @('Test-LfoMemoryStore.ps1','Test-Dev4L2Retrieval.ps1','Test-LfoL3Store.ps1','Test-LfoL3Tagger.ps1','Test-LfoL3Planner.ps1','Test-LfoL3RuntimeContext.ps1','Test-LfoL3Indexer.ps1','Test-LfoL3L0Locator.ps1')
 $results = @()
 try {
     foreach ($name in $tests) {
