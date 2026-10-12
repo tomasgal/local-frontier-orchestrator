@@ -38,7 +38,7 @@ $l2HashBefore = (Get-FileHash -LiteralPath $l2Path -Algorithm SHA256).Hash
 $l3 = Open-LfoL3Store $l3Path
 try {
     $schema = @(Invoke-LfoSqliteQuery $l3 "SELECT value FROM l3_meta WHERE key='schema_version';")
-    if ($schema.Count -ne 1 -or $schema[0].value -ne '2') {
+    if ($schema.Count -ne 1 -or $schema[0].value -ne '3') {
         throw 'Unexpected L3 schema version.'
     }
 
@@ -57,6 +57,7 @@ try {
         [void](Set-LfoL3Facet $l3 $fact.id 'topic' 'LFO' 1 'r1-test')
         [void](Set-LfoL3Facet $l3 $fact.id 'entity' 'l2:1' 1 'r1-test')
         [void](Set-LfoL3Facet $l3 $fact.id 'kind' 'Configuration' 1 'r1-test')
+        [void](Set-LfoL3Facet $l3 $fact.id 'predicate' 'os' 1 'r1-test')
         [void](Set-LfoL3Facet $l3 $fact.id 'retrieval' 'Priority' 1 'r1-test')
 
         # Unknown is represented by absence, not by a synthetic zero tag.
@@ -84,6 +85,10 @@ try {
     $removed = @(Get-LfoL3ItemsByFacet $l3 'conversation:1' 'topic' 'temporary' 1)
     $turnFacets = @(Get-LfoL3Facets $l3 $turn.id)
     $stats = Get-LfoL3StoreStats $l3
+    $facetSql = @(Invoke-LfoSqliteQuery $l3 "SELECT sql FROM sqlite_master WHERE type='table' AND name='l3_facets';")
+    if ($facetSql.Count -ne 1 -or [string]$facetSql[0].sql -match 'dimension\s+IN\s*\(') {
+        throw 'L3 v3 facet table still physically hard-codes the dimension whitelist.'
+    }
 
     if ($positive.Count -ne 2) { throw "Expected 2 positive LFO items in scope 1, got $($positive.Count)." }
     if ($negative.Count -ne 1 -or $negative[0].source_ref -ne 'turn:101') {
@@ -94,7 +99,7 @@ try {
     if (@($turnFacets | Where-Object { $_.dimension -eq 'topic' -and $_.value_key -eq 'temporary' }).Count -ne 0) {
         throw 'Unknown facet was persisted instead of represented by absence.'
     }
-    if ($stats.Items -ne 3 -or $stats.Facets -ne 10) {
+    if ($stats.Items -ne 3 -or $stats.Facets -ne 11) {
         throw ("Unexpected L3 counts: items={0}, facets={1}" -f $stats.Items,$stats.Facets)
     }
 
@@ -131,7 +136,7 @@ try {
 
 [pscustomobject]@{
     PASS = $true
-    SchemaVersion = 2
+    SchemaVersion = 3
     PositiveTopicItems = $positive.Count
     NegativeTopicItems = $negative.Count
     ScopeIsolation = ($otherScope.Count -eq 1)
