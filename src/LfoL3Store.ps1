@@ -115,6 +115,28 @@ function Open-LfoL3Store([string]$Path) {
     }
 }
 
+function Open-LfoL3ReadOnly([string]$Path) {
+    Assert-LfoL3SqlitePrerequisites
+    Initialize-LfoSqliteInterop
+    $fullPath = [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($Path))
+    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) { return $null }
+
+    $handle = [IntPtr]::Zero
+    $rc = [LfoWinSqlite]::sqlite3_open_v2($fullPath, [ref]$handle, 1, [IntPtr]::Zero)
+    if ($rc -ne [LfoWinSqlite]::SQLITE_OK) {
+        $message = Get-LfoSqliteError $handle
+        if ($handle -ne [IntPtr]::Zero) { [void][LfoWinSqlite]::sqlite3_close_v2($handle) }
+        throw ("L3 SQLite read-only open failed (rc={0}): {1}" -f $rc, $message)
+    }
+    try {
+        Assert-LfoSqliteRc $handle ([LfoWinSqlite]::sqlite3_busy_timeout($handle, 2500)) 'sqlite3_busy_timeout'
+        return [pscustomobject]@{ Path = $fullPath; Handle = $handle }
+    } catch {
+        [void][LfoWinSqlite]::sqlite3_close_v2($handle)
+        throw
+    }
+}
+
 function Start-LfoL3Transaction($Connection) {
     Invoke-LfoSqliteExec $Connection 'BEGIN IMMEDIATE;'
 }
