@@ -46,10 +46,67 @@ ON l3_items(scope_id, source_layer);
 
 CREATE INDEX IF NOT EXISTS ix_l3_items_source_turn
 ON l3_items(scope_id, source_turn);
+'@
 
+    $schemaRows = @(Invoke-LfoSqliteQuery $Connection "SELECT value FROM l3_meta WHERE key='schema_version';")
+    $schemaVersion = if ($schemaRows.Count -eq 0) { 0 } else { [int]$schemaRows[0].value }
+    if ($schemaVersion -notin @(0,2,3)) {
+        throw "Unsupported L3 schema version $schemaVersion."
+    }
+
+    if ($schemaVersion -eq 2) {
+        # v3 removes the physical dimension whitelist from SQLite. L3 is
+        # reconstructible, but preserve the existing derived index during the
+        # migration so an upgrade does not silently discard useful metadata.
+        Invoke-LfoSqliteExec $Connection @'
+PRAGMA foreign_keys = OFF;
+BEGIN IMMEDIATE;
+DROP VIEW IF EXISTS l3_item_facets;
+
+CREATE TABLE l3_facets_v3 (
+    item_id     INTEGER NOT NULL REFERENCES l3_items(id) ON DELETE CASCADE,
+    dimension   TEXT NOT NULL,
+    value_key   TEXT NOT NULL,
+    polarity    INTEGER NOT NULL CHECK (polarity IN (-1,1)),
+    rule_id     TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(item_id, dimension, value_key)
+);
+INSERT INTO l3_facets_v3
+SELECT item_id, dimension, value_key, polarity, rule_id, created_at, updated_at
+FROM l3_facets;
+DROP TABLE l3_facets;
+ALTER TABLE l3_facets_v3 RENAME TO l3_facets;
+
+CREATE TABLE l3_terms_v3 (
+    dimension  TEXT NOT NULL,
+    value_key  TEXT NOT NULL,
+    term_key   TEXT NOT NULL,
+    priority   INTEGER NOT NULL DEFAULT 0,
+    rule_id    TEXT NOT NULL,
+    active     INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(dimension, value_key, term_key)
+);
+INSERT INTO l3_terms_v3
+SELECT dimension, value_key, term_key, priority, rule_id, active, created_at, updated_at
+FROM l3_terms;
+DROP TABLE l3_terms;
+ALTER TABLE l3_terms_v3 RENAME TO l3_terms;
+
+UPDATE l3_meta SET value='3' WHERE key='schema_version';
+COMMIT;
+PRAGMA foreign_keys = ON;
+'@
+        $schemaVersion = 3
+    }
+
+    Invoke-LfoSqliteExec $Connection @'
 CREATE TABLE IF NOT EXISTS l3_facets (
     item_id     INTEGER NOT NULL REFERENCES l3_items(id) ON DELETE CASCADE,
-    dimension   TEXT NOT NULL CHECK (dimension IN ('topic','entity','kind','temporal','retrieval')),
+    dimension   TEXT NOT NULL,
     value_key   TEXT NOT NULL,
     polarity    INTEGER NOT NULL CHECK (polarity IN (-1,1)),
     rule_id     TEXT NOT NULL,
@@ -65,7 +122,7 @@ CREATE INDEX IF NOT EXISTS ix_l3_facets_item
 ON l3_facets(item_id);
 
 CREATE TABLE IF NOT EXISTS l3_terms (
-    dimension  TEXT NOT NULL CHECK (dimension IN ('topic','entity','kind')),
+    dimension  TEXT NOT NULL,
     value_key  TEXT NOT NULL,
     term_key   TEXT NOT NULL,
     priority   INTEGER NOT NULL DEFAULT 0,
@@ -98,7 +155,7 @@ FROM l3_items i
 LEFT JOIN l3_facets f ON f.item_id = i.id;
 
 INSERT INTO l3_meta(key, value)
-VALUES ('schema_version', '2')
+VALUES ('schema_version', '3')
 ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 '@
 }
@@ -169,7 +226,7 @@ function ConvertTo-LfoL3Key([string]$Value) {
 
 function Assert-LfoL3FacetDimension([string]$Dimension) {
     $key = ConvertTo-LfoL3Key $Dimension
-    if ($key -notin @('topic','entity','kind','temporal','retrieval')) {
+    if ($key -notin @('topic','entity','kind','predicate','temporal','retrieval')) {
         throw "Unsupported L3 facet dimension '$Dimension'."
     }
     return $key
@@ -342,7 +399,7 @@ function Get-LfoL3StoreStats($Connection) {
 
 function Assert-LfoL3RuleDimension([string]$Dimension) {
     $key = ConvertTo-LfoL3Key $Dimension
-    if ($key -notin @('topic','entity','kind')) {
+    if ($key -notin @('topic','entity','kind','predicate')) {
         throw "Unsupported L3 rule dimension '$Dimension'."
     }
     return $key
