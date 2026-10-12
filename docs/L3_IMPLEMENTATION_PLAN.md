@@ -563,3 +563,19 @@ The runtime configuration recognizes:
 Existing configs that do not define these fields remain unchanged in behavior.
 
 The automatic-indexing gate is **IMPLEMENTED / VALIDATION PENDING**. `tests/Invoke-L3IndexerOffline.ps1` re-runs all prior L2/L3 tests plus the new indexer/correction semantics test. No Ollama call or production memory is used.
+
+
+### Automatic-indexing first-run correction — authority ordering
+
+The first Windows PowerShell 5.1 run of `Invoke-L3IndexerOffline.ps1` passed the first six suites and failed only the new indexer/current-state assertion. The L3 correction metadata were correct: the superseded L2 fact was excluded and the replacement current L2 fact existed. The planner nevertheless selected the newer L0 turn because lexical richness outweighed the previous very small L2 layer bonus.
+
+This exposed a ranking-policy bug rather than an indexing or correction-semantics bug.
+
+Fix:
+
+- planner score now behaves lexicographically: metadata relevance first, then L2 authority for equally relevant candidates, then bounded lexical richness;
+- a direct R3 regression with equally relevant L0/L2 evidence and no shared fingerprint now requires L2 selection.
+
+Fix/test checkpoint: `144b7fc6dbb10ac659f467916548fd54eabf9c41`.
+
+Automatic indexing remains **IMPLEMENTED / VALIDATION PENDING** until the full seven-suite runner passes on this fix.
