@@ -93,6 +93,70 @@ ORDER BY n.entity_id, n.id;
     }
 }
 
+function Get-LfoL3PredicateRuleTerms([string]$Predicate) {
+    $key = ConvertTo-LfoL3Key $Predicate
+    if ([string]::IsNullOrWhiteSpace($key)) { return @() }
+
+    $parts = @($key -split '[-._:+]+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    $seen = @{}
+    $out = @()
+    function Add-PredicateTerm([string]$Term,[int]$Priority) {
+        $termKey = ConvertTo-LfoL3Key $Term
+        if ([string]::IsNullOrWhiteSpace($termKey) -or $seen.ContainsKey($termKey)) { return }
+        $seen[$termKey] = $true
+        $script:__lfoPredicateTerms += [pscustomobject]@{ Term=$Term; Priority=$Priority }
+    }
+
+    $script:__lfoPredicateTerms = @()
+    Add-PredicateTerm $Predicate 130
+    if ($parts.Count -gt 1) {
+        Add-PredicateTerm ($parts -join ' ') 120
+    }
+
+    $genericSuffix = @('gb','mb','tb','kb','count','id','value','name','flag','bool','boolean','enabled')
+    foreach ($part in $parts) {
+        if ($part -in $genericSuffix) { continue }
+        Add-PredicateTerm $part 100
+    }
+    $out = @($script:__lfoPredicateTerms)
+    Remove-Variable -Scope Script -Name __lfoPredicateTerms -ErrorAction SilentlyContinue
+    return $out
+}
+
+function Sync-LfoL3PredicateRulesFromL2(
+    $L3Connection,
+    [string]$L2Path,
+    [string]$ScopeId
+) {
+    if (-not (Test-Path -LiteralPath $L2Path -PathType Leaf) -or
+        [string]::IsNullOrWhiteSpace($ScopeId)) { return 0 }
+
+    $reader = $null
+    try {
+        $reader = Open-LfoMemoryReadOnly $L2Path
+        if ($null -eq $reader) { return 0 }
+        $rows = @(Invoke-LfoSqliteQuery $reader @'
+SELECT DISTINCT predicate
+FROM facts
+WHERE scope_id = ?1
+  AND predicate IS NOT NULL
+  AND TRIM(predicate) <> ''
+ORDER BY predicate;
+'@ @($ScopeId))
+        $count = 0
+        foreach ($row in $rows) {
+            $predicate = [string]$row.predicate
+            foreach ($term in @(Get-LfoL3PredicateRuleTerms $predicate)) {
+                Set-LfoL3TermRule $L3Connection 'predicate' $predicate ([string]$term.Term) ([int]$term.Priority) 'l3-l2-predicate-v1' $true
+                $count++
+            }
+        }
+        return $count
+    } finally {
+        if ($null -ne $reader) { Close-LfoSqliteDatabase $reader }
+    }
+}
+
 function Get-LfoL3FactsTouchedAtTurn(
     [string]$L2Path,
     [string]$ScopeId,
@@ -160,6 +224,7 @@ function Invoke-LfoL3PostTurnIndex(
         FacetsWritten = 0
         TopicRulesSynced = 0
         EntityRulesSynced = 0
+        PredicateRulesSynced = 0
         Error = $null
     }
     if ($TurnId -le 0 -or $Epoch -le 0 -or
@@ -174,6 +239,10 @@ function Invoke-LfoL3PostTurnIndex(
         Initialize-LfoL3DefaultKindRules $db
         $result.TopicRulesSynced = Sync-LfoL3ConfiguredTopicRules $db $TopicRules
         $result.EntityRulesSynced = Sync-LfoL3EntityRulesFromL2 $db $L2Path $scopeId
+        $result.PredicateRulesSynced = Sync-LfoL3PredicateRulesFromL2 $db $L2Path $scopeId
+
+        $facts = @(Get-LfoL3FactsTouchedAtTurn $L2Path $scopeId $TurnId)
+        $result.L2FactsTouched = $facts.Count
 
         $classification = Get-LfoL3Classification $db $Prompt
         if ($classification.Status -eq 'ok') {
@@ -182,8 +251,6 @@ function Invoke-LfoL3PostTurnIndex(
             $result.TurnIndexed = $true
         }
 
-        $facts = @(Get-LfoL3FactsTouchedAtTurn $L2Path $scopeId $TurnId)
-        $result.L2FactsTouched = $facts.Count
         foreach ($fact in $facts) {
             $item = Set-LfoL3Item $db $scopeId 'L2' ("fact:$([int64]$fact.id)") ([int64]$fact.source_turn) $null
 
@@ -196,6 +263,9 @@ function Invoke-LfoL3PostTurnIndex(
                 [void](Set-LfoL3Facet $db $item.id 'entity' $objectKey 1 'l3-l2-fact-v1')
                 $result.FacetsWritten++
             }
+
+            [void](Set-LfoL3ExclusiveFacet $db $item.id 'predicate' ([string]$fact.predicate) 1 'l3-l2-predicate-v1')
+            $result.FacetsWritten++
 
             if ($classification.Status -eq 'ok') {
                 $result.FacetsWritten += Add-LfoL3TurnFacetsToItem $db $item.id $classification
