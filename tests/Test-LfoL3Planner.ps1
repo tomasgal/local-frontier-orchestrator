@@ -135,7 +135,8 @@ try {
     $atlasRam = Set-LfoL3Item $db 'conversation:1' 'L2' 'fact:atlas-ram' 20 $null
     $atlasCpu = Set-LfoL3Item $db 'conversation:1' 'L2' 'fact:atlas-cpu' 20 $null
     $atlasDisk = Set-LfoL3Item $db 'conversation:1' 'L2' 'fact:atlas-disk' 20 $null
-    foreach ($item in @($atlasOs,$atlasRam,$atlasCpu,$atlasDisk)) {
+    $atlasNarrative = Set-LfoL3Item $db 'conversation:1' 'L0' 'turn:20' 20 $null
+    foreach ($item in @($atlasOs,$atlasRam,$atlasCpu,$atlasDisk,$atlasNarrative)) {
         [void](Set-LfoL3Facet $db $item.id 'topic' 'lfo' 1 'r3-seed')
         [void](Set-LfoL3Facet $db $item.id 'entity' 'atlas' 1 'r3-seed')
         [void](Set-LfoL3Facet $db $item.id 'kind' 'configuration' 1 'r3-seed')
@@ -144,7 +145,8 @@ try {
         [pscustomobject]@{ SourceLayer='L2'; SourceRef='fact:atlas-os'; Text='ATLAS.os = Synthetic OS 13' },
         [pscustomobject]@{ SourceLayer='L2'; SourceRef='fact:atlas-ram'; Text='ATLAS.ram_gb = 96' },
         [pscustomobject]@{ SourceLayer='L2'; SourceRef='fact:atlas-cpu'; Text='ATLAS.cpu_count = 8' },
-        [pscustomobject]@{ SourceLayer='L2'; SourceRef='fact:atlas-disk'; Text='ATLAS.disk_gb = 512' }
+        [pscustomobject]@{ SourceLayer='L2'; SourceRef='fact:atlas-disk'; Text='ATLAS.disk_gb = 512' },
+        [pscustomobject]@{ SourceLayer='L0'; SourceRef='turn:20'; Text='Historical ATLAS narrative mentions Synthetic OS 11, RAM 96 and CPU 8.' }
     )
 
     $atlasSingleQuery = 'For LFO, what OS does ATLAS run?'
@@ -152,7 +154,8 @@ try {
     $atlasSingle = New-LfoL3ContextPlan $db 'conversation:1' $atlasSingleQuery $atlasSingleClass $atlasEvidence 4 1000
     if ($atlasSingle.Status -ne 'ok' -or $atlasSingle.SelectedCount -ne 1 -or
         $atlasSingle.Packet -cne 'ATLAS.os = Synthetic OS 13' -or
-        $atlasSingle.LexicalNarrowDrops -ne 3) {
+        $atlasSingle.LexicalNarrowDrops -ne 3 -or
+        $atlasSingle.AuthorityShadowDrops -ne 1 -or $atlasSingle.Packet -match 'Historical ATLAS') {
         throw ('R3 single-predicate lexical narrowing failed: ' + ($atlasSingle | ConvertTo-Json -Depth 5 -Compress))
     }
 
@@ -163,7 +166,8 @@ try {
         $atlasTwo.Packet -notmatch 'ATLAS\.ram_gb = 96' -or
         $atlasTwo.Packet -notmatch 'ATLAS\.cpu_count = 8' -or
         $atlasTwo.Packet -match 'ATLAS\.os|ATLAS\.disk_gb' -or
-        $atlasTwo.LexicalNarrowDrops -ne 2) {
+        $atlasTwo.LexicalNarrowDrops -ne 2 -or
+        $atlasTwo.AuthorityShadowDrops -ne 1 -or $atlasTwo.Packet -match 'Historical ATLAS') {
         throw ('R3 two-predicate lexical narrowing failed: ' + ($atlasTwo | ConvertTo-Json -Depth 5 -Compress))
     }
 
