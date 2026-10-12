@@ -2,7 +2,7 @@
 
 ## Status
 
-**Design direction agreed 2026-10-12. L3-R1 is offline-validated PASS; L3-R2 deterministic tagging is implemented on branch `v9.5-l3-selective-index` and awaits Windows offline acceptance.**
+**Design direction agreed 2026-10-12. L3-R1 and L3-R2 are offline-validated PASS; L3-R3 retrieval planning/context compilation is implemented on branch `v9.5-l3-selective-index` and awaits Windows offline acceptance.**
 
 L3 is the next milestone after the immutable L2 baseline `v9.4-l2-frozen`. It does not reopen L2 and it does not replace L0, L1 or L2 authority. L3 is a separate, reconstructible SQLite database and software layer whose job is to **reduce the amount of memory/context work that reaches the LLM**.
 
@@ -466,4 +466,30 @@ R2 also deliberately does **not** carry an active-topic heuristic across turns y
 
 The corpus reports exact-case count and facet TP/FP/FN. These figures validate the deterministic fixture only; they are **not** claims about general-language classifier precision/recall.
 
-R2 is **IMPLEMENTED / VALIDATION PENDING** until `tests/Invoke-L3R2Offline.ps1` passes under Windows PowerShell 5.1.
+R2 is **PASS** on fix commit `94c7ce7751999b74ad9252665ebe3744d23be1ab`. User-supplied Windows PowerShell 5.1 evidence completed 4/4 suites with `ModelCalls=0` and `ProductionMemoryTouched=False`. The first R2 run exposed a sentence-final punctuation bug (`passed.` did not match `passed`); the tokenizer was corrected to strip boundary punctuation while retaining internal identifier punctuation, and the full suite then passed.
+
+
+## 15. Implementation checkpoint — L3-R3
+
+R3 adds an isolated deterministic retrieval planner and context compiler in `src/LfoL3Planner.ps1`.
+
+The planner:
+
+1. consumes the bounded R2 query classification;
+2. uses indexed positive L3 facets to build a candidate union;
+3. honors explicit negative query-facet membership and `retrieval:exclude`;
+4. applies small fixed weights to topic/entity/kind matches and `retrieval:priority`;
+5. performs lexical ranking only inside the tag-narrowed candidate set;
+6. resolves source refs against caller-supplied L0/L2 evidence payloads;
+7. safely deduplicates only records carrying the same explicit non-empty content fingerprint;
+8. prefers the compact L2 representation inside an explicitly equivalent group;
+9. emits only evidence text under explicit item/character budgets — no L3 tags or routing metadata;
+10. returns a baseline-fallback status when query facets or resolvable candidates are absent.
+
+R3 deliberately does not truncate an evidence record to force it under budget; an item either fits as a whole or is omitted.
+
+The offline corpus verifies L0/L2 equivalence dedupe, irrelevant/excluded suppression, lexical discrimination inside a tag-compatible set, character reduction, hard budgets, zero metadata leakage, no-query fallback, no partial truncation and multi-topic candidate union.
+
+This remains an offline planner contract. `QwenMemory.ps1` and `QwenChat.ps1` are still unchanged. Runtime integration and real prompt savings belong to the next gate after R3 offline acceptance.
+
+R3 is **IMPLEMENTED / VALIDATION PENDING** at commit `a030b04cf2bdda24e765391cbb43ab9af6fa5ac2` until `tests/Invoke-L3R3Offline.ps1` passes under Windows PowerShell 5.1.
