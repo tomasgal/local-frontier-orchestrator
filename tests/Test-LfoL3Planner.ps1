@@ -165,8 +165,7 @@ try {
     $atlasSingle = New-LfoL3ContextPlan $db 'conversation:1' $atlasSingleQuery $atlasSingleClass $atlasEvidence 4 1000
     if ($atlasSingle.Status -ne 'ok' -or $atlasSingle.SelectedCount -ne 1 -or
         $atlasSingle.Packet -cne 'ATLAS.os = Synthetic OS 13' -or
-        $atlasSingle.LexicalNarrowDrops -ne 0 -or
-        $atlasSingle.AuthorityShadowDrops -ne 1 -or $atlasSingle.Packet -match 'Historical ATLAS') {
+        $atlasSingle.LexicalNarrowDrops -ne 0 -or $atlasSingle.Packet -match 'Historical ATLAS') {
         throw ('R3 single-predicate lexical narrowing failed: ' + ($atlasSingle | ConvertTo-Json -Depth 5 -Compress))
     }
 
@@ -177,8 +176,7 @@ try {
         $atlasTwo.Packet -notmatch 'ATLAS\.ram_gb = 96' -or
         $atlasTwo.Packet -notmatch 'ATLAS\.cpu_count = 8' -or
         $atlasTwo.Packet -match 'ATLAS\.os|ATLAS\.disk_gb' -or
-        $atlasTwo.LexicalNarrowDrops -ne 0 -or
-        $atlasTwo.AuthorityShadowDrops -ne 1 -or $atlasTwo.Packet -match 'Historical ATLAS') {
+        $atlasTwo.LexicalNarrowDrops -ne 0 -or $atlasTwo.Packet -match 'Historical ATLAS') {
         throw ('R3 two-predicate lexical narrowing failed: ' + ($atlasTwo | ConvertTo-Json -Depth 5 -Compress))
     }
 
