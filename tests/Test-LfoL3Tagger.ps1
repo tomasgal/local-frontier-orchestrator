@@ -131,6 +131,17 @@ try {
         throw ("R2 corpus metrics failed: tp={0}, fp={1}, fn={2}, passed={3}/{4}" -f $tp,$fp,$fn,$casePass,$cases.Count)
     }
 
+    # Predicate is an independent bounded dimension.
+    Set-LfoL3TermRule $db 'predicate' 'ram_gb' 'RAM' 100 'r2-predicate-ram' $true
+    Set-LfoL3TermRule $db 'predicate' 'cpu_count' 'CPU count' 120 'r2-predicate-cpu' $true
+    $predicateClass = Get-LfoL3Classification $db 'For ORION, what are the RAM and CPU count?'
+    $predicateKeys = @($predicateClass.Predicates | ForEach-Object { $_.ValueKey })
+    if ((@($predicateKeys) -join '|') -cne 'cpu_count|ram_gb' -and
+        (@($predicateKeys) -join '|') -cne 'ram_gb|cpu_count') {
+        throw ('R2 predicate dimension mismatch: ' + ($predicateKeys -join ','))
+    }
+    if ($predicateClass.Predicates.Count -gt 4) { throw 'R2 predicate bound exceeded.' }
+
     # Disabled rules must disappear without creating a negative tag.
     Set-LfoL3TermRule $db 'topic' 'teaching' 'STH' 90 'r2-topic-teaching' $false
     $disabled = Get-LfoL3Classification $db 'STH'
@@ -150,11 +161,11 @@ try {
 
     $termCount = @(Invoke-LfoSqliteQuery $db 'SELECT COUNT(*) AS n FROM l3_terms WHERE active=1;')
     $schema = @(Invoke-LfoSqliteQuery $db "SELECT value FROM l3_meta WHERE key='schema_version';")
-    if ($schema[0].value -ne '2') { throw 'R2 expected L3 schema version 2.' }
+    if ($schema[0].value -ne '3') { throw 'R2 expected L3 schema version 3.' }
 
     [pscustomobject]@{
         PASS = $true
-        SchemaVersion = 2
+        SchemaVersion = 3
         CorpusCases = $cases.Count
         ExactCases = $casePass
         TruePositiveFacets = $tp
