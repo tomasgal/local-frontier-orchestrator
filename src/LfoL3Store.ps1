@@ -50,7 +50,7 @@ ON l3_items(scope_id, source_turn);
 
     $schemaRows = @(Invoke-LfoSqliteQuery $Connection "SELECT value FROM l3_meta WHERE key='schema_version';")
     $schemaVersion = if ($schemaRows.Count -eq 0) { 0 } else { [int]$schemaRows[0].value }
-    if ($schemaVersion -notin @(0,2,3)) {
+    if ($schemaVersion -notin @(0,2,3,4)) {
         throw "Unsupported L3 schema version $schemaVersion."
     }
 
@@ -103,6 +103,22 @@ PRAGMA foreign_keys = ON;
         $schemaVersion = 3
     }
 
+    if ($schemaVersion -eq 3) {
+        Invoke-LfoSqliteExec $Connection @'
+CREATE TABLE IF NOT EXISTS l3_l0_locators (
+    item_id      INTEGER PRIMARY KEY REFERENCES l3_items(id) ON DELETE CASCADE,
+    source_file  TEXT NOT NULL,
+    byte_offset  INTEGER NOT NULL CHECK (byte_offset >= 0),
+    byte_length  INTEGER NOT NULL CHECK (byte_length > 0),
+    updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS ix_l3_l0_locators_file_offset
+ON l3_l0_locators(source_file, byte_offset);
+UPDATE l3_meta SET value='4' WHERE key='schema_version';
+'@
+        $schemaVersion = 4
+    }
+
     Invoke-LfoSqliteExec $Connection @'
 CREATE TABLE IF NOT EXISTS l3_facets (
     item_id     INTEGER NOT NULL REFERENCES l3_items(id) ON DELETE CASCADE,
@@ -139,6 +155,17 @@ ON l3_terms(term_key, active, dimension);
 CREATE INDEX IF NOT EXISTS ix_l3_terms_value
 ON l3_terms(dimension, value_key, active);
 
+CREATE TABLE IF NOT EXISTS l3_l0_locators (
+    item_id      INTEGER PRIMARY KEY REFERENCES l3_items(id) ON DELETE CASCADE,
+    source_file  TEXT NOT NULL,
+    byte_offset  INTEGER NOT NULL CHECK (byte_offset >= 0),
+    byte_length  INTEGER NOT NULL CHECK (byte_length > 0),
+    updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_l3_l0_locators_file_offset
+ON l3_l0_locators(source_file, byte_offset);
+
 CREATE VIEW IF NOT EXISTS l3_item_facets AS
 SELECT
     i.id,
@@ -155,7 +182,7 @@ FROM l3_items i
 LEFT JOIN l3_facets f ON f.item_id = i.id;
 
 INSERT INTO l3_meta(key, value)
-VALUES ('schema_version', '3')
+VALUES ('schema_version', '4')
 ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 '@
 }
@@ -269,6 +296,55 @@ LIMIT 1;
 
     if ($rows.Count -ne 1) { throw 'L3 item upsert did not resolve exactly one row.' }
     return $rows[0]
+}
+
+function Set-LfoL3L0Locator(
+    $Connection,
+    [int64]$ItemId,
+    [string]$SourceFile,
+    [int64]$ByteOffset,
+    [int64]$ByteLength
+) {
+    $file = [IO.Path]::GetFileName($SourceFile)
+    if ([string]::IsNullOrWhiteSpace($file)) { throw 'L3 L0 locator source_file must not be empty.' }
+    if ($ByteOffset -lt 0) { throw 'L3 L0 locator byte_offset must be >= 0.' }
+    if ($ByteLength -le 0) { throw 'L3 L0 locator byte_length must be > 0.' }
+
+    Invoke-LfoSqliteNonQuery $Connection @'
+INSERT INTO l3_l0_locators(item_id, source_file, byte_offset, byte_length)
+VALUES (?1, ?2, ?3, ?4)
+ON CONFLICT(item_id) DO UPDATE SET
+    source_file = excluded.source_file,
+    byte_offset = excluded.byte_offset,
+    byte_length = excluded.byte_length,
+    updated_at = CURRENT_TIMESTAMP;
+'@ @($ItemId,$file,$ByteOffset,$ByteLength)
+
+    return @(Invoke-LfoSqliteQuery $Connection @'
+SELECT item_id, source_file, byte_offset, byte_length
+FROM l3_l0_locators
+WHERE item_id = ?1
+LIMIT 1;
+'@ @($ItemId))[0]
+}
+
+function Get-LfoL3L0Locators(
+    $Connection,
+    [int64[]]$ItemIds
+) {
+    $ids = @($ItemIds | Where-Object { $_ -gt 0 } | Sort-Object -Unique)
+    if ($null -eq $Connection -or $ids.Count -eq 0) { return @() }
+
+    $table = @(Invoke-LfoSqliteQuery $Connection "SELECT name FROM sqlite_master WHERE type='table' AND name='l3_l0_locators';")
+    if ($table.Count -ne 1) { return @() }
+
+    $placeholders = (1..$ids.Count | ForEach-Object { "?$_" }) -join ','
+    return @(Invoke-LfoSqliteQuery $Connection @"
+SELECT item_id, source_file, byte_offset, byte_length
+FROM l3_l0_locators
+WHERE item_id IN ($placeholders)
+ORDER BY item_id;
+"@ ([object[]]$ids))
 }
 
 function Set-LfoL3ExclusiveFacet(
