@@ -30,9 +30,20 @@ $lyraDebian=New-Proposal LYRA SET_TEXT os 'Debian 13'
 $core32=New-Proposal Core SET_INTEGER ram_gb '32'
 $backupOn=New-Proposal ORION SET_BOOLEAN nightly_backups_enabled 'true'
 $backupOff=New-Proposal ORION SET_BOOLEAN nightly_backups_enabled 'false'
+$databaseAsOs=New-Proposal ORION SET_TEXT os 'PostgreSQL 16'
+$cpu64=New-Proposal ORION SET_INTEGER cpu_count '64'
+$cpu32=New-Proposal ORION SET_INTEGER cpu_count '32'
+# Paired R1 cases use identical user evidence with independently specified
+# correct and incorrect proposals. Co-occurrence cannot bind an attribute.
+$textBindingPrompt='ORION runs Ubuntu 24.04, uses PostgreSQL 16.'
+$numericBindingPrompt='ORION has 64 GB RAM and 32 CPU cores.'
+$booleanBindingPrompt='ORION runs Ubuntu 24.04, nightly backups are enabled and audit logging is disabled.'
 # These cases must not authorize a durable LOCAL L2 write. Each contains a
 # plausible model proposal but insufficient or contradictory current-user evidence.
 $negative=@(
+    [pscustomobject]@{Name='database-value-misbound-to-os';Prompt=$textBindingPrompt;Ops=$databaseAsOs},
+    [pscustomobject]@{Name='ram-value-misbound-to-cpu-count';Prompt=$numericBindingPrompt;Ops=$cpu64},
+    [pscustomobject]@{Name='audit-disabled-misbound-to-backups';Prompt=$booleanBindingPrompt;Ops=$backupOff},
     [pscustomobject]@{Name='negation-in-main-claim';Prompt='ORION runs not Debian 13.';Ops=$debian},
     [pscustomobject]@{Name='negated-integer-claim';Prompt='ORION has no 64 GB RAM.';Ops=$ram64},
     [pscustomobject]@{Name='old-value-in-correction';Prompt='Correction: ORION now runs Debian 13 instead of Ubuntu 24.04.';Ops=$ubuntu},
@@ -49,6 +60,9 @@ $negative=@(
     [pscustomobject]@{Name='historic-claim-past-tense';Prompt='ORION was running Ubuntu 24.04.';Ops=$ubuntu}
 )
 $positive=@(
+    [pscustomobject]@{Name='os-bound-despite-database-value';Prompt=$textBindingPrompt;Ops=$ubuntu},
+    [pscustomobject]@{Name='cpu-count-bound-despite-ram-value';Prompt=$numericBindingPrompt;Ops=$cpu32},
+    [pscustomobject]@{Name='backups-enabled-despite-audit-disabled';Prompt=$booleanBindingPrompt;Ops=$backupOn},
     [pscustomobject]@{Name='fresh-os-declaration';Prompt='ORION runs Ubuntu 24.04.';Ops=$ubuntu},
     [pscustomobject]@{Name='explicit-correction-current';Prompt='Correction: ORION now runs Debian 13 instead of Ubuntu 24.04.';Ops=$debian},
     [pscustomobject]@{Name='ram-unit-bound';Prompt='ORION has 64 GB RAM and 32 CPU cores.';Ops=$ram64},
@@ -57,14 +71,21 @@ $positive=@(
     [pscustomobject]@{Name='boolean-negative-value';Prompt='ORION runs Ubuntu 24.04, and nightly backups are disabled.';Ops=$backupOff}
 )
 $fails=@()
+$caseResults=@()
 foreach($c in $negative) {
     $r=Get-LfoLocalModelWriteAuthorization -Prompt $c.Prompt -Route 'LOCAL' -ParsedOps $c.Ops
+    $caseResults+=[pscustomobject]@{Name=$c.Name;Prompt=$c.Prompt;Proposals=@($c.Ops.Valid);ExpectedAllowed=$false;ActualAllowed=[bool]$r.Allowed;Reason=$r.Reason;Verdict=$(if($r.Allowed){'FAIL'}else{'PASS'})}
     if($r.Allowed){$fails+= "UNSAFE ACCEPT $($c.Name): $($r.Reason)"}
 }
 foreach($c in $positive) {
     $r=Get-LfoLocalModelWriteAuthorization -Prompt $c.Prompt -Route 'LOCAL' -ParsedOps $c.Ops
+    $caseResults+=[pscustomobject]@{Name=$c.Name;Prompt=$c.Prompt;Proposals=@($c.Ops.Valid);ExpectedAllowed=$true;ActualAllowed=[bool]$r.Allowed;Reason=$r.Reason;Verdict=$(if($r.Allowed){'PASS'}else{'FAIL'})}
     if(-not $r.Allowed){$fails+= "FALSE REJECT $($c.Name): $($r.Reason)"}
 }
+# The existing runner captures this synthetic evidence in its TEMP log even
+# when this suite fails. Evaluate all pairs before failing; never mark a known
+# unsafe acceptance as an expected pass. No persistence is attempted here.
+$caseResults | ConvertTo-Json -Depth 8
 if($fails.Count -gt 0){throw ('Adversarial authorization FAILED: '+($fails -join ' | '))}
 [pscustomobject]@{
     PASS=$true

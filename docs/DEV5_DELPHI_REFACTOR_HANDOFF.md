@@ -1,5 +1,8 @@
 # Selective refactoring goal and chat handoff
 
+> **Superseding closure — 2026-10-12:** L2 is complete and frozen at `v9.4-l2-frozen`. Read [L2_FROZEN_BASELINE.md](L2_FROZEN_BASELINE.md) for the accepted profile, R1/R3/R4/R5 evidence and limitations. Earlier candidate, PENDING, PAUSED and next-test instructions below are historical. Do not restart L2 tuning automatically; next work is L3 design, then L4. The full 2414-character write policy is restored; A+B is accepted selectively, grouped extraction and C are not adopted.
+
+
 > **Current programme update (2026-10-11):** DEV3 remains the frozen semantic comparison and selective improvement workstream; DEV5 is the active experimental refactoring branch. Testing exposed substantial opportunities to simplify development and validation. See [ROADMAP.md](ROADMAP.md) for R0–R6 and the retained L3/L4 milestones. No claim of general speedup, model acceptance, or automatic production promotion is made.
 
 Tracking goal: [GitHub issue #3](https://github.com/tomasgal/local-frontier-orchestrator/issues/3).

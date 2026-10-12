@@ -1,5 +1,8 @@
 # Memory strategy
 
+> **Superseding closure — 2026-10-12:** L2 is complete and frozen at `v9.4-l2-frozen`. Read [L2_FROZEN_BASELINE.md](L2_FROZEN_BASELINE.md) for the accepted profile, R1/R3/R4/R5 evidence and limitations. Earlier candidate, PENDING, PAUSED and next-test instructions below are historical. Do not restart L2 tuning automatically; next work is L3 design, then L4. The full 2414-character write policy is restored; A+B is accepted selectively, grouped extraction and C are not adopted.
+
+
 > **2026-10-11 policy checkpoint:** the current experimental branch implements the user-requested **2040-character L2 extraction policy candidate**, preserving all five examples. The full-policy validation recorded below belongs to the earlier 2414-character template and does not validate this revision. Current Windows offline/model extraction acceptance is PENDING. See [the refactoring goal and handoff](DEV5_DELPHI_REFACTOR_HANDOFF.md) for the counting convention, prior-policy pin and staged acceptance roadmap.
 
 This document explains the **design rationale and evolution strategy** for conversational memory in Local Frontier Orchestrator (LFO).

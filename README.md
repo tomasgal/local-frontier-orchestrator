@@ -1,10 +1,10 @@
 # Local Frontier Orchestrator
 
-**Current fixed working baseline (2026-10-11): v9.3 on `main`.** The validated local-first routing and L0/L1 memory release baseline remains unchanged. **Active development: v9.4 DEV3 + DEV5**, on experimental branch `v9.4-dev5-compact-read`; frozen DEV3 reference `a34658b81742596520da844618b5bb39f3329279`. DEV3 L2 typed writes have targeted functional validation; DEV4 read/observability and DEV5 authorization/compact-read candidates have narrower experimental evidence. No DEV5 whole-system net speedup or production promotion has been established.
+**L2 complete and frozen (2026-10-12): `v9.4-l2-frozen`.** Typed SQLite memory, scope/provenance, corrections and integrity guards form the fixed foundation for L3/L4. The accepted variant combines DEV3/post-DEV3 improvements with selective DEV5 A+B read optimization. The separate v9.3 runtime on `main` remains unchanged; this milestone is published on `v9.4-dev5-compact-read` and pinned by the immutable tag.
 
-**Optimization milestone (2026-10-11):** Development and test results identified substantial scope to streamline test orchestration, validation and engineering decisions. Accepted earlier improvements include single-pass memory work elimination (v9.2), pressure-based compaction (v9.3), LOCAL temperature 0.10, removal of 871 duplicate prompt characters and narrow deterministic acknowledgement. Eligible DEV5 A/B trials demonstrated reduced unnecessary output/input token counts, but not a representative net speedup. A new **2040-character L2 extraction-policy candidate** (down from 2414, 15.49% fewer template characters) retains all five examples and passed static checks; Windows/model semantic acceptance is pending. The [selective-refactoring roadmap](docs/ROADMAP.md#active-development-programme--dev3--dev5--l3--l4-2026-10-11) and [handoff](docs/DEV5_DELPHI_REFACTOR_HANDOFF.md) reduce combinatorial tuning in favor of cheap offline gates, bounded model tests and explicit stop/go decisions. This is a positive development-process result; faster implementation is an expectation, not yet a measured outcome. **L3 semantic retrieval and L4 epistemic mediation remain planned milestones**, to be specified in detail after DEV3/DEV5 refactoring.
+**Measured CPU read-path improvement:** in four correctness-gated FULL / A+B / A+B / FULL observations, input fell **1756 to 1210 tokens (-31%)**, mean output **173 to 24 (-86%)**, and mean complete-turn time **159.629 to 24.791 seconds**. All responses were correct and L1/L2 memory unchanged. Load/cache asymmetry limits exact latency attribution; this is an accepted eligible-read optimization, not a general whole-workload DEV3–DEV5 speedup claim.
 
-**Start here:** [Current roadmap](docs/ROADMAP.md) · [Delphi refactor handoff](docs/DEV5_DELPHI_REFACTOR_HANDOFF.md) · [issue #3](https://github.com/tomasgal/local-frontier-orchestrator/issues/3) · [DEV5 experiments](docs/DEV5_PERFORMANCE_EXPERIMENTS.md) · [G2 historical handoff](docs/DEV5_G2_HANDOFF.md).
+**Start here:** [Frozen L2 contract, decisions and evidence](docs/L2_FROZEN_BASELINE.md) · [Frozen file manifest](docs/L2_FROZEN_MANIFEST.json) · [Next: L3, then L4](docs/ROADMAP.md). Existing default switches remain OFF. The explicit [accepted L2 profile](config/QwenChat-L2Frozen.config.psd1) selects A+B and the bounded mixed-current-user path; C and grouped extraction are not adopted. No repeated L2 tuning or model runs are a prerequisite for beginning L3 design.
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
@@ -14,66 +14,21 @@ The current reference implementation uses **Qwen via Ollama** as the local conve
 
 For v9.2 memory validation, the project uses a **conservative 90% engineering acceptance floor** for qualitative semantic behavior. This is not a claim that measured reliability is 90% or below 99%: the development smoke suite performed materially better than the acceptance floor, but its size and construction do not support a statistically defensible 99%-class reliability estimate.
 
-This repository is intentionally experimental. Routing, synthesis policy, context handling, and future bias-balancing behaviour are being tuned through longer-term use rather than optimized around a small fixed benchmark.
+The project remains a research prototype. L2 is now frozen; future retrieval and bias-balancing development proceeds above its fixed contract.
 
 For the rationale behind the conversational-memory architecture, trade-offs against other memory systems, and the planned path from single-pass micro-memory to pressure-triggered and eventually keyed/deterministic memory updates, see [docs/MEMORY_STRATEGY.md](docs/MEMORY_STRATEGY.md).
 
 As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validation scope on the constrained reference hardware. It preserves v9.2 single-pass micro-memory as the normal path, adds pressure-triggered compaction at `>=4` pending notes or `>=108` pending-note characters, and uses at most one focused memory-only recovery when the user explicitly asks the system to remember something but the single-pass note is empty. Invalid final-answer sentinels are also recovered without regenerating memory, and correction-prefix normalization is hardened across `CORR`, `CORR:` and `CORR :` variants. Isolated end-to-end tests passed both count-pressure and char-pressure compaction, while ordinary implicit memory remains single-pass. Raw JSONL history remains authoritative; rolling memory remains a lossy orientation layer.
 
-## v9.4 experimental status — Dev3 → Dev4 → Dev5 (checkpoint 2026-10-11)
+## v9.4 L2 closure — DEV3 foundation, selective DEV5 optimization
 
-**Dev3: functional L2 structured memory validated.** The scoped SQLite fact store provides typed attributes/relations, multi-fact updates, supersession history, source-turn provenance, correction, alias isolation, fail-closed atomic turn writes and restart continuity. Tests covered two Windows host classes and isolated live Qwen writing/correction on the constrained reference host. Dev3's post-write prompt/runtime optimization showed one-sample latency reductions; cross-host/repeated gains were not established.
+- **R1:** 12/12 Windows offline regression suites PASS for the accepted authorization repairs.
+- **R3:** six targeted Windows offline suites PASS after restoring the full 2414-character write policy.
+- **R4:** four isolated LOCAL turns PASS: declaration, correction, protected read, and exact-source mixed update. Four model calls; saved first turn rechecked after correcting an overly narrow predicate-name assertion, followed by three resumed turns.
+- **R5:** four protected read trials PASS; A+B eliminates redundant write output/instructions on eligible reads. FULL still proposed two memory operations per trial, safely suppressed by the existing guard. No production memory touched.
+- **R6:** accept the conservative write contract, integrity guards and selective A+B; retain bounded mixed writes and observability; defer grouped extraction and C; reject the 2040-character policy as the frozen default.
 
-**Dev4: observability and selective L2 read-side validated.** Per-phase model/assembly/persistence traces and bounded current-fact retrieval were introduced, with a deterministic read-side guard because the local model had echoed old retrieved facts as new write operations. On an isolated live four-fact ORION read, the guard suppressed four model-derived operations, left SQLite unchanged and preserved the answer. L2 retrieval is still opt-in.
-
-**Dev5: architecture-first performance and G2 persistence hardening are experimental.** Candidate A generates only `route` and `answer` when an actual protected L2 read makes memory operation output unnecessary. Candidate B separately removes unused write-extraction instructions on that same eligible path. Candidate C moves L2 evidence to a lower-priority quoted message; one adversarial control pair showed no proven C advantage. A separate narrow mixed-current-user evidence path permits exactly source-validated RAM updates in supported forms. All optional switches, including `Memory.StructuredReadEnabled`, are **false in default configuration**. Normal declarative writes and synthesis retain the full validated schema.
-
-### What is confirmed
-
-- **Targeted live A mechanism:** on the synthetic ORION read, output fell **294 → 45 tokens (-84.7%)** with the compact schema; full-schema control still emitted 294. This demonstrates removal of wasted generation on an *eligible* read path, not whole-project speedup.
-- **Targeted live A+B mechanism:** prompt input fell **1641 → 1042 tokens (-36.5%)** versus A-only. The observed one-sample answer wall fell **154.549 → 111.614 s**, with correct answers and no new L1/L2 state. Time attribution is exploratory and not statistically repeated.
-- **Bounded mixed-user feature:** a one-turn isolated Qwen test correctly answered a question while storing a single exact-source, opt-in RAM64→96 update, retaining scope, history and provenance. Wider language coverage and adversarial safety are **not** established.
-- **G2 Windows offline hardening:** **9/9 regression suites PASS**, including SQLite `BEGIN IMMEDIATE` guarded alias/scope authorization, writer lock, duplicate replay, cross-scope rejection, rollback under SQL failure and mixed-wrapper persistence failure reporting. This does not make the SQLite + L0 JSONL stores a single distributed transaction.
-- **Comparator contract:** synthetic-only comparator self-test PASS, including eight negative contract cases. It does not count as actual performance evidence.
-- **Measured model-free component pilot:** 4 matched AB/BA repetitions (pinned dev3 `a34658b8...` / dev5 `75e0b4b8...`) passed correctness. Five of six shared PowerShell/SQLite operations had dev5 medians ~12–17% slower, but subsequent paired-sign analysis found **none of the six consistently slower or faster over all 4 pairs**; absolute differences were millisecond-scale. This result does not establish either a stable regression or a net system gain.
-
-### Core 2026-10-11 offline acceptance and write-authority boundary
-
-**Twelve deterministic offline test scripts PASS** on the Core Windows host at exactly dev5 commit **370827f6793b59062aae841c9cf1cc439dadf6de**, with zero Ollama calls and no production-memory changes. This includes ten prior regression/comparator suites and two new LOCAL model-write safety suites: **14/14 unsafe statements blocked**, **6/6 representative valid statements retained**, and **11/11 original authorization scenarios**; the original unrecognized imperative read triggered **zero** new TEMP SQLite writes while a four-fact user assertion wrote **four**.
-
-The persistence boundary now rejects model-sourced LOCAL L2 operations without current-user assertion and subject/clause/value grounding, independently of the read/declaration routing heuristic. Refused model proposals also lose the accompanying untrusted L1 micro-note; trace records the authorization reason and rejected count. The policy remains **conservative lexical containment, not semantic verification**: nuanced valid statements may be rejected and unknown edge cases may remain. This does not establish live correctness with Qwen after the patch, transactional integrity across L0 JSONL + L2 SQLite, or production-grade security.
-
-An earlier Core 4-pair model-free benchmark pinned dev5 **581288e69f473c7f4a3ec346b96c48c24718fcab** (before the safety changes), versus pinned dev3 **a34658b81742596520da844618b5bb39f3329279**. Core descriptive signs: **2/6** operations consistently slower in all four pairs, **4/6** mixed signs, with millisecond-scale overhead and no end-to-end inference. These historic component timings must not be attributed to the newer acceptance commit.
-
-On Windows PowerShell and a clean experimental branch, run the one-command offline gate:
-
-    & .\tests\Invoke-Dev5OfflineRegressions.ps1
-
-This creates a TEMP-only JSON acceptance report and individual logs. The next stage is a frozen natural-language, correctness-gated, isolated dev3/dev5 live workload with explicit routing/authorization and model digest provenance; start with one controlled pair, not an automatic batch. See [G2 handoff](docs/DEV5_G2_HANDOFF.md) and [benchmark protocol](docs/DEV5_VS_DEV3_BENCHMARK_PROTOCOL.md).
-
-### First live dev3/dev5 pilot: useful diagnosis, **not A+B acceptance**
-
-Two isolated TEMP runs used `qwen3.5:4b-q4_K_M`, Ollama 0.34.4, `think=false`, context hint 5120 and the same synthetic BENCH_SERVER read request. Both answered the four requested facts correctly.
-
-| Pilot measure | dev3 pinned `a34658b8...` | dev5 pinned `1f57ec16...` |
-|---|---:|---:|
-| Answer wall | 184.84 s | 130.54 s |
-| Input tokens | 1508 | 1517 |
-| Output tokens | 298 | 234 |
-| L2 operations reported applied | 4 | 1 |
-| L1 micro-note | none | none |
-
-The observed dev5 turn was **54.30 s / 29.4% shorter**, but the sequential one-pair measurement does **not** prove a repeatable, weighted or causal speedup. The dev5 trace identified `l2_read_status=write_only_turn`, `l2_read_items=0`, `dev5_local_output_mode=full`, `dev5_read_policy_mode=full`, `l2_read_write_guard_active=false`, and `l2_write_source=model-unmodified`. Its request began with `State BENCH_SERVER ...`; the heuristic treated this imperative read request as a declarative update. **A and B did not activate.** The model suggested four memory operations and one was reported persisted despite the user's read-only intent. Which row was written requires a separate SQLite audit; the trace alone does not establish the exact predicate or historical effect.
-
-**This failure is actionable diagnostic evidence.** The goal is not to bolt on ever more regex exceptions or rewrite test prompts until they trigger A+B. For real workloads, measure routing hit/miss, extra token/time cost, model-call retries, memory mutation containment and ability to explain the decision from trace. Incorrect optimization selection may incur bounded extra cost; unsupported inference from earlier memory must not silently authorize new durable facts.
-
-### What is NOT confirmed and what happens next
-
-No repeatable representative **dev5-over-dev3 end-to-end net speedup**, no measured natural-workload optimization eligibility rate/weights, no comprehensive mixed-intent write safety, no RPi5/heterogeneous-node performance transfer and no deployment-ready security conclusion. An older full-schema timing residual (~110.95 s) was not reproduced in a later instrumented trial; its root cause is unknown. No default opt-in switch should be promoted on this evidence.
-
-The pause checkpoint is documented in [`docs/DEV5_G2_HANDOFF.md`](docs/DEV5_G2_HANDOFF.md). On restart, first audit the single reported dev5 SQLite write **offline**, then freeze a natural-language five-case workload and evaluation rubric before more model calls. Separate the dev5 A+B mechanism test (eligible scoped reads) from the dev3/dev5 whole-system benchmark (all routing outcomes, including heuristic misses). Match evidence, model digest and runtime conditions; stop early on failed correctness or excessive cost. Keep benchmarks in fresh TEMP state, and do not transfer host-specific tuning into common orchestration.
-
-**Raspberry Pi/edge transfer hypothesis:** work on memory-constrained Raspberry Pi inference motivates reducing unnecessary tokens, memory/context traffic, extra inference and blocking before tuning hardware-specific knobs. The roadmap cites *Pushing Four Raspberry Pis to the Memory Wall* (DOI `10.5281/zenodo.20357376`); informal references to a `5x RPi5` setup are not an independently verified replication specification here. Dev5 supports the **software work-elimination principle**, but LFO has not reproduced the paper, run a five-RPi5 system, measured energy/bandwidth or shown that its speedups transfer to Raspberry Pi devices. See the G2 handoff for evidence boundaries.
+L2 is closed for this scope. Historical results, failed candidates, source pins and remaining limitations are preserved in [the freeze record](docs/L2_FROZEN_BASELINE.md) and [historical experiments](docs/DEV5_PERFORMANCE_EXPERIMENTS.md). The next active design milestone is L3; L4 epistemic mediation follows. Human–AI bias-checker quality has not been established by these memory tests.
 
 ## Core architecture
 
@@ -322,19 +277,14 @@ The transport path is working:
 local model -> ask_codex -> native Codex frontier -> local model
 ```
 
-Current work focuses on:
+L2 is complete and frozen at `v9.4-l2-frozen`. Its accepted profile combines the
+DEV3 foundation, repaired authorization and selective DEV5 A+B optimization.
+See [the closure record](docs/L2_FROZEN_BASELINE.md) for evidence and boundaries.
 
-- **v9.4-dev5-compact-read (G2, experimental):** document the already validated Dev3 write and Dev4 read/observability paths; characterize Dev5 A+B's read-path token savings and the live heuristic-misroute/persistence anomaly; complete natural-workload full-loop net-gain evaluation before any release promotion. See [G2 handoff](docs/DEV5_G2_HANDOFF.md);
-- keep all Dev5 opt-in read/compact/lean/lower-trust/mixed features disabled in defaults until evidence justifies promotion;
-- preserve the v9.3 `main` baseline and do not alter production memory when testing;
-- long-term routing quality;
-- faithful-but-useful frontier synthesis;
-- structured trace logging;
-- additional host validation and context sizing;
-- suppressing internal retrieval metadata from user-facing answers;
-- multi-host profiles;
-- bias-aware mediation;
-- future edge/SBC execution.
+Next work is L3 interface/retrieval design, followed by L4 epistemic mediation.
+The v9.3 runtime on `main`, historical DEV3 and production memory remain unchanged.
+Future L2 defect fixes require a separately versioned change; the frozen reference
+must not be moved or silently retuned.
 
 ## License
 

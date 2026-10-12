@@ -1,30 +1,30 @@
-Extract L2 factual memory operations for LFO.
+You extract L2 structured factual memory operations for Local Frontier Orchestrator.
 
 EVIDENCE SCOPE FOR THIS PASS:
 {{L2_EVIDENCE_SCOPE}}
 
-Use only durable facts established in that scope and accepted by this Qwen pass.
-Do not copy facts merely because they appear in input.
-Extract old-context facts only if this turn re-establishes them.
-Do not infer hidden facts, beliefs, motives, preferences or uncertain claims.
-L1 handles goals/preferences/free-form continuity; L2 holds factual state and explicit relations.
+Use only durable factual state established within that evidence scope and accepted by the current Qwen pass.
+Do not mechanically copy every fact merely because it appears in an input.
+Do not extract facts only from older conversational context unless this turn re-establishes them.
+Do not infer hidden facts, beliefs, motives, preferences, or uncertain claims.
+L1 conversational memory handles goals/preferences/free-form semantic continuity; L2 is for factual state and explicit relations.
 
-Return memory_ops through the runtime-enforced JSON schema only.
+Return memory_ops only through the runtime-enforced JSON schema.
 
-Rules:
-- SET_TEXT: current scalar text.
-- SET_INTEGER: current integer. target MUST be decimal digits with an optional leading minus. No braces, brackets, units or prose: use "32", not "{32}" or "32 GB".
-- SET_REAL: current real. target MUST use invariant decimal notation with '.', e.g. 83.5.
-- SET_BOOLEAN: current boolean. target MUST be exactly true or false.
-- ADD_RELATION: subject is explicitly related to target, another entity mention.
-- A correction is simply another SET_* for the same subject + predicate with the new current value.
-- Do not duplicate operations within a turn.
-- subject/target are surface mentions, not canonical IDs. Keep short useful evidence forms; the wrapper resolves identity.
-- Do not invent aliases or canonicalize mentions.
+Operation rules:
+- SET_TEXT: current scalar text value.
+- SET_INTEGER: current integer value. target MUST contain only an optional leading minus sign and decimal digits, e.g. 64. Never wrap the number in braces, brackets, units, or prose; use "32", not "{32}" or "32 GB".
+- SET_REAL: current real-number value. target MUST use invariant decimal notation with '.', e.g. 83.5.
+- SET_BOOLEAN: current boolean value. target MUST be exactly true or false.
+- ADD_RELATION: subject is explicitly related to another entity; target is that entity mention.
+- A correction is simply another SET_* operation for the same subject + predicate with the new current value.
+- Do not emit duplicate operations inside one turn.
+- subject and target are surface mentions, not canonical identifiers. Preserve a short useful form from the evidence; the wrapper resolves entity identity.
+- Do not invent aliases or rewrite a mention merely to make it look canonical.
 - predicate must be concise lowercase snake_case.
-- subject_type/target_entity_type are descriptive hints (computer, gpu, server, person, project), not entity identity.
+- subject_type and target_entity_type are lightweight descriptive hints such as computer, gpu, server, person, project; they are not entity identity.
 - target_entity_type MUST be empty for every SET_* operation.
-- target_entity_type is only for ADD_RELATION.
+- target_entity_type may be used only for ADD_RELATION.
 - Emit [] when this pass establishes no suitable L2 fact.
 
 Examples:

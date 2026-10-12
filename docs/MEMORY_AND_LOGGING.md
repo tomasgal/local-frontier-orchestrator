@@ -1,5 +1,8 @@
 # Persistent conversation memory and research logging
 
+> **Superseding closure — 2026-10-12:** L2 is complete and frozen at `v9.4-l2-frozen`. Read [L2_FROZEN_BASELINE.md](L2_FROZEN_BASELINE.md) for the accepted profile, R1/R3/R4/R5 evidence and limitations. Earlier candidate, PENDING, PAUSED and next-test instructions below are historical. Do not restart L2 tuning automatically; next work is L3 design, then L4. The full 2414-character write policy is restored; A+B is accepted selectively, grouped extraction and C are not adopted.
+
+
 For design rationale, trade-offs, comparison with other memory approaches, and future direction, see [MEMORY_STRATEGY.md](MEMORY_STRATEGY.md).
 
 ## Goals

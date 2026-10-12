@@ -4,10 +4,27 @@
 param(
     [string]$Model,
     [string]$ConfigPath,
-    [string]$PolicyPath
+    [string]$PolicyPath,
+    [double]$Temperature = [double]::NaN,
+    [int]$ContextLength = 5120,
+    [int]$NumThreads = 1,
+    [string]$EvidenceDirectory,
+    [string]$ExpectedDigest
 )
 
 $ErrorActionPreference = 'Stop'
+# This is an extraction probe, not acceptance of an epistemic/bias mediator.
+# Select its sampling profile explicitly; never silently reuse it as a global
+# LOCAL/FRONTIER synthesis setting. Missing values fail without a UI prompt.
+if ([double]::IsNaN($Temperature) -or [double]::IsInfinity($Temperature) -or $Temperature -lt 0) {
+    throw 'Specify an explicit finite non-negative -Temperature for this extraction probe.'
+}
+if ($ContextLength -lt 1) { throw 'ContextLength must be positive.' }
+if ($NumThreads -lt 1) { throw 'NumThreads must be positive.' }
+if ([string]::IsNullOrWhiteSpace($EvidenceDirectory)) {
+    $EvidenceDirectory = Join-Path ([IO.Path]::GetTempPath()) ('LFO-r2-evidence-' + [guid]::NewGuid().ToString('N'))
+}
+$null = New-Item -ItemType Directory -Path $EvidenceDirectory -Force
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
@@ -94,6 +111,11 @@ The checked inventory identifies Core as an i7-8700 computer with 32 GB RAM and 
 )
 
 foreach ($case in $cases) {
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedDigest)) {
+        $tags = Invoke-RestMethod -Uri "$baseUri/api/tags" -TimeoutSec 15
+        $pin = @($tags.models | Where-Object { $_.name -ceq $Model })
+        if ($pin.Count -ne 1 -or $pin[0].digest -cne $ExpectedDigest) { throw 'Model digest changed or disappeared; no further inference.' }
+    }
     $policy = $policyTemplate.Replace('{{L2_EVIDENCE_SCOPE}}', ([string]$case.EvidenceScope).Trim())
 
     $bodyObj = @{
@@ -108,24 +130,34 @@ foreach ($case in $cases) {
         format = $schema
         options = @{
             num_predict = 384
-            temperature = 0.05
+            temperature = $Temperature
+            num_ctx = $ContextLength
+            num_gpu = 0
+            num_thread = $NumThreads
         }
     }
 
     $body = $bodyObj | ConvertTo-Json -Depth 16 -Compress
+    $body | Set-Content -LiteralPath (Join-Path $EvidenceDirectory ($case.Name + '.request.json')) -Encoding UTF8
+    Write-Host ("Running {0} (temperature={1}; CPU threads={2})..." -f $case.Name,$Temperature,$NumThreads)
     $sw = [Diagnostics.Stopwatch]::StartNew()
     $response = Invoke-RestMethod -Uri "$baseUri/api/chat" -Method Post -ContentType 'application/json; charset=utf-8' -Body $body -TimeoutSec 600
     $sw.Stop()
+    $response | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath (Join-Path $EvidenceDirectory ($case.Name + '.response.json')) -Encoding UTF8
 
     $content = [string]$response.message.content
+    Write-Host ("RawJSON: {0}" -f $content)
+    if ($response.done -ne $true -or $response.done_reason -eq 'length') { throw "Incomplete/truncated response: $($case.Name); preserve evidence, do not retry automatically." }
     $obj = $content | ConvertFrom-Json -ErrorAction Stop
+    if ($null -eq $obj.PSObject.Properties['memory_ops']) { throw "Missing memory_ops: $($case.Name)" }
     $parsed = ConvertFrom-LfoStructuredMemoryOps $obj.memory_ops 6
+    $parsed | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $EvidenceDirectory ($case.Name + '.parsed.json')) -Encoding UTF8
 
     Write-Host ""
     Write-Host ("=== {0} ===" -f $case.Name)
     Write-Host ("Prompt: {0}" -f $case.Prompt)
+    Write-Host ("Profile: extraction-only; temperature={0}; num_ctx={1}; num_predict=384; think=false" -f $Temperature,$ContextLength)
     Write-Host ("Time: {0:n2}s; valid={1}; rejected={2}" -f $sw.Elapsed.TotalSeconds, @($parsed.Valid).Count, @($parsed.Rejected).Count)
-    Write-Host ("RawJSON: {0}" -f $content)
 
     if (@($parsed.Valid).Count -eq 0) {
         Write-Host "memory_ops: []"
@@ -138,5 +170,7 @@ foreach ($case in $cases) {
     if (@($parsed.Rejected).Count -gt 0) {
         Write-Host "Rejected:" -ForegroundColor Yellow
         $parsed.Rejected | Format-List
+        throw "Rejected operations: $($case.Name); stop and inspect semantic output."
     }
 }
+Write-Host "Five responses collected. Semantic verdict: PENDING REVIEW. Evidence: $EvidenceDirectory"

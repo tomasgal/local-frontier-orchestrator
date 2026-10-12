@@ -1,5 +1,8 @@
 # Dev5 versus dev3: representative, correctness-gated benchmark
 
+> **Superseding closure — 2026-10-12:** L2 is complete and frozen at `v9.4-l2-frozen`. Read [L2_FROZEN_BASELINE.md](L2_FROZEN_BASELINE.md) for the accepted profile, R1/R3/R4/R5 evidence and limitations. Earlier candidate, PENDING, PAUSED and next-test instructions below are historical. Do not restart L2 tuning automatically; next work is L3 design, then L4. The full 2414-character write policy is restored; A+B is accepted selectively, grouped extraction and C are not adopted.
+
+
 **Status (2026-10-11): RESUMED after Core G2 12/12 offline acceptance PASS at dev5 commit 370827f, with a conservative independent LOCAL model-write authorization boundary and adversarial suite.** Comparator synthetic-only self-test PASS; four-pair measured model-free components PASS but are pinned to pre-hardening dev5 581288e and remain descriptive. A single two-turn dev3/dev5 pilot produced valid answers but **did not activate dev5 A+B** and reported an unintended model-origin L2 update. **No valid five-workload matched end-to-end result or net-gain acceptance.** Read [DEV5_G2_HANDOFF.md](DEV5_G2_HANDOFF.md) before resuming. This protocol is deliberately model-free until the Windows TEMP-only SQLite atomicity tests pass. Historical ORION/TITAN live timings are **not** a dev3/dev5 paired workload: different tasks, schemas, scopes and uncontrolled host states cannot establish a whole-project speedup.
 
 ## Refs and isolation

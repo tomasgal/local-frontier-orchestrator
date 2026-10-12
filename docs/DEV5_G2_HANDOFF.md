@@ -1,5 +1,8 @@
 # G2 handoff — v9.4-dev5-compact-read
 
+> **Superseding closure — 2026-10-12:** L2 is complete and frozen at `v9.4-l2-frozen`. Read [L2_FROZEN_BASELINE.md](L2_FROZEN_BASELINE.md) for the accepted profile, R1/R3/R4/R5 evidence and limitations. Earlier candidate, PENDING, PAUSED and next-test instructions below are historical. Do not restart L2 tuning automatically; next work is L3 design, then L4. The full 2414-character write policy is restored; A+B is accepted selectively, grouped extraction and C are not adopted.
+
+
 > **New chat entry point — 2026-10-11:** read [DEV5_DELPHI_REFACTOR_HANDOFF.md](DEV5_DELPHI_REFACTOR_HANDOFF.md) first for the selective-refactoring goal, four-stage roadmap and user-authorized **2040-character policy candidate**. The historical G2 evidence below remains valid only for its recorded source pins. Current policy acceptance is PENDING; the next step is the cheap offline gate. This supersedes the older restart ordering for the new candidate.
 
 **Checkpoint:** 2026-10-11 · **Status:** RESUMED; Core offline write-authority hardening and 12-suite acceptance PASS, still no post-hardening live dev3/dev5 net benchmark. Prior Lenovo live pilot remains exploratory. No feature promotion. This document is the starting point for the next session; do not restart the validation journey or silently run costly Ollama calls.

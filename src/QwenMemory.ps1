@@ -285,25 +285,30 @@ function Get-LfoLocalModelWriteAuthorization([string]$Prompt,[string]$Route,$Par
             # In 'now Debian instead of Ubuntu', only the current side may
             # justify an L2 write; the superseded side is not write evidence.
             $currentSide=[string]([regex]::Split([string]$clause,'(?i)\b(?:instead\s+of|rather\s+than)\b')[0])
-            # Boolean truth is evidenced by enabled/disabled vocabulary, not by literal 'true'/'false'.
+            # Presence in one sentence does not bind a value to its attribute.
+            # For OS and CPU count require the local assertion below. These are
+            # bounded lexical contracts, not inference about arbitrary predicates.
             if([string]$op.Op -ne 'SET_BOOLEAN' -and $currentSide -notmatch $targetPattern){continue}
+            if([string]$op.Op -eq 'SET_TEXT' -and [string]$op.Predicate -in @('os','operating_system')) {
+                $osEvidence='(?i)(?:\b(?:runs|be[z\u017E][i\u00ED])\s+(?:na\s+)?|\b(?:os|operating\s+system)\s*(?:is|=|:)\s*)'+$targetPattern+'(?=\s*(?:[,.;]|$|\band\b))'
+                if($currentSide -notmatch $osEvidence){continue}
+            }
+            if([string]$op.Op -eq 'SET_INTEGER' -and [string]$op.Predicate -eq 'cpu_count') {
+                $num=[regex]::Escape($opTarget)
+                $cpuEvidence='(?i)(?:(?<![\p{L}\p{N}.+\-])'+$num+'\s+CPU\s+cores?\b|\bCPU\s+(?:count|cores?)\s*(?:(?:is|are|=|:)\s*)?(?<![\p{L}\p{N}.+\-])'+$num+'(?![\p{L}\p{N}.]|[.,][0-9]))'
+                if($currentSide -notmatch $cpuEvidence){continue}
+            }
             if([string]$op.Op -eq 'SET_BOOLEAN') {
                 $truth=[bool]$op.TypedValue
                 $words=@(([string]$op.Predicate -split '_') |
                     Where-Object {$_ -notin @('is','has','enabled','active','true','false')})
-                $predicateSupported=$true
-                foreach($word in $words) {
-                    if($currentSide -notmatch ('(?i)(?<!\p{L})'+[regex]::Escape($word)+'(?!\p{L})')) {
-                        $predicateSupported=$false
-                        break
-                    }
-                }
-                $boolSupported=if($truth) {
-                    $currentSide -match '(?i)\b(?:enabled|active|true|on)\b'
-                } else {
-                    $currentSide -match '(?i)\b(?:disabled|inactive|false|off)\b'
-                }
-                if(-not $predicateSupported -or -not $boolSupported){continue}
+                if($words.Count -eq 0){continue}
+                $property=(@($words | ForEach-Object {[regex]::Escape($_)}) -join '\s+')
+                $state=if($truth){'(?:enabled|active|true|on)'}else{'(?:disabled|inactive|false|off)'}
+                # Property and truth must form one contiguous assertion. Never
+                # borrow the state of another property elsewhere in the clause.
+                $boolEvidence='(?i)(?<![\p{L}\p{N}_])'+$property+'\s+(?:is\s+|are\s+)?'+$state+'\b'
+                if($currentSide -notmatch $boolEvidence){continue}
             }
             if([string]$op.Op -eq 'SET_INTEGER' -and [string]$op.Predicate -eq 'ram_gb') {
                 # Prevent borrowing a CPU count or other integer as RAM.

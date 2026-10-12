@@ -51,6 +51,14 @@ $script:PendingNotesPath=Join-Path $state 'pending_notes.jsonl'
 [IO.File]::WriteAllText($script:PendingNotesPath,'')
 $script:RuntimeState=@{epoch=1;next_turn_id=3}
 $script:L2StructuredMemoryTemplate=(Get-Content -LiteralPath (Join-Path $repoRoot 'policy\l2-structured-memory.txt') -Raw -Encoding UTF8).TrimEnd()
+# Assert the complete checked-in policy with the independently specified LOCAL
+# evidence scope; editorial changes to its opening sentence are not a contract.
+$expectedEvidenceScope = @(
+    'For route LOCAL, the L2 evidence is the CURRENT USER TURN as interpreted by this Qwen pass.',
+    'For route FRONTIER, emit memory_ops=[] because the post-frontier synthesis pass owns L2 memory for the turn.',
+    'Do not derive L2 operations from old STATE, PENDING, RELEVANT OLD DATA, CURRENT STRUCTURED FACTS (L2), or older turns unless the current turn explicitly re-establishes the fact.'
+) -join "`n"
+$fullPolicyPattern = ([regex]::Escape($script:L2StructuredMemoryTemplate.Replace("`r`n", "`n").Replace('{{L2_EVIDENCE_SCOPE}}', $expectedEvidenceScope))).Replace('\n', '\r?\n')
 function Get-OrchestratorSystemPrompt{return 'DEV5 SEMANTIC REGRESSION ORCHESTRATOR'}
 $fakeOps=[pscustomobject]@{Valid=@([pscustomobject]@{Op='SET_INTEGER';Subject='ORION';Predicate='ram_gb';TypedValue=[int64]96});Rejected=@()}
 $fakeNote=[pscustomobject]@{Text='ORION RAM 96 GB'}
@@ -76,7 +84,7 @@ function Test-Dev5BoundaryCase{
     $guard=Protect-LfoPersistenceFromReadSide 'LOCAL' $fakeOps $fakeNote
     $shouldGuard=$L2Count -gt 0
     $hasLean=[bool]($policyText -match 'DEV5 READ-ONLY L2 POLICY')
-    $hasFull=[bool]($policyText -match 'You extract L2 structured factual memory operations')
+    $hasFull=[bool]($policyText -match $fullPolicyPattern)
     $schemaCount=if($Compact){2}else{4}
     if([int]$stat.l2_read_items -ne $L2Count -or
        [string]$stat.l2_read_status -ne $ReadStatus -or
@@ -84,7 +92,7 @@ function Test-Dev5BoundaryCase{
        @($schema.required).Count -ne $schemaCount -or
        $hasLean -ne $Lean -or $hasFull -eq $Lean -or
        $guard.GuardActive -ne $shouldGuard){
-        throw ("Boundary FAIL {0}: items={1} status={2} compact={3} lean={4} guard={5}" -f $Name,$stat.l2_read_items,$stat.l2_read_status,$eligibleCompact,$eligibleLean,$guard.GuardActive)
+        throw ("Boundary FAIL {0}: items={1}/{2} status={3}/{4} compact={5}/{6} lean={7}/{8} guard={9}/{10} schema={11}/{12} leanPolicy={13}/{8} fullPolicy={14}/{15} (actual/expected)" -f $Name,$stat.l2_read_items,$L2Count,$stat.l2_read_status,$ReadStatus,$eligibleCompact,$Compact,$eligibleLean,$Lean,$guard.GuardActive,$shouldGuard,@($schema.required).Count,$schemaCount,$hasLean,$hasFull,(-not $Lean))
     }
     if($shouldGuard){
         if(@($guard.Ops.Valid).Count -ne 0 -or $null -ne $guard.Note -or
@@ -154,7 +162,7 @@ foreach($probe in $roleProbes){
         }
     }else{
         if([string]$messages[0].content -match 'DEV5 DATA ROLE BOUNDARY' -or
-           [string]$messages[0].content -notmatch 'You extract L2 structured factual memory operations' -or
+           [string]$messages[0].content -notmatch $fullPolicyPattern -or
            (Get-QwenLocalOutputFormat).required.Count -ne 4){
             throw "Fallback from lower-trust path changed normal write schema: $($probe.Name)"
         }

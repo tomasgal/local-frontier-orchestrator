@@ -28,41 +28,28 @@ if ([double]$config.LocalGeneration.Temperature -ne 0.10) {
     throw "Unexpected LOCAL temperature: $($config.LocalGeneration.Temperature)"
 }
 
-$l2Policy = Get-Content -LiteralPath (Join-Path $repoRoot 'policy\l2-structured-memory.txt') -Raw -Encoding UTF8
-# User-requested 2040-character candidate. Count the checked-in template with
-# LF newlines, including its final LF, before evidence-scope substitution.
-# Windows checkout CRLF must not change the reported policy budget.
-# This structural check does not establish model extraction correctness.
-$l2Policy = $l2Policy.Replace("`r`n", "`n")
-if ($l2Policy.Length -ne 2040) {
-    throw "Unexpected L2 policy size: $($l2Policy.Length) chars; expected 2040 (LF-normalized)"
+# Check repository defaults before any test fixture overrides them. The
+# compact-read suite deliberately sets A/B/C itself, so it cannot prove this.
+$defaultOff = [ordered]@{
+    StructuredReadEnabled = $config.Memory.StructuredReadEnabled
+    CompactReadSchemaEnabled = $config.LocalGeneration.CompactReadSchemaEnabled
+    LeanReadPolicyEnabled = $config.LocalGeneration.LeanReadPolicyEnabled
+    LowerTrustL2EvidenceEnabled = $config.LocalGeneration.LowerTrustL2EvidenceEnabled
+    MixedUserEvidenceWriteEnabled = $config.LocalGeneration.MixedUserEvidenceWriteEnabled
 }
-if ([regex]::Matches($l2Policy, [regex]::Escape('{{L2_EVIDENCE_SCOPE}}')).Count -ne 1) {
-    throw 'Expected exactly one L2 evidence-scope placeholder.'
-}
-foreach ($required in @(
-    'SET_TEXT', 'SET_INTEGER', 'SET_REAL', 'SET_BOOLEAN', 'ADD_RELATION',
-    'snake_case', 'target_entity_type MUST be empty for every SET_*',
-    'A correction is simply another SET_*', 'Examples:',
-    'Do not infer hidden facts, beliefs, motives, preferences or uncertain claims.',
-    'Do not copy facts merely because they appear in input.',
-    'Extract old-context facts only if this turn re-establishes them.',
-    'Do not duplicate operations within a turn.',
-    'target MUST be decimal digits with an optional leading minus.',
-    'No braces, brackets, units or prose:',
-    'invariant decimal notation', 'target MUST be exactly true or false.',
-    'surface mentions, not canonical IDs', 'Do not invent aliases or canonicalize mentions.',
-    'target_entity_type is only for ADD_RELATION.',
-    'Emit [] when this pass establishes no suitable L2 fact.',
-    'SET_INTEGER ORION / ram_gb / 64',
-    'ADD_RELATION Core / has_gpu / GTX1050 / gpu',
-    'SET_TEXT GTX1050 / vendor / NVIDIA',
-    'SET_BOOLEAN ORION / nightly_backups_enabled / true',
-    'SET_TEXT ORION / os / Ubuntu 24.04'
-)) {
-    if (-not $l2Policy.Contains($required)) {
-        throw "L2 policy candidate lost required contract text: $required"
+foreach ($name in $defaultOff.Keys) {
+    if ($defaultOff[$name] -isnot [bool] -or $defaultOff[$name] -ne $false) {
+        throw "Experimental repository default must be boolean false: $name"
     }
+}
+
+$l2Policy = Get-Content -LiteralPath (Join-Path $repoRoot 'policy\l2-structured-memory.txt') -Raw -Encoding UTF8
+# Conservative integration restores the pinned full policy; check exact LF bytes.
+$l2Policy = $l2Policy.Replace("`r`n", "`n")
+$sha = [Security.Cryptography.SHA256]::Create()
+try {$actual = [BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($l2Policy))).Replace('-','').ToLowerInvariant()} finally {$sha.Dispose()}
+if ($l2Policy.Length -ne 2414 -or $actual -cne 'e569f902206f03a2318aed4de97ba4d62766ce89824ccac6fee3a5ea877a45ec') {
+    throw 'Conservative full policy differs from pinned reference.'
 }
 
 $memorySource = Get-Content -LiteralPath (Join-Path $repoRoot 'src\QwenMemory.ps1') -Raw -Encoding UTF8
@@ -101,6 +88,7 @@ if (-not $chatSource.Contains("local-declarative-ack")) {
 [pscustomobject]@{
     PASS = $true
     LocalTemperature = [double]$config.LocalGeneration.Temperature
+    DefaultOffFlagsChecked = $defaultOff.Count
     L2PolicyChars = $l2Policy.Length
     L2PolicyCountConvention = 'LF-normalized file including final LF; before scope substitution'
     ModelCalls = 0

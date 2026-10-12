@@ -1,5 +1,8 @@
 # v9.4-dev5 — architecture-first performance experiments
 
+> **Superseding closure — 2026-10-12:** L2 is complete and frozen at `v9.4-l2-frozen`. Read [L2_FROZEN_BASELINE.md](L2_FROZEN_BASELINE.md) for the accepted profile, R1/R3/R4/R5 evidence and limitations. Earlier candidate, PENDING, PAUSED and next-test instructions below are historical. Do not restart L2 tuning automatically; next work is L3 design, then L4. The full 2414-character write policy is restored; A+B is accepted selectively, grouped extraction and C are not adopted.
+
+
 > **2026-10-11 new candidate:** after the historical results below, the shared L2 extraction template was shortened at the user's request from **2414 to 2040 LF-normalized characters**, preserving all five examples. This changes normal LOCAL and synthesis extraction, so old PASS/token measurements are not current-candidate acceptance. Static text checks completed; Windows suites, model extraction and net benefit remain PENDING. Follow [DEV5_DELPHI_REFACTOR_HANDOFF.md](DEV5_DELPHI_REFACTOR_HANDOFF.md) before resuming tests; no automatic Ollama runs.
 
 Status (2026-10-11): **Core G2 write-authority hardening and 12/12 deterministic offline acceptance PASS at dev5 commit 370827f; historical A+B and mixed-turn isolated live mechanism trials PASS on Lenovo; NO post-hardening live full-loop run or proven dev5-versus-dev3 net speedup.** Four experimental read/mixed switches remain OFF by default. The Core four-pair model-free benchmark used an *earlier* dev5 pin 581288e, before safety hardening; see [G2 handoff](DEV5_G2_HANDOFF.md).

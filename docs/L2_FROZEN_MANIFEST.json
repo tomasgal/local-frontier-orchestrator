@@ -1,0 +1,25 @@
+{
+  "milestone": "v9.4-l2-frozen",
+  "decision_date": "2026-10-12",
+  "tested_runtime_source": "8ace0ca81e830095230efa1313e675dcd9143085",
+  "hash_convention": "SHA256 of UTF-8 content with LF line endings; BOM excluded",
+  "accepted_profile": "config/QwenChat-L2Frozen.config.psd1",
+  "files": {
+    "config/QwenChat-L2Frozen.config.psd1": "936b4c0a2e6aeaffe0a64e4d87e3cfc25cf3691f9b8d64366e35f5130ad80670",
+    "config/QwenChat.config.psd1": "316c3814b12e282458b9628835250d578c48dc53a924229acf4950823d6aed60",
+    "config/host.example.psd1": "2cede91c7afeb741db3137770fe2245ff435635784b561f6df8d6a68882eda99",
+    "policy/frontier-subagent.txt": "4055ea4ca3253ff0bb0b44a5447de8bd1f5b412381fd9829ebf4f922bdcfba9e",
+    "policy/l2-structured-memory.txt": "e569f902206f03a2318aed4de97ba4d62766ce89824ccac6fee3a5ea877a45ec",
+    "policy/memory-compaction-system.txt": "344d1e714d56b750cf68ca349b79c34a79a9e117b54951a7b4a04ca6dc3ca4fe",
+    "policy/memory-note-system.txt": "1ce60272b8edd10f13121ac0ad71f83458b5bf95d99e5f54e4ffff666da9b7c0",
+    "policy/orchestrator-system.txt": "637ed7d27fb128c4254257824372c9fffe5d5c312520104ee51f61cb73bd8bd7",
+    "policy/synthesis-system.txt": "84107e830fd0ea68c5fef9b477f6b594bd23f4d413641af459c707a810b55257",
+    "src/LfoMemoryStore.ps1": "1e699fa787d24889d6bbaa22b27835b522867b6e44cad10fadb690e5c6efe73a",
+    "src/LfoMixedTurnEvidence.ps1": "9bbf2ad37b3d832bc376c7184597d062c434e4a9ffd973bd3d56f7e9441bc80f",
+    "src/LfoStructuredMemory.ps1": "1225831a6014fed0e68b0cf6b46e5a357ccc01c5346dbef5348fafe9fc4a4394",
+    "src/LfoStructuredRetrieval.ps1": "d25a46541a263d48acac4747cca21b89ecbd460915f1a6ad5ad989efdc8811ab",
+    "src/LfoTurnTelemetry.ps1": "4635813f899ed6015e2b62792426cc68922734e7f99e6d99778cd9d3898751c0",
+    "src/QwenChat.ps1": "55b461f24d5666758bb7639d6e471de9a9e0547d3c84fabb47da32a346295cfd",
+    "src/QwenMemory.ps1": "ec53162319467280ba8f1705f94fd6e3f15888efb627393abe0acd0083559d0a"
+  }
+}

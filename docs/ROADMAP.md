@@ -1,28 +1,44 @@
 # Roadmap
 
-> **2026-10-11 selective-refactoring goal:** start with [DEV5_DELPHI_REFACTOR_HANDOFF.md](DEV5_DELPHI_REFACTOR_HANDOFF.md) for the staged roadmap and next-chat instructions. The user-requested L2 extraction policy is now a **2040-character candidate** (previously 2414, LF-normalized). Static text checks completed; current Windows/model acceptance and net performance remain PENDING. Historical full-policy validation below is preserved for its original revisions. All experimental defaults remain OFF.
+## Current programme — L2 CLOSED → L3 design → L4
 
-This roadmap describes engineering directions, not release commitments.
+**2026-10-12 decision:** L2 is complete for the accepted scope and frozen at
+`v9.4-l2-frozen`. See [the closure record](L2_FROZEN_BASELINE.md) for the exact
+profile, evidence, three decision classes and known limitations. Do not reopen
+L2 tuning or performance experiments by default. `main` runtime remains v9.3;
+its docs point to the separate frozen L2 baseline.
 
-## Active development programme — DEV3 + DEV5 → L3 → L4 (2026-10-11)
+| Gate | Closure |
+|---|---|
+| R0 | Development/test process simplified; expensive runs bounded. |
+| R1 | PASS: 12 Windows offline suites; demonstrated authorization defects repaired. |
+| R2 | Evaluation completed; failed shortened/grouped candidates retained as negative evidence, not promoted. |
+| R3 | PASS: six targeted Windows suites for conservative integration. |
+| R4 | PASS for four LOCAL declaration/correction/read/mixed turns; broader FRONTIER acceptance not asserted. |
+| R5 | PASS for four eligible FULL vs A+B observations; strong token/decode savings, bounded latency evidence. Broad DEV3/DEV5 benchmark deferred. |
+| R6 | DONE: conservative write policy plus guards and selective A+B accepted; immutable L2 boundary established. |
 
-**Management assessment: successful optimization discovery and development-process refactoring.** The DEV3 and DEV5 investigations exposed a substantial opportunity to simplify how LFO is developed, validated and benchmarked. Earlier semantic-policy reductions identified the cost of losing critical extraction instructions; selective read-path experiments demonstrated that unnecessary model output and input can be eliminated on eligible paths. Repeated orchestration/test-launch failures and inconclusive whole-loop timings identified avoidable development overhead. These are actionable discoveries, not proof of a general speedup. The new bounded roadmap is expected to accelerate *implementation and decision-making* by reusing existing test gates, reducing parameter combinations and requiring fewer expensive model experiments; the acceleration itself has not yet been measured.
+### Next: L3 requirements and interface design
 
-**Version and development policy:** `main` = frozen **v9.3 validated working/release baseline**; historical **DEV3** = immutable reference `a34658b81742596520da844618b5bb39f3329279`, with functionally validated L2 write semantics and accepted post-dev3 small optimizations; active integration/refactoring = **`v9.4-dev5-compact-read`**. DEV3 remains an active *development and comparison workstream*, not a branch to rewrite. DEV5 retains post-DEV3 authorization, transaction and read-side safety fixes. No automatic merge or feature promotion.
+Define semantic retrieval, entity resolution/linking and selective reranking over
+L0/L1/L2 where real needs justify them. Specify inputs/outputs, provenance, corpus,
+acceptance criteria and cost limits before implementation. Preserve the frozen
+L2 store and write/read contract; no vector or graph database is required by default.
+This milestone is planned, not implemented.
 
-### Execution roadmap and gates
+### Then: L4 / Local Epistemic Balancer
 
-1. **R0 — Refactoring checkpoint (DONE).** Simulated Delphi-style prioritization, [issue #3](https://github.com/tomasgal/local-frontier-orchestrator/issues/3), [handoff](DEV5_DELPHI_REFACTOR_HANDOFF.md), 2414 → 2040-character L2 policy candidate retaining five examples and static structural checks. Character savings are confirmed; semantic equivalence, Windows acceptance and net speedup are **not**.
-2. **R1 — Cheap deterministic acceptance (NEXT).** On clean Windows checkout of the exact DEV5 commit run existing `tests/Test-PromptPolicyOptimization.ps1` and `tests/Invoke-Dev5OfflineRegressions.ps1`; TEMP-only, zero Ollama, no production memory. Fix only demonstrated defects; no new test harness.
-3. **R2 — DEV3/DEV5 semantic gate (EXPLICIT APPROVAL FOR OLLAMA).** Run the unchanged five-case L2 extraction battery against the 2040-character candidate; inspect full entity/predicate/type/value/relation semantics, including LOCAL and post-FRONTIER evidence scope. On regression, preserve evidence and revert **only** the L2 policy to its pinned full-policy blob. Do not dilute fixtures.
-4. **R3 — Selective DEV5 simplification (PLANNED).** Assess a coherent opt-in A+B read profile with derived schema/policy; keep separate controls only when attribution requires them. Consider explicit typed L2 updates instead of expanding special-case mixed-turn grammar, subject to user-effort and automatic-capture trade-offs. Retain write authorization, transaction guards, observability and safe misses; avoid a new intent classifier or configuration sweep.
-5. **R4 — Isolated end-to-end integrity (EXPLICIT APPROVAL FOR MODEL RUNS).** Validate LOCAL and FRONTIER write/read/correction/mixed scenarios, independent SQLite/L1 audit, source-turn provenance and rejection behavior, using isolated TEMP state. Preserve DEV3 and v9.3 contracts.
-6. **R5 — Bounded performance attribution (EXPLICIT APPROVAL FOR OLLAMA).** Separate eligible FULL vs A+B from frozen five-case DEV3 vs DEV5 whole-turn comparisons. Pin source, policy, model/runtime and evidence; correctness gate first, then AB/BA, controlled cold/warm state, measured A+B hit/miss rate and realistic workload weights. Expand only on evidence of useful repeatable gains; accept inconclusive/negative results.
-7. **R6 — Architecture decision.** Accept, retain opt-in, simplify or retire candidates based on semantic integrity, net useful-turn cost and complexity budget. Preserve v9.3 main unless an explicit release decision authorizes promotion.
-8. **L3 — Next planned milestone, to be decomposed after R1–R6.** Semantic retrieval, candidate linking/entity resolution and selective reranking across L0/L1/L2, without replacing authoritative provenance or adding a vector/graph database by default. After the DEV3/DEV5 gates, define L3 scope, interface contract, evaluation corpus, necessity threshold, architecture alternatives, costs and acceptance criteria **before implementation**. L3 is retained on the roadmap, not cancelled.
-9. **L4 — Subsequent planned research/development milestone, to be decomposed after L3 planning.** Generic epistemic mediation / Local Epistemic Balancer: interaction-level bias detection and interventions, explicit control/reference conditions, reliance and calibration metrics, and preservation of a reproducible local epistemic anchor. Define research hypotheses, ethical constraints, intervention contract and separate validation gates after preceding milestones. L4 is retained on the roadmap, not cancelled; no premature coupling to DEV5 optimizations.
+Define generic epistemic mediation, disagreement and uncertainty handling, control
+conditions, reliance/calibration metrics and research safeguards. Keep derived bias
+observations separate from ordinary L2 factual memory. Plan this after L3 design;
+no claim of bias-checker validation follows from L2 extraction tests.
 
-**Streamlining principles:** optimize whole inference calls and useful-answer quality before micro-tuning; preserve semantic contracts; treat model-free tests as distinct from live correctness and speed evidence; reuse existing scripts rather than generate large ad-hoc PowerShell launchers; eliminate redundant knobs, not necessary safety guards. No production-memory access, `main` changes or costly model runs without authorization.
+### Historical roadmap and evidence
+
+The dated material below records development history. Earlier NEXT/PENDING/PAUSED
+or proposed large benchmark instructions are superseded by the closure above.
+They are not instructions to restart R1–R5. A new material defect or explicitly
+requested research scope may justify a versioned follow-up, never moving the tag.
 
 ## Baseline reached — 2026-09-29
 

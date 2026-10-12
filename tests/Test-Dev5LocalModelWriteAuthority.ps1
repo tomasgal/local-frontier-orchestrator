@@ -61,7 +61,12 @@ $script:Config=Import-PowerShellDataFile -LiteralPath (Join-Path $repo 'config\Q
 $script:Config.LocalGeneration.MixedUserEvidenceWriteEnabled=$false
 $script:Config.Memory.StructuredReadEnabled=$false
 $results=@()
-foreach($scenario in @('misrouted-read','positive-declaration')){
+$misbindingCases=@{
+    'misbound-text'=@{Prompt='ORION runs Ubuntu 24.04, uses PostgreSQL 16.';Op=(New-TestOp SET_TEXT ORION os 'PostgreSQL 16')}
+    'misbound-number'=@{Prompt='ORION has 64 GB RAM and 32 CPU cores.';Op=(New-TestOp SET_INTEGER ORION cpu_count '64')}
+    'misbound-boolean'=@{Prompt='ORION runs Ubuntu 24.04, nightly backups are enabled and audit logging is disabled.';Op=(New-TestOp SET_BOOLEAN ORION nightly_backups_enabled 'false')}
+}
+foreach($scenario in @('misrouted-read','positive-declaration','misbound-text','misbound-number','misbound-boolean')){
     $data=Join-Path $root $scenario
     [void](New-Item -ItemType Directory -Path $data -Force)
     $script:Config.Memory.DataDirectory=$data
@@ -83,6 +88,11 @@ foreach($scenario in @('misrouted-read','positive-declaration')){
     $isWrite=$scenario -eq 'positive-declaration'
     $prompt=if($isWrite){'ORION runs Ubuntu 24.04, uses PostgreSQL 16, has 64 GB RAM, and nightly backups are enabled.'}else{'State BENCH_SERVER operating system, RAM in GB, disk in GB and CPU count. Reply in one short sentence.'}
     $ops=if($isWrite){$dense}else{$pilotOps}
+    if($misbindingCases.ContainsKey($scenario)){
+        $prompt=$misbindingCases[$scenario].Prompt
+        $ops=ConvertFrom-LfoStructuredMemoryOps -RawOps @($misbindingCases[$scenario].Op) -MaxOps 6
+        if(@($ops.Valid).Count -ne 1 -or @($ops.Rejected).Count -ne 0){throw 'Invalid misbinding integration proposal'}
+    }
     $note=if($isWrite){$null}else{[pscustomobject]@{Text='UNTRUSTED MODEL FACT';Raw='UNTRUSTED MODEL FACT'}}
     $script:LfoTurnContext=$null
     $script:Messages=@(@{role='system';content='TEST'},@{role='user';content=$prompt})
@@ -100,7 +110,7 @@ foreach($scenario in @('misrouted-read','positive-declaration')){
     $trace=@(foreach($file in $traces){foreach($line in (Get-Content -LiteralPath $file.FullName -Encoding UTF8)){if($line.Trim()){$line|ConvertFrom-Json}}})
     if($trace.Count -ne 1 -or
        [bool]$trace[0].l2_model_write_authorized -ne $isWrite -or
-       [int]$trace[0].l2_model_ops_unauthorized_count -ne $(if($isWrite){0}else{4}) -or
+       [int]$trace[0].l2_model_ops_unauthorized_count -ne $(if($isWrite){0}else{@($ops.Valid).Count}) -or
        [int]$trace[0].l2_applied_count -ne $(if($isWrite){4}else{0}) -or
        [bool]$trace[0].l2_read_write_guard_active -or
        [bool]$trace[0].l1_note_suppressed_by_write_authority -ne (-not $isWrite) -or
@@ -114,4 +124,4 @@ foreach($scenario in @('misrouted-read','positive-declaration')){
     $results+=[pscustomobject]@{Scenario=$scenario;ActualSqliteWrites=$new.Count;Authorization=[string]$trace[0].l2_model_write_authorization_reason}
 }
 $results|Format-Table -AutoSize
-[pscustomobject]@{PASS=$true;Cases=$cases.Count;ActualPersistScenarios=2;MisroutedReadWrites=0;DeclarativeWrites=4;FrontierPolicyUnchanged=$true;ModelCalls=0;ProductionMemoryTouched=$false;TempRoot=$root}|Format-List
+[pscustomobject]@{PASS=$true;Cases=$cases.Count;ActualPersistScenarios=$results.Count;MisroutedReadWrites=0;MisbindingWrites=0;DeclarativeWrites=4;FrontierPolicyUnchanged=$true;ModelCalls=0;ProductionMemoryTouched=$false;TempRoot=$root}|Format-List
