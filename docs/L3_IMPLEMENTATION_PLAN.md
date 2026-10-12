@@ -633,3 +633,25 @@ Acceptance gates:
 Wall-clock latency is reported but is **exploratory**, not a universal-speedup acceptance criterion for this small paired pilot.
 
 This live gate is **IMPLEMENTED / VALIDATION PENDING**.
+
+
+### Live comparison first-run correction — invalid read-intent fixture
+
+The first bounded live run produced identical baseline/L3 model-visible input: 7512 chars and 1611 prompt tokens in every sample. The first baseline call took ~102 s while subsequent calls were ~6 s, showing a cold-load effect; this latency difference is not attributable to L3.
+
+Root cause: the live fixture query ended with an instruction sentence after the question:
+
+`For LFO, what operating system does BENCH_SERVER run? Answer in one concise sentence.`
+
+The frozen `Test-DeclarativeStateUpdatePrompt` heuristic classifies a prompt ending in a non-question mark as declarative unless a request pattern matches at the beginning. Because this prompt started with `For LFO,` and ended with a period, both baseline L2 retrieval and L3 retrieval were skipped as a write-only turn. The live comparison was therefore invalid and provides no evidence for or against L3 prompt reduction.
+
+Fix at `4a24c1fa9e5026b7c147012c43d35c67674b6816`:
+
+- use the unambiguous read query `For LFO, what OS does BENCH_SERVER run?`;
+- add a mandatory **pre-inference retrieval-shape probe**;
+- require baseline `L2Items=4`, L3 `L3Used=True`, `L3Status=ok`, `L3Selected=1`, `L2Items=1`;
+- require lower L3 model-visible chars and memory-block chars **before any model call**;
+- if the preflight fails, abort without spending inference time;
+- print L2/L3 activation status beside each measured live sample.
+
+The live gate remains **IMPLEMENTED / VALIDATION PENDING**.
