@@ -1437,8 +1437,16 @@ function Persist-TurnAndMemory(
         ''
     }
 
+    $conversationLogPath = $null
+    $conversationByteOffset = $null
+    $conversationByteLength = $null
     if ($script:MemoryEnabled) {
-        Append-JsonLine (Get-MonthlyLogPath 'conversation') ([ordered]@{
+        $conversationLogPath = Get-MonthlyLogPath 'conversation'
+        $conversationByteOffset = if (Test-Path -LiteralPath $conversationLogPath -PathType Leaf) {
+            [int64](Get-Item -LiteralPath $conversationLogPath).Length
+        } else { [int64]0 }
+
+        Append-JsonLine $conversationLogPath ([ordered]@{
             event = 'turn'
             timestamp = $timestamp
             turn_id = $turnId
@@ -1447,6 +1455,12 @@ function Persist-TurnAndMemory(
             user = $Prompt
             assistant = $FinalContent
         })
+
+        $conversationByteLength = [int64](Get-Item -LiteralPath $conversationLogPath).Length - [int64]$conversationByteOffset
+        if ($conversationByteLength -le 0) {
+            $conversationByteOffset = $null
+            $conversationByteLength = $null
+        }
 
         $script:RuntimeState.next_turn_id = $turnId + 1
         Save-RuntimeState
@@ -1535,7 +1549,7 @@ function Persist-TurnAndMemory(
     $l3IndexSw = [System.Diagnostics.Stopwatch]::StartNew()
     if ($script:L3IndexEnabled -and (Get-Command Invoke-LfoL3PostTurnIndex -ErrorAction SilentlyContinue)) {
         try {
-            $l3IndexResult = Invoke-LfoL3PostTurnIndex $Prompt $FinalContent $turnId $epoch $script:StructuredMemoryPath $script:L3Path $script:L3TopicRules
+            $l3IndexResult = Invoke-LfoL3PostTurnIndex $Prompt $FinalContent $turnId $epoch $script:StructuredMemoryPath $script:L3Path $script:L3TopicRules $(if ($null -ne $conversationLogPath) { [IO.Path]::GetFileName($conversationLogPath) } else { $null }) $conversationByteOffset $conversationByteLength
             $l3IndexStatus = [string]$l3IndexResult.Status
             $l3IndexError = $l3IndexResult.Error
         } catch {
