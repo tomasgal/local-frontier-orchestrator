@@ -161,11 +161,11 @@ try {
 
     $termCount = @(Invoke-LfoSqliteQuery $db 'SELECT COUNT(*) AS n FROM l3_terms WHERE active=1;')
     $schema = @(Invoke-LfoSqliteQuery $db "SELECT value FROM l3_meta WHERE key='schema_version';")
-    if ($schema[0].value -ne '3') { throw 'R2 expected L3 schema version 3.' }
+    if ($schema[0].value -ne '4') { throw 'R2 expected L3 schema version 4.' }
 
     [pscustomobject]@{
         PASS = $true
-        SchemaVersion = 3
+        SchemaVersion = 4
         CorpusCases = $cases.Count
         ExactCases = $casePass
         TruePositiveFacets = $tp
