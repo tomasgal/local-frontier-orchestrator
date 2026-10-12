@@ -1,37 +1,35 @@
 # Roadmap
 
-## Current programme — L2 CLOSED → L3 design → L4
+## Current programme — L2 CLOSED → L3 CLOSED → L4
 
-**2026-10-12 decision:** L2 is complete for the accepted scope and frozen at
-`v9.4-l2-frozen`. See [the closure record](L2_FROZEN_BASELINE.md) for the exact
-profile, evidence, three decision classes and known limitations. Do not reopen
-L2 tuning or performance experiments by default. `main` runtime remains v9.3;
-its docs point to the separate frozen L2 baseline.
+**2026-10-12 decision:** L2 is frozen at `v9.4-l2-frozen` and L3 is closed for
+the accepted scope at `v9.5-l3-frozen`. Do not reopen either layer by default.
+See [L2 frozen baseline](L2_FROZEN_BASELINE.md) and
+[L3 frozen baseline](L3_FROZEN_BASELINE.md) for the exact contracts, evidence,
+limitations and reopen criteria.
 
-| Gate | Closure |
-|---|---|
-| R0 | Development/test process simplified; expensive runs bounded. |
-| R1 | PASS: 12 Windows offline suites; demonstrated authorization defects repaired. |
-| R2 | Evaluation completed; failed shortened/grouped candidates retained as negative evidence, not promoted. |
-| R3 | PASS: six targeted Windows suites for conservative integration. |
-| R4 | PASS for four LOCAL declaration/correction/read/mixed turns; broader FRONTIER acceptance not asserted. |
-| R5 | PASS for four eligible FULL vs A+B observations; strong token/decode savings, bounded latency evidence. Broad DEV3/DEV5 benchmark deferred. |
-| R6 | DONE: conservative write policy plus guards and selective A+B accepted; immutable L2 boundary established. |
+### L3 closure
 
-### Next: L3 requirements and interface design
+Accepted L3 properties:
 
-Define semantic retrieval, entity resolution/linking and selective reranking over
-L0/L1/L2 where real needs justify them. Specify inputs/outputs, provenance, corpus,
-acceptance criteria and cost limits before implementation. Preserve the frozen
-L2 store and write/read contract; no vector or graph database is required by default.
-This milestone is planned, not implemented.
+- reconstructible schema-v4 faceted SQLite index over L0/L2 references;
+- deterministic bounded topic/entity/kind/predicate classification;
+- selective current-L2 retrieval with historical exclusion;
+- exact baseline fallback for unclassified/no-match reads;
+- verified L0 byte locator with authoritative JSONL scan fallback;
+- no mandatory extra model call;
+- default-OFF deployment switches;
+- final 8/8 offline suite PASS and broader LIVE2 correctness PASS.
 
-### Then: L4 / Local Epistemic Balancer
+Final closure progress: **100/100**.
+
+### Next: L4 / Local Epistemic Balancer
 
 Define generic epistemic mediation, disagreement and uncertainty handling, control
 conditions, reliance/calibration metrics and research safeguards. Keep derived bias
-observations separate from ordinary L2 factual memory. Plan this after L3 design;
-no claim of bias-checker validation follows from L2 extraction tests.
+observations separate from ordinary L2 factual memory. L4 must build above the
+frozen L2/L3 contracts rather than reopening their tuning. No claim of
+bias-checker validation follows from memory/retrieval tests alone.
 
 ### Historical roadmap and evidence
 
