@@ -47,7 +47,8 @@ foreach ($case in @($doc.cases)) {
         }
         'two_current' {
             if (-not $l.l3_used -or [string]$l.l3_status -cne 'ok' -or
-                [int]$l.l2_items -ne 2 -or [int]$b.l2_items -lt 2) { throw 'Invalid two_current shape.' }
+                [int]$l.l2_items -ne 2 -or [int]$l.l0_items -ne 0 -or
+                [int]$b.l2_items -lt 2) { throw 'Invalid two_current shape.' }
             if (@($l.predicate_keys).Count -ne 2 -or
                 @($l.predicate_keys) -notcontains 'ram_gb' -or
                 @($l.predicate_keys) -notcontains 'cpu_count') {
