@@ -38,7 +38,7 @@ $l2HashBefore = (Get-FileHash -LiteralPath $l2Path -Algorithm SHA256).Hash
 $l3 = Open-LfoL3Store $l3Path
 try {
     $schema = @(Invoke-LfoSqliteQuery $l3 "SELECT value FROM l3_meta WHERE key='schema_version';")
-    if ($schema.Count -ne 1 -or $schema[0].value -ne '3') {
+    if ($schema.Count -ne 1 -or $schema[0].value -ne '4') {
         throw 'Unexpected L3 schema version.'
     }
 
@@ -59,6 +59,7 @@ try {
         [void](Set-LfoL3Facet $l3 $fact.id 'kind' 'Configuration' 1 'r1-test')
         [void](Set-LfoL3Facet $l3 $fact.id 'predicate' 'os' 1 'r1-test')
         [void](Set-LfoL3Facet $l3 $fact.id 'retrieval' 'Priority' 1 'r1-test')
+        [void](Set-LfoL3L0Locator $l3 ([int64]$turn.id) 'conversation-2026-10.jsonl' 123 456)
 
         # Unknown is represented by absence, not by a synthetic zero tag.
         Remove-LfoL3Facet $l3 $turn.id 'topic' 'Temporary'
@@ -84,6 +85,7 @@ try {
     $otherScope = @(Get-LfoL3ItemsByFacet $l3 'conversation:2' 'topic' 'lfo' 1)
     $removed = @(Get-LfoL3ItemsByFacet $l3 'conversation:1' 'topic' 'temporary' 1)
     $turnFacets = @(Get-LfoL3Facets $l3 $turn.id)
+    $turnLocator = @(Get-LfoL3L0Locators $l3 @([int64]$turn.id))
     $stats = Get-LfoL3StoreStats $l3
     $facetSql = @(Invoke-LfoSqliteQuery $l3 "SELECT sql FROM sqlite_master WHERE type='table' AND name='l3_facets';")
     if ($facetSql.Count -ne 1 -or [string]$facetSql[0].sql -match 'dimension\s+IN\s*\(') {
@@ -101,6 +103,10 @@ try {
     }
     if ($stats.Items -ne 3 -or $stats.Facets -ne 11) {
         throw ("Unexpected L3 counts: items={0}, facets={1}" -f $stats.Items,$stats.Facets)
+    }
+    if ($turnLocator.Count -ne 1 -or $turnLocator[0].source_file -cne 'conversation-2026-10.jsonl' -or
+        [int64]$turnLocator[0].byte_offset -ne 123 -or [int64]$turnLocator[0].byte_length -ne 456) {
+        throw 'L3 L0 locator persistence failed.'
     }
 
     Close-LfoSqliteDatabase $l3
@@ -171,13 +177,16 @@ try {
     $migratedSchema = @(Invoke-LfoSqliteQuery $migrated "SELECT value FROM l3_meta WHERE key='schema_version';")
     $migratedFacet = @(Get-LfoL3ItemsByFacet $migrated 'conversation:1' 'topic' 'lfo' 1)
     $migratedTerm = @(Invoke-LfoSqliteQuery $migrated "SELECT * FROM l3_terms WHERE dimension='topic' AND value_key='lfo' AND term_key='lfo';")
-    if ($migratedSchema.Count -ne 1 -or $migratedSchema[0].value -ne '3' -or
+    if ($migratedSchema.Count -ne 1 -or $migratedSchema[0].value -ne '4' -or
         $migratedFacet.Count -ne 1 -or $migratedTerm.Count -ne 1) {
-        throw 'L3 v2->v3 migration did not preserve derived metadata.'
+        throw 'L3 v2->v4 migration did not preserve derived metadata.'
     }
-    [void](Set-LfoL3Facet $migrated 1 'predicate' 'os' 1 'migration-v3')
+    [void](Set-LfoL3Facet $migrated 1 'predicate' 'os' 1 'migration-v4')
     $migratedPredicate = @(Get-LfoL3ItemsByFacet $migrated 'conversation:1' 'predicate' 'os' 1)
-    if ($migratedPredicate.Count -ne 1) { throw 'L3 v3 predicate facet is not writable after migration.' }
+    if ($migratedPredicate.Count -ne 1) { throw 'L3 v4 predicate facet is not writable after migration.' }
+    [void](Set-LfoL3L0Locator $migrated 1 'conversation-legacy.jsonl' 10 20)
+    $migratedLocator = @(Get-LfoL3L0Locators $migrated @(1))
+    if ($migratedLocator.Count -ne 1) { throw 'L3 v4 locator is not writable after migration.' }
 } finally {
     Close-LfoSqliteDatabase $migrated
 }
@@ -204,7 +213,7 @@ try {
 
 [pscustomobject]@{
     PASS = $true
-    SchemaVersion = 3
+    SchemaVersion = 4
     PositiveTopicItems = $positive.Count
     NegativeTopicItems = $negative.Count
     ScopeIsolation = ($otherScope.Count -eq 1)
