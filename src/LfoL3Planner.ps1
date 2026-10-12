@@ -37,7 +37,7 @@ function Get-LfoL3EvidenceLexicalScore([string]$Text, [string[]]$Terms) {
     $score = 0
     foreach ($term in $Terms) {
         if ([string]::IsNullOrWhiteSpace($term)) { continue }
-        if ($normalized -match ('(^|-)' + [regex]::Escape($term) + '(-|$)')) {
+        if ($normalized -match ('(^|[-._:+])' + [regex]::Escape($term) + '([-._:+]|$)')) {
             $score += 1
         }
     }
@@ -163,6 +163,7 @@ function New-LfoL3ContextPlan(
         PacketChars = 0
         DroppedChars = 0
         DuplicateDrops = 0
+        LexicalNarrowDrops = 0
         BudgetDrops = 0
     }
     if ($null -eq $Connection -or [string]::IsNullOrWhiteSpace($ScopeId) -or
@@ -221,6 +222,9 @@ function New-LfoL3ContextPlan(
             ContentFingerprint = [string]$candidate.ContentFingerprint
             Text = $text
             MetadataScore = [int]$candidate.MetadataScore
+            TopicMatches = [int]$candidate.TopicMatches
+            EntityMatches = [int]$candidate.EntityMatches
+            KindMatches = [int]$candidate.KindMatches
             LexicalScore = [int]$lexical
             Score = ([int]$candidate.MetadataScore * 1000) + $layerAuthority + ([int]$lexical * 5)
             Priority = [bool]$candidate.Priority
@@ -261,6 +265,36 @@ function New-LfoL3ContextPlan(
     }
     $deduped += $withoutFingerprint
 
+    # If several L2 facts are equally eligible by matched L3 facets, use lexical
+    # contrast only as a deterministic read-side discriminator.  This keeps a
+    # broad query broad (all scores equal), but lets an explicit predicate name
+    # such as os, ram or cpu_count suppress sibling facts from the same entity.
+    # L0 evidence is never removed by this step.
+    $lexicalNarrowDrops = 0
+    $l0Deduped = @($deduped | Where-Object { $_.SourceLayer -ne 'L2' })
+    $l2Deduped = @($deduped | Where-Object { $_.SourceLayer -eq 'L2' })
+    $narrowedL2 = @()
+    foreach ($group in @($l2Deduped | Group-Object -Property {
+        '{0}|{1}|{2}' -f $_.TopicMatches,$_.EntityMatches,$_.KindMatches
+    })) {
+        $items = @($group.Group)
+        if ($items.Count -le 1) {
+            $narrowedL2 += $items
+            continue
+        }
+        $range = $items | Measure-Object -Property LexicalScore -Minimum -Maximum
+        if ([int]$range.Maximum -gt [int]$range.Minimum) {
+            $keep = @($items | Where-Object { [int]$_.LexicalScore -gt [int]$range.Minimum })
+            if ($keep.Count -gt 0) {
+                $narrowedL2 += $keep
+                $lexicalNarrowDrops += ($items.Count - $keep.Count)
+                continue
+            }
+        }
+        $narrowedL2 += $items
+    }
+    $deduped = @($l0Deduped) + @($narrowedL2)
+
     $ranked = @(
         $deduped |
         Sort-Object @{Expression='Score';Descending=$true},
@@ -292,6 +326,7 @@ function New-LfoL3ContextPlan(
     if ($selected.Count -eq 0) {
         $empty.Status = 'budget_empty'
         $empty.DuplicateDrops = $duplicateDrops
+        $empty.LexicalNarrowDrops = $lexicalNarrowDrops
         $empty.BudgetDrops = $budgetDrops
         return $empty
     }
@@ -308,6 +343,7 @@ function New-LfoL3ContextPlan(
         PacketChars = $packet.Length
         DroppedChars = [Math]::Max(0,$candidateChars - $packet.Length)
         DuplicateDrops = $duplicateDrops
+        LexicalNarrowDrops = $lexicalNarrowDrops
         BudgetDrops = $budgetDrops
     }
 }
