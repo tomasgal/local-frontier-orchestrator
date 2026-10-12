@@ -114,6 +114,74 @@ try {
     Close-LfoSqliteDatabase $l3
 }
 
+# Explicit schema migration control: preserve a v2 derived index and make
+# the new predicate dimension writable without touching L2.
+$migrationPath = Join-Path $root 'l3-v2-migration.db'
+$legacy = Open-LfoSqliteDatabase $migrationPath
+try {
+    Invoke-LfoSqliteExec $legacy @'
+PRAGMA foreign_keys = ON;
+CREATE TABLE l3_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE l3_items (
+    id INTEGER PRIMARY KEY,
+    scope_id TEXT NOT NULL,
+    source_layer TEXT NOT NULL CHECK (source_layer IN ('L0','L2')),
+    source_ref TEXT NOT NULL,
+    source_turn INTEGER NULL,
+    content_fingerprint TEXT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(scope_id, source_layer, source_ref)
+);
+CREATE TABLE l3_facets (
+    item_id INTEGER NOT NULL REFERENCES l3_items(id) ON DELETE CASCADE,
+    dimension TEXT NOT NULL CHECK (dimension IN ('topic','entity','kind','temporal','retrieval')),
+    value_key TEXT NOT NULL,
+    polarity INTEGER NOT NULL CHECK (polarity IN (-1,1)),
+    rule_id TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(item_id, dimension, value_key)
+);
+CREATE TABLE l3_terms (
+    dimension TEXT NOT NULL CHECK (dimension IN ('topic','entity','kind')),
+    value_key TEXT NOT NULL,
+    term_key TEXT NOT NULL,
+    priority INTEGER NOT NULL DEFAULT 0,
+    rule_id TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(dimension, value_key, term_key)
+);
+INSERT INTO l3_meta(key,value) VALUES ('schema_version','2');
+INSERT INTO l3_items(id,scope_id,source_layer,source_ref,source_turn)
+VALUES (1,'conversation:1','L2','fact:legacy',1);
+INSERT INTO l3_facets(item_id,dimension,value_key,polarity,rule_id)
+VALUES (1,'topic','lfo',1,'legacy-v2');
+INSERT INTO l3_terms(dimension,value_key,term_key,priority,rule_id,active)
+VALUES ('topic','lfo','lfo',100,'legacy-v2',1);
+'@
+} finally {
+    Close-LfoSqliteDatabase $legacy
+}
+
+$migrated = Open-LfoL3Store $migrationPath
+try {
+    $migratedSchema = @(Invoke-LfoSqliteQuery $migrated "SELECT value FROM l3_meta WHERE key='schema_version';")
+    $migratedFacet = @(Get-LfoL3ItemsByFacet $migrated 'conversation:1' 'topic' 'lfo' 1)
+    $migratedTerm = @(Invoke-LfoSqliteQuery $migrated "SELECT * FROM l3_terms WHERE dimension='topic' AND value_key='lfo' AND term_key='lfo';")
+    if ($migratedSchema.Count -ne 1 -or $migratedSchema[0].value -ne '3' -or
+        $migratedFacet.Count -ne 1 -or $migratedTerm.Count -ne 1) {
+        throw 'L3 v2->v3 migration did not preserve derived metadata.'
+    }
+    [void](Set-LfoL3Facet $migrated 1 'predicate' 'os' 1 'migration-v3')
+    $migratedPredicate = @(Get-LfoL3ItemsByFacet $migrated 'conversation:1' 'predicate' 'os' 1)
+    if ($migratedPredicate.Count -ne 1) { throw 'L3 v3 predicate facet is not writable after migration.' }
+} finally {
+    Close-LfoSqliteDatabase $migrated
+}
+
 # L3 operations must not mutate the physically separate L2 database.
 $l2HashAfter = (Get-FileHash -LiteralPath $l2Path -Algorithm SHA256).Hash
 if ($l2HashAfter -cne $l2HashBefore) {
