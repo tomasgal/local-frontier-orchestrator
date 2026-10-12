@@ -6,6 +6,8 @@
 
 **Start here:** [Frozen L2 contract, decisions and evidence](docs/L2_FROZEN_BASELINE.md) · [Frozen file manifest](docs/L2_FROZEN_MANIFEST.json) · [Next: L3, then L4](docs/ROADMAP.md). Existing default switches remain OFF. The explicit [accepted L2 profile](config/QwenChat-L2Frozen.config.psd1) selects A+B and the bounded mixed-current-user path; C and grouped extraction are not adopted. No repeated L2 tuning or model runs are a prerequisite for beginning L3 design.
 
+**L3 candidate checkpoint (2026-10-12):** the selective tagged SQL retrieval layer is now approximately **80% toward freeze-ready status**. Store, deterministic tagging, context planner, opt-in runtime integration, automatic indexing and the first valid live comparison have passed. On the bounded eligible live case, L3 reduced model input from **1165 to 973 prompt tokens (-16.48%)** and model-visible context from **5519 to 4618 chars (-16.33%)** at matched correctness. Broader five-case live validation and closure hardening remain before freeze. See [L3 candidate checkpoint and test plan](docs/L3_CANDIDATE_CHECKPOINT.md).
+
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
 The project starts from a simple premise: a local model does not need to outperform a frontier model in general intelligence to be useful. It can remain the always-available conversational layer, handle inexpensive or privacy-sensitive work locally, preserve conversational continuity, and selectively escalate tasks that require fresh information, external verification, stronger reasoning, or broader tool access.

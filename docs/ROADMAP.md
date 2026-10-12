@@ -256,3 +256,28 @@ An isolated dev3/dev5 LOCAL pilot on identical `BENCH_SERVER` synthetic question
 Acceptance guidance: prefer **low-cost and observable failures** over brittle expansion of the lexical classifier. Keep optimizer eligibility separate from authorization of persistent memory mutations. Assess natural prompt distribution, wrong-branch cost, read-only correctness, trace attribution, retries/extra model passes, and representative full-loop net performance against pinned dev3, including always-on dev4 overhead. Separate opt-in eligible A+B mechanism measurements from broad dev3/dev5 workload analysis. An inconclusive/negative speed result remains publishable without promoting experimental flags.
 
 The referenced Raspberry Pi study is a **research motivation**, not a performance transfer proven by LFO. The project's contact entry calls it *Pushing Four Raspberry Pis to the Memory Wall* (DOI `10.5281/zenodo.20357376`); informal shorthand `5x RPi5` must not be interpreted as an independently confirmed hardware topology, a five-fold gain or an LFO reproduction. No edge power/performance/energy or multi-host scaling study has been completed. The next session must begin with the handoff and an offline audit of the lone model-origin L2 write; testing is presently PAUSED.
+
+
+## L3 candidate checkpoint — 2026-10-12
+
+L3 selective tagged SQL retrieval is now a **validated candidate solution**, not yet frozen.
+
+Current milestone estimate: **80% toward freeze-ready L3**.
+
+Completed:
+- separate reconstructible L3 SQLite store;
+- deterministic bounded tagging;
+- planner/context compiler with safe dedupe and explicit budget;
+- opt-in runtime integration with fail-open baseline fallback;
+- automatic post-turn indexing and correction maintenance;
+- first valid end-to-end live proof: **-16.48% prompt tokens, -16.33% model-visible chars at matched correctness**.
+
+Remaining before freeze:
+1. broader five-case live corpus;
+2. focused hardening from demonstrated failures only;
+3. closure docs/config migration review;
+4. freeze/tag/manifest decision.
+
+Canonical checkpoint and test plan: [L3_CANDIDATE_CHECKPOINT.md](L3_CANDIDATE_CHECKPOINT.md).
+
+The optional L0 source-locator/I/O optimization is deferred until the broader live corpus demonstrates that JSONL scan cost is material. It is not a prerequisite for functional L3 closure.
