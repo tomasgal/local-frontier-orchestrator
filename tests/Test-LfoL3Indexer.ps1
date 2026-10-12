@@ -49,7 +49,11 @@ try {
     $topics = @($c1.Topics | ForEach-Object ValueKey)
     $entities = @($c1.Entities | ForEach-Object ValueKey)
     $kind = if ($null -eq $c1.Kind) { '' } else { [string]$c1.Kind.ValueKey }
-    if ($topics -notcontains 'lfo' -or $entities -notcontains $entityKey -or $kind -ne 'configuration') { throw ('Synced rules did not classify query: ' + ($c1 | ConvertTo-Json -Depth 6 -Compress)) }
+    $predicates = @($c1.Predicates | ForEach-Object ValueKey)
+    if ($topics -notcontains 'lfo' -or $entities -notcontains $entityKey -or
+        $kind -ne 'configuration' -or $predicates -notcontains 'os') {
+        throw ('Synced rules did not classify query: ' + ($c1 | ConvertTo-Json -Depth 6 -Compress))
+    }
 
     $turnItem = @(Invoke-LfoSqliteQuery $l3 "SELECT id FROM l3_items WHERE source_layer='L0' AND source_ref='turn:1';")
     $factItem = @(Invoke-LfoSqliteQuery $l3 ("SELECT id FROM l3_items WHERE source_layer='L2' AND source_ref='fact:{0}';" -f [int64]$firstFact.id))
@@ -60,6 +64,7 @@ try {
     if (@($turnFacets | Where-Object { $_.dimension -eq 'topic' -and $_.value_key -eq 'lfo' }).Count -ne 1) { throw 'L0 topic facet missing.' }
     if (@($turnFacets | Where-Object { $_.dimension -eq 'entity' -and $_.value_key -eq $entityKey }).Count -ne 1) { throw 'L0 entity facet missing.' }
     if (@($factFacets | Where-Object { $_.dimension -eq 'temporal' -and $_.value_key -eq 'current' }).Count -ne 1) { throw 'L2 current temporal facet missing.' }
+    if (@($factFacets | Where-Object { $_.dimension -eq 'predicate' -and $_.value_key -eq 'os' }).Count -ne 1) { throw 'L2 predicate facet missing.' }
 } finally { Close-LfoSqliteDatabase $l3 }
 
 $l2 = Open-LfoMemoryStore $l2Path
@@ -101,6 +106,7 @@ if ($r3.Status -ne 'ok' -or $r3.TurnIndexed) { throw 'Unclassified turn should r
     Turn2Indexed = $r2.TurnIndexed
     TopicRulesSynced = $r2.TopicRulesSynced
     EntityRulesSynced = $r2.EntityRulesSynced
+    PredicateRulesSynced = $r2.PredicateRulesSynced
     L2FactsTouchedOnCorrection = $r2.L2FactsTouched
     OldFactHistoricalExcluded = $true
     NewFactCurrent = $true
