@@ -80,23 +80,27 @@ $script:Messages = @()
 [IO.File]::WriteAllText($script:PendingNotesPath,'',(New-Object Text.UTF8Encoding($false)))
 
 function Add-FixtureTurn([int]$TurnId,[string]$User,[string]$Assistant) {
+    $path = Join-Path $logs 'conversation-2026-10.jsonl'
+    $offset = if (Test-Path -LiteralPath $path -PathType Leaf) { [int64](Get-Item -LiteralPath $path).Length } else { [int64]0 }
     $row = [ordered]@{
         event='turn'; timestamp=(Get-Date).ToString('o'); turn_id=$TurnId
         epoch=1; route='LOCAL'; user=$User; assistant=$Assistant
     }
     [IO.File]::AppendAllText(
-        (Join-Path $logs 'conversation-2026-10.jsonl'),
+        $path,
         ($row | ConvertTo-Json -Compress) + [Environment]::NewLine,
         (New-Object Text.UTF8Encoding($false))
     )
+    $length = [int64](Get-Item -LiteralPath $path).Length - $offset
+    return [pscustomobject]@{ File=[IO.Path]::GetFileName($path); Offset=$offset; Length=$length }
 }
 
 
 # Unique synthetic data; no access to production memory.
-Add-FixtureTurn 1 'For LFO BENCH_SERVER runs Synthetic OS 11 with 96 GB RAM, 512 GB disk and 8 CPUs.' 'Recorded configuration.'
-Add-FixtureTurn 2 'For LFO correction: BENCH_SERVER now runs Synthetic OS 13.' 'Confirmed correction.'
-Add-FixtureTurn 3 'RETRO_ARCHIVE contains the fictional HALCYON-77 catalog token for archival testing.' 'Archival HALCYON-77 record was indexed.'
-Add-FixtureTurn 4 'Unrelated continuity.' 'Acknowledged.'
+$loc1 = Add-FixtureTurn 1 'For LFO BENCH_SERVER runs Synthetic OS 11 with 96 GB RAM, 512 GB disk and 8 CPUs.' 'Recorded configuration.'
+$loc2 = Add-FixtureTurn 2 'For LFO correction: BENCH_SERVER now runs Synthetic OS 13.' 'Confirmed correction.'
+$loc3 = Add-FixtureTurn 3 'RETRO_ARCHIVE contains the fictional HALCYON-77 catalog token for archival testing.' 'Archival HALCYON-77 record was indexed.'
+$loc4 = Add-FixtureTurn 4 'Unrelated continuity.' 'Acknowledged.'
 $l2 = Open-LfoMemoryStore $script:StructuredMemoryPath
 try {
   [void](Set-LfoMemoryAttribute $l2 'BENCH_SERVER' 'os' 'Synthetic OS 11' 1 'server' 'conversation:1')
@@ -105,9 +109,9 @@ try {
   [void](Set-LfoMemoryAttribute $l2 'BENCH_SERVER' 'cpu_count' ([int64]8) 1 'server' 'conversation:1')
   [void](Set-LfoMemoryAttribute $l2 'BENCH_SERVER' 'os' 'Synthetic OS 13' 2 'server' 'conversation:1')
 } finally { Close-LfoSqliteDatabase $l2 }
-$index1 = Invoke-LfoL3PostTurnIndex 'For LFO BENCH_SERVER runs Synthetic OS 11 with 96 GB RAM, 512 GB disk and 8 CPUs.' 'Recorded configuration.' 1 1 $script:StructuredMemoryPath $script:L3Path $script:L3TopicRules
-$index2 = Invoke-LfoL3PostTurnIndex 'For LFO correction: BENCH_SERVER now runs Synthetic OS 13.' 'Confirmed correction.' 2 1 $script:StructuredMemoryPath $script:L3Path $script:L3TopicRules
-$index3 = Invoke-LfoL3PostTurnIndex 'RETRO_ARCHIVE contains the fictional HALCYON-77 catalog token for archival testing.' 'Archival HALCYON-77 record was indexed.' 3 1 $script:StructuredMemoryPath $script:L3Path $script:L3TopicRules
+$index1 = Invoke-LfoL3PostTurnIndex 'For LFO BENCH_SERVER runs Synthetic OS 11 with 96 GB RAM, 512 GB disk and 8 CPUs.' 'Recorded configuration.' 1 1 $script:StructuredMemoryPath $script:L3Path $script:L3TopicRules $loc1.File $loc1.Offset $loc1.Length
+$index2 = Invoke-LfoL3PostTurnIndex 'For LFO correction: BENCH_SERVER now runs Synthetic OS 13.' 'Confirmed correction.' 2 1 $script:StructuredMemoryPath $script:L3Path $script:L3TopicRules $loc2.File $loc2.Offset $loc2.Length
+$index3 = Invoke-LfoL3PostTurnIndex 'RETRO_ARCHIVE contains the fictional HALCYON-77 catalog token for archival testing.' 'Archival HALCYON-77 record was indexed.' 3 1 $script:StructuredMemoryPath $script:L3Path $script:L3TopicRules $loc3.File $loc3.Offset $loc3.Length
 foreach($x in @($index1,$index2,$index3)) { if($x.Status -ne 'ok') { throw ('Index failed: ' + ($x | ConvertTo-Json -Compress)) } }
 
 function Invoke-Probe([string]$Question,[string]$Variant) {
