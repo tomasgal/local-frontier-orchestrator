@@ -1,12 +1,12 @@
 # Local Frontier Orchestrator
 
-**Current fixed working baseline (2026-10-11): v9.3 on `main`.** The validated local-first routing and L0/L1 memory release baseline remains unchanged. **Active development: v9.4 DEV3 + DEV5**, on experimental branch `v9.4-dev5-compact-read`; frozen DEV3 reference `a34658b81742596520da844618b5bb39f3329279`. DEV3 L2 typed writes have targeted functional validation; DEV4 read/observability and DEV5 authorization/compact-read candidates have narrower experimental evidence. No DEV5 whole-system net speedup or production promotion has been established.
+**L2 complete and frozen (2026-10-12): [`v9.4-l2-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.4-l2-frozen).** The accepted L2 baseline combines the DEV3 typed-memory foundation and selective DEV5 integrity/read-path optimizations. This branch keeps the **v9.3 runtime** unchanged; the frozen L2 implementation is on its separate immutable tag.
 
-**Optimization milestone (2026-10-11):** Development and test results identified substantial scope to streamline test orchestration, validation and engineering decisions. Accepted earlier improvements include single-pass memory work elimination (v9.2), pressure-based compaction (v9.3), LOCAL temperature 0.10, removal of 871 duplicate prompt characters and narrow deterministic acknowledgement. Eligible DEV5 A/B trials demonstrated reduced unnecessary output/input token counts, but not a representative net speedup. A new **2040-character L2 extraction-policy candidate** (down from 2414, 15.49% fewer template characters) retains all five examples and passed static checks; Windows/model semantic acceptance is pending. The [selective-refactoring roadmap](docs/ROADMAP.md#active-development-programme--dev3--dev5--l3--l4-2026-10-11) and [handoff](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-dev5-compact-read/docs/DEV5_DELPHI_REFACTOR_HANDOFF.md) reduce combinatorial tuning in favor of cheap offline gates, bounded model tests and explicit stop/go decisions. This is a positive development-process result; faster implementation is an expectation, not yet a measured outcome. **L3 semantic retrieval and L4 epistemic mediation remain planned milestones**, to be specified in detail after DEV3/DEV5 refactoring.
+**Measured benefit:** the eligible LOCAL FULL vs A+B CPU pilot passed all four correctness checks with zero L1/L2 mutation. Input fell from 1756 to 1210 tokens; average output from 173 to 24. Mean complete-turn time was 159.629 s vs 24.791 s. The observed latency reduction includes unequal cache/load effects and is not a universal speedup or a complete DEV3-versus-DEV5 benchmark. It is sufficient for selective engineering acceptance.
 
-**Start here:** [Current roadmap](docs/ROADMAP.md) · [Delphi refactor handoff](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-dev5-compact-read/docs/DEV5_DELPHI_REFACTOR_HANDOFF.md) · [issue #3](https://github.com/tomasgal/local-frontier-orchestrator/issues/3) · [DEV5 experiments](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-dev5-compact-read/docs/DEV5_PERFORMANCE_EXPERIMENTS.md) · [G2 historical handoff](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-dev5-compact-read/docs/DEV5_G2_HANDOFF.md).
+**Start here:** [Frozen L2 contract and results](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_BASELINE.md) · [Fixed implementation hashes](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_MANIFEST.json) · [Accepted opt-in profile](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/config/QwenChat-L2Frozen.config.psd1) · [Next: L3, then L4](docs/ROADMAP.md). Full 2414-character write policy retained; A+B selected for eligible reads; C OFF; grouped extraction deferred. Historical DEV3 and production memory are unchanged. New sessions should begin L3 design, not reopen closed L2 tuning.
 
-**Status:** experimental / research prototype (`v0.1-alpha`) · **Main build:** `v9.3` (`pressure-compaction + explicit-memory recovery`) · **Active development:** `v9.4` L2 structured memory (`v9.4-dev3` write-side validated on two host classes; post-dev3 prompt/policy tuning pending validation)
+**Status:** experimental / research prototype (`v0.1-alpha`) · **Main runtime:** `v9.3` · **Completed L2 milestone:** `v9.4-l2-frozen` · **Next:** L3 requirements and interfaces, then L4 epistemic mediation.
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
@@ -279,17 +279,7 @@ The transport path is working:
 local model -> ask_codex -> native Codex frontier -> local model
 ```
 
-Current work focuses on:
-
-- v9.4 L2 structured-memory work on branch `v9.4-l2-structured-memory`: `v9.4-dev3` write-side semantics are validated across two host classes; a post-dev3 prompt/policy optimization candidate is implemented but not yet runtime-validated; L2 read/retrieval integration remains the next architectural boundary;
-- long-term routing quality;
-- faithful-but-useful frontier synthesis;
-- structured trace logging;
-- additional host validation and context sizing;
-- suppressing internal retrieval metadata from user-facing answers;
-- multi-host profiles;
-- bias-aware mediation;
-- future edge/SBC execution.
+L2 is closed for its accepted scope. The [immutable milestone](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_BASELINE.md) preserves the implementation, evidence, rejected candidates and known limitations. A future L2 correction must use a new version; do not move the frozen tag. Current planning proceeds to L3 semantic retrieval/interfaces and then L4 epistemic mediation. This documentation update does not deploy L2 or change the v9.3 runtime on `main`.
 
 ## License
 

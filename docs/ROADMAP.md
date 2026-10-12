@@ -1,5 +1,17 @@
 # Roadmap
 
+## Current status — L2 CLOSED; L3 design next
+
+**2026-10-12:** L2 is complete for the accepted scope at immutable tag `v9.4-l2-frozen`. The DEV3 foundation, integrity fixes and selective DEV5 A+B read optimizations are accepted. R1/R3 offline gates and the bounded R4/R5 LOCAL pilots passed. Shortened/grouped extraction candidates are not adopted; full write policy retained, C OFF.
+
+See the [canonical closure record](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_BASELINE.md) for exact evidence, limitations and the [fixed file manifest](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_MANIFEST.json). `main` keeps its v9.3 runtime unchanged. No L2 retuning or repeated model benchmark is a prerequisite for future work.
+
+Next: specify L3 semantic retrieval, entity resolution and selective reranking against the frozen L2 contract; then scope L4 epistemic mediation separately. Neither is implemented by this closure.
+
+## Historical roadmap — superseded by the closure above
+
+The older active/pending DEV3/DEV5 programme below records the development path; it is not an instruction to reopen L2.
+
 This roadmap describes engineering directions, not release commitments.
 
 ## Active development programme — DEV3 + DEV5 → L3 → L4 (2026-10-11)
