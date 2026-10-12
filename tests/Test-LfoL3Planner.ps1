@@ -94,6 +94,49 @@ try {
         throw 'R3 cross-topic candidate union failed.'
     }
 
+    # Regression: equally relevant L0 and L2 evidence without an equivalence
+    # fingerprint must prefer L2 authority over lexical verbosity.
+    Set-LfoL3TermRule $db 'entity' 'vega' 'VEGA' 100 'r3-entity' $true
+    $l0vega = Set-LfoL3Item $db 'conversation:1' 'L0' 'turn:15' 15 $null
+    $l2vega = Set-LfoL3Item $db 'conversation:1' 'L2' 'fact:vega-os' 15 $null
+    foreach ($item in @($l0vega,$l2vega)) {
+        [void](Set-LfoL3Facet $db $item.id 'topic' 'lfo' 1 'r3-seed')
+        [void](Set-LfoL3Facet $db $item.id 'entity' 'vega' 1 'r3-seed')
+        [void](Set-LfoL3Facet $db $item.id 'kind' 'configuration' 1 'r3-seed')
+    }
+    $vegaQuery = 'For LFO, what OS does VEGA run?'
+    $vegaClass = Get-LfoL3Classification $db $vegaQuery
+    $vegaEvidence = @(
+        [pscustomobject]@{ SourceLayer='L0'; SourceRef='turn:15'; Text='VEGA now definitely runs Fedora 42 as the operating system and this is a verbose narrative.' },
+        [pscustomobject]@{ SourceLayer='L2'; SourceRef='fact:vega-os'; Text='VEGA.os = Fedora 42' }
+    )
+    $vegaPlan = New-LfoL3ContextPlan $db 'conversation:1' $vegaQuery $vegaClass $vegaEvidence 1 200
+    if ($vegaPlan.Status -ne 'ok' -or $vegaPlan.SelectedCount -ne 1 -or
+        $vegaPlan.Selected[0].SourceLayer -ne 'L2' -or $vegaPlan.Packet -notmatch '^VEGA\.os = Fedora 42
+        PASS = $true
+        CandidateCount = $plan.CandidateCount
+        ResolvedCandidates = $plan.ResolvedCandidates
+        SelectedCount = $plan.SelectedCount
+        CandidateChars = $plan.InputCandidateChars
+        PacketChars = $plan.PacketChars
+        DroppedChars = $plan.DroppedChars
+        DuplicateDrops = $plan.DuplicateDrops
+        BudgetDrops = $plan.BudgetDrops
+        InternalMetadataVisible = $false
+        UnknownFallsBack = $true
+        NoPartialTruncation = $true
+        CrossTopicUnion = $true
+        ModelCalls = 0
+        ProductionMemoryTouched = $false
+        TempFixture = $root
+    } | Format-List
+} finally {
+    Close-LfoSqliteDatabase $db
+}
+) {
+        throw ('R3 authority ordering failed: ' + ($vegaPlan | ConvertTo-Json -Depth 5 -Compress))
+    }
+
     [pscustomobject]@{
         PASS = $true
         CandidateCount = $plan.CandidateCount
