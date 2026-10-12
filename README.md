@@ -4,9 +4,11 @@
 
 **Measured benefit:** the eligible LOCAL FULL vs A+B CPU pilot passed all four correctness checks with zero L1/L2 mutation. Input fell from 1756 to 1210 tokens; average output from 173 to 24. Mean complete-turn time was 159.629 s vs 24.791 s. The observed latency reduction includes unequal cache/load effects and is not a universal speedup or a complete DEV3-versus-DEV5 benchmark. It is sufficient for selective engineering acceptance.
 
-**Start here:** [Frozen L2 contract and results](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_BASELINE.md) · [Fixed implementation hashes](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_MANIFEST.json) · [Accepted opt-in profile](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/config/QwenChat-L2Frozen.config.psd1) · [Next: L3, then L4](docs/ROADMAP.md). Full 2414-character write policy retained; A+B selected for eligible reads; C OFF; grouped extraction deferred. Historical DEV3 and production memory are unchanged. New sessions should begin L3 design, not reopen closed L2 tuning.
+**Start here:** [Frozen L2 contract and results](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_BASELINE.md) Â· [DEV5 implementation and provenance](docs/DEV5_IMPLEMENTATION_SUMMARY.md) Â· [Fixed implementation hashes](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_MANIFEST.json) Â· [Accepted opt-in profile](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/config/QwenChat-L2Frozen.config.psd1) Â· [Next: L3, then L4](docs/ROADMAP.md). Full 2414-character write policy retained; A+B selected for eligible reads; C OFF; grouped extraction deferred. Historical DEV3 and production memory are unchanged. New sessions should begin L3 design, not reopen closed L2 tuning.
 
-**Status:** experimental / research prototype (`v0.1-alpha`) · **Main runtime:** `v9.3` · **Completed L2 milestone:** `v9.4-l2-frozen` · **Next:** L3 requirements and interfaces, then L4 epistemic mediation.
+**Status:** experimental / research prototype (`v0.1-alpha`) Â· **Main runtime:** `v9.3` Â· **Completed L2 milestone:** `v9.4-l2-frozen` Â· **Next:** L3 requirements and interfaces, then L4 epistemic mediation.
+
+DEV5's architecture-first optimization direction was materially informed by Daniel Correa Villa's *Pushing Four Raspberry Pis to the Memory Wall* (DOI `10.5281/zenodo.20357376`). LFO transfers the general principle of eliminating unnecessary work and context/data movement before hardware-specific tuning; it does not claim a reproduction of the paper or transfer of its Raspberry Pi measurements. The exact accepted mapping is documented in [docs/DEV5_IMPLEMENTATION_SUMMARY.md](docs/DEV5_IMPLEMENTATION_SUMMARY.md).
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
@@ -80,7 +82,7 @@ Potential reasons to keep a local first-line model include:
 - local preprocessing and future retrieval over private sources;
 - local policy enforcement and redaction before a cloud call;
 - explicit control over routing and intervention policy;
-- a stable place to implement metacognitive and Human–AI bias-balancing experiments;
+- a stable place to implement metacognitive and Humanâ€“AI bias-balancing experiments;
 - the ability to use different local hardware tiers without changing the user-facing interaction model.
 
 ## Scalability of single-pass memory
@@ -93,9 +95,9 @@ Practical scaling expectations:
 
 | Hardware tier | Expected effect of v9.2 |
 | --- | --- |
-| CPU-only / constrained host | Largest absolute latency gain. On the validated notebook, ordinary post-answer memory work fell from roughly 18–21 s to commonly 0.01–0.05 s. |
+| CPU-only / constrained host | Largest absolute latency gain. On the validated notebook, ordinary post-answer memory work fell from roughly 18â€“21 s to commonly 0.01â€“0.05 s. |
 | ~6 GB VRAM | The removed second inference is already much faster than on CPU, but still consumes prompt evaluation, decode, scheduler, and runtime overhead. Single-pass therefore remains useful for latency and efficiency. |
-| ~16–17 GB VRAM | More VRAM can be spent on a larger model, higher-quality quantization, or more context without changing the single-pass memory architecture. A stronger local model may also improve semantic extraction quality. |
+| ~16â€“17 GB VRAM | More VRAM can be spent on a larger model, higher-quality quantization, or more context without changing the single-pass memory architecture. A stronger local model may also improve semantic extraction quality. |
 | 24 GB+ / server-class GPU | The absolute latency saving per turn may become small, but removing one model request per conversational turn still improves throughput, concurrency, and energy efficiency. |
 | Multi-user service | The benefit compounds with request volume: v9.2 avoids one separate memory-note inference for each completed turn; only periodic compaction remains an additional model call. |
 
@@ -143,11 +145,11 @@ A related experimental fork is maintained at [tomasgal/codex-router](https://git
 - **Qwen-first:** local conversational model calls Codex only when needed;
 - **Codex-first:** Codex provides the interface and routes execution to a local model.
 
-## Human–AI bias balancing research
+## Humanâ€“AI bias balancing research
 
-A major research track for this architecture is **Human–AI bias balancing**.
+A major research track for this architecture is **Humanâ€“AI bias balancing**.
 
-The working hypothesis is that Human–LLM interaction can form a reciprocal feedback loop:
+The working hypothesis is that Humanâ€“LLM interaction can form a reciprocal feedback loop:
 
 - human confirmation/myside bias, automation bias, confidence miscalibration, and framing affect how AI advice is requested and interpreted;
 - LLM sycophancy, agreement bias, context sensitivity, and fluent overconfidence can reinforce the user's initial framing;
@@ -155,7 +157,7 @@ The working hypothesis is that Human–LLM interaction can form a reciprocal fee
 
 The local layer provides a natural experimental location for an auditable **Local Epistemic Balancer**. It can inspect the user request before frontier escalation and inspect the frontier result before presenting it to the user.
 
-The goal is not to create an “unbiased AI.” The goal is to study whether a local mediator can improve **appropriate reliance**: accepting useful AI guidance while resisting misleading guidance, without merely suppressing disagreement or maximizing user satisfaction.
+The goal is not to create an â€śunbiased AI.â€ť The goal is to study whether a local mediator can improve **appropriate reliance**: accepting useful AI guidance while resisting misleading guidance, without merely suppressing disagreement or maximizing user satisfaction.
 
 See [`docs/HUMAN_AI_BIAS_BALANCER.md`](docs/HUMAN_AI_BIAS_BALANCER.md).
 
@@ -167,32 +169,32 @@ The planned research architecture names the derived analytical layer **L4**: L0 
 
 ```text
 .
-├── README.md
-├── .gitignore
-├── config/
-│   ├── host.example.psd1
-│   └── QwenChat.config.psd1
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── CODEX_ROUTER_NOTES.md
-│   ├── HUMAN_AI_BIAS_BALANCER.md
-│   ├── GENERIC_EPISTEMIC_MEDIATOR.md
-│   ├── CANDIDATE_SOLUTION_DESIGNS.md
-│   ├── DOKUWIKI_SEARCH_SUBSYSTEM.md
-│   ├── L4_RESEARCH_ANALYSIS.md
-│   ├── NOTEBOOK_SETUP.md
-│   └── ROADMAP.md
-├── policy/
-│   ├── orchestrator-system.txt
-│   ├── synthesis-system.txt
-│   └── frontier-subagent.txt
-├── launch/
-│   ├── QwenChat.bat
-│   ├── Start-Ollama.bat
-│   └── Start-Ollama.ps1
-└── src/
-    ├── QwenChat.ps1
-    └── QwenMemory.ps1
+â”śâ”€â”€ README.md
+â”śâ”€â”€ .gitignore
+â”śâ”€â”€ config/
+â”‚   â”śâ”€â”€ host.example.psd1
+â”‚   â””â”€â”€ QwenChat.config.psd1
+â”śâ”€â”€ docs/
+â”‚   â”śâ”€â”€ ARCHITECTURE.md
+â”‚   â”śâ”€â”€ CODEX_ROUTER_NOTES.md
+â”‚   â”śâ”€â”€ HUMAN_AI_BIAS_BALANCER.md
+â”‚   â”śâ”€â”€ GENERIC_EPISTEMIC_MEDIATOR.md
+â”‚   â”śâ”€â”€ CANDIDATE_SOLUTION_DESIGNS.md
+â”‚   â”śâ”€â”€ DOKUWIKI_SEARCH_SUBSYSTEM.md
+â”‚   â”śâ”€â”€ L4_RESEARCH_ANALYSIS.md
+â”‚   â”śâ”€â”€ NOTEBOOK_SETUP.md
+â”‚   â””â”€â”€ ROADMAP.md
+â”śâ”€â”€ policy/
+â”‚   â”śâ”€â”€ orchestrator-system.txt
+â”‚   â”śâ”€â”€ synthesis-system.txt
+â”‚   â””â”€â”€ frontier-subagent.txt
+â”śâ”€â”€ launch/
+â”‚   â”śâ”€â”€ QwenChat.bat
+â”‚   â”śâ”€â”€ Start-Ollama.bat
+â”‚   â””â”€â”€ Start-Ollama.ps1
+â””â”€â”€ src/
+    â”śâ”€â”€ QwenChat.ps1
+    â””â”€â”€ QwenMemory.ps1
 ```
 
 ## Hardware and storage requirements
@@ -255,7 +257,7 @@ launch\QwenChat.bat -Model "your-local-model:tag"
 
 The local model profile should carry hardware/runtime placement settings appropriate for that machine. The chat client intentionally avoids overriding GPU/CPU placement, context length, or thread count per request.
 
-QwenChat v9.3 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. Ordinary memory remains **single-pass**: the LOCAL answer or post-frontier synthesis may emit a bounded 0–40 character user-delta micro-note without a separate per-turn memory inference. Pending notes are compacted into a 0–160 character rolling state when semantic pressure reaches **4 notes or 108 pending-note characters**. If the user explicitly asks the system to remember something and the single-pass note is empty, the wrapper permits at most one focused memory-only recovery call. Exact historical data is not compressed away: full conversation JSONL remains authoritative and bounded relevant raw snippets can be retrieved when needed.
+QwenChat v9.3 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. Ordinary memory remains **single-pass**: the LOCAL answer or post-frontier synthesis may emit a bounded 0â€“40 character user-delta micro-note without a separate per-turn memory inference. Pending notes are compacted into a 0â€“160 character rolling state when semantic pressure reaches **4 notes or 108 pending-note characters**. If the user explicitly asks the system to remember something and the single-pass note is empty, the wrapper permits at most one focused memory-only recovery call. Exact historical data is not compressed away: full conversation JSONL remains authoritative and bounded relevant raw snippets can be retrieved when needed.
 
 For a clean Windows host bootstrap, see [`docs/NOTEBOOK_SETUP.md`](docs/NOTEBOOK_SETUP.md). Do not copy a tuned context/GPU profile from another machine before measuring the new host.
 
