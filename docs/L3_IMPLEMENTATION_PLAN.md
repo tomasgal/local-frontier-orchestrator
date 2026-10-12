@@ -2,7 +2,7 @@
 
 ## Status
 
-**Design direction agreed 2026-10-12. L3-R1 and L3-R2 are offline-validated PASS; L3-R3 retrieval planning/context compilation is implemented on branch `v9.5-l3-selective-index` and awaits Windows offline acceptance.**
+**Design direction agreed 2026-10-12. L3-R1, L3-R2 and L3-R3 are offline-validated PASS; the first opt-in runtime context/prompt-savings gate is implemented on branch `v9.5-l3-selective-index` and awaits Windows offline acceptance.**
 
 L3 is the next milestone after the immutable L2 baseline `v9.4-l2-frozen`. It does not reopen L2 and it does not replace L0, L1 or L2 authority. L3 is a separate, reconstructible SQLite database and software layer whose job is to **reduce the amount of memory/context work that reaches the LLM**.
 
@@ -492,4 +492,30 @@ The offline corpus verifies L0/L2 equivalence dedupe, irrelevant/excluded suppre
 
 This remains an offline planner contract. `QwenMemory.ps1` and `QwenChat.ps1` are still unchanged. Runtime integration and real prompt savings belong to the next gate after R3 offline acceptance.
 
-R3 is **IMPLEMENTED / VALIDATION PENDING** at commit `a030b04cf2bdda24e765391cbb43ab9af6fa5ac2` until `tests/Invoke-L3R3Offline.ps1` passes under Windows PowerShell 5.1.
+R3 is **PASS**. User-supplied Windows PowerShell 5.1 evidence on documentation checkpoint `0c0a62ed23a7950095892aabb1bce0ea9cb242c0` completed 5/5 suites with `ModelCalls=0` and `ProductionMemoryTouched=False`.
+
+
+## 16. First runtime integration gate
+
+The first runtime gate is deliberately **opt-in and default-OFF**.
+
+Integrated branch head: `df81393181d53ba03a146259318528cd66b7b1b2`.
+
+Changes:
+
+- `QwenMemory.ps1` understands optional `Memory.L3ReadEnabled`, `L3ReadMaxItems` and `L3ReadMaxChars`;
+- `QwenChat.ps1` loads the L3 store/planner/runtime modules, which remain inert while L3 is disabled;
+- `LfoL3Runtime.ps1` resolves selected L3 references back to current L0/L2 evidence;
+- when L3 returns a valid plan, context assembly skips the normal broad L0/L2 retrieval path and uses only the selected evidence plus normal L1/recent continuity;
+- when L3 cannot classify, resolve or safely select evidence, context assembly fails open to the existing baseline path;
+- L3 metadata remain model-invisible.
+
+The runtime test compares both `memory_block_chars` and total character count of the messages returned by `Get-QwenConversationMessages` between the frozen-style baseline path and the L3 opt-in path.
+
+### Important measurement boundary
+
+The first runtime adapter still resolves an L0 turn reference by scanning the relevant JSONL conversation files. Therefore this gate may demonstrate **prompt/context reduction**, but it must not yet be reported as an L0 I/O-scan reduction. Avoiding the physical scan requires a later source-locator/offset or equivalent derived index.
+
+The runtime gate also verifies exact fallback parity for an unclassified query: enabling L3 must produce the same memory block as disabling L3 when no safe L3 plan exists.
+
+This gate is **IMPLEMENTED / VALIDATION PENDING** until `tests/Invoke-L3RuntimeOffline.ps1` passes under Windows PowerShell 5.1. No Ollama/model call is part of this test.
