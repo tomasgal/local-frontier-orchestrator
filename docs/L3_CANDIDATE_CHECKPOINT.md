@@ -68,9 +68,46 @@ Accepted finding:
 
 > On an eligible current-state query, L3 reduced measured model input by 16.48% at matched correctness while preserving baseline fallback behavior elsewhere.
 
+## L3-LIVE2 broader live validation — substantive PASS
+
+Commit under test: `e71bd7dc4645563df77b9691e3f364ce8eef0aaa`  
+Model: `qwen3.5:4b-q4_K_M`  
+Paired repetitions: 2 per variant, AB/BA order.  
+Total model calls: 20.
+
+Mandatory offline/pre-inference retrieval-shape gate: **5/5 PASS** with
+`ModelCalls=0` and `ProductionMemoryTouched=False`.
+
+| Case | Baseline -> L3 evidence | Prompt tokens | Model-visible chars | Correctness |
+|---|---|---:|---:|---|
+| single current | L2 4 + L0 2 -> L2 1 + L0 0 | 1113 -> 972 (**-12.67%**) | 5032 -> 4617 (**-8.25%**) | 4/4 paired samples correct |
+| two current | L2 4 + L0 2 -> L2 2 + L0 0 | 1119 -> 999 (**-10.72%**) | 5055 -> 4697 (**-7.08%**) | 4/4 paired samples correct |
+| corrected current | L2 4 + L0 2 -> L2 1 + L0 0 | 1115 -> 974 (**-12.65%**) | 5048 -> 4633 (**-8.22%**) | 4/4 paired samples correct; historical value absent |
+| topic-only L0 | L0 1 -> L0 1 | 1522 -> 1522 | 6927 -> 6927 | 4/4 paired samples correct |
+| no-match | exact baseline fallback | 1492 -> 1492 | 6805 -> 6805 | 4/4 answers semantically correct |
+
+The automated run exited FAIL only because the `no_match` assertion accepted
+`no information` but not the model's equivalent wording
+`No specific information is available ...`. Baseline and L3 produced the
+same semantically correct LOCAL answer and used the same 1492-token / 6805-char
+prompt. This is classified as a **test-harness false negative**, not a runtime
+correctness failure. The intended no-match contract had already passed the
+pre-inference exact-context fallback gate with `l3_status=no_query_facets`.
+
+Wall-time observations are not accepted as a general speedup claim. The AB/BA
+samples show strong cold/warm/cache effects (for example the first baseline
+single-current call was 91.94 s while warm calls were much shorter).
+
+Accepted finding:
+
+> LIVE2 preserved correctness across all five retrieval shapes while reducing
+> prompt tokens by about 10.7-12.7% on the three cases where predicate-aware L3
+> narrowed evidence. Topic-only and no-match cases remained non-increasing and
+> preserved their baseline context.
+
 ## Engineering progress
 
-**Estimated progress toward a freeze-ready L3 candidate: 80%.**
+**Estimated progress toward a freeze-ready L3 candidate: 95%.**
 
 This is a milestone-based engineering estimate, not a statistical measurement.
 
@@ -82,10 +119,10 @@ This is a milestone-based engineering estimate, not a statistical measurement.
 | opt-in runtime integration + fail-open fallback | 15% | done |
 | automatic post-turn indexing/correction maintenance | 15% | done |
 | first valid end-to-end live proof | 10% | done |
-| broader multi-case live validation | 15% | **pending** |
+| broader multi-case live validation | 15% | **done — LIVE2 substantive PASS** |
 | closure hardening + freeze/publish decision | 5% | **pending** |
 
-Completed weighted milestones: **80/100**.
+Completed weighted milestones: **95/100**.
 
 The optional L0 source-locator/I/O optimization is **not required for L3 functional closure**. It should be attempted only after the broader live corpus confirms that prompt/context selection is robust enough to justify further optimization.
 
