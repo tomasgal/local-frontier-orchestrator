@@ -98,29 +98,28 @@ function Get-LfoL3PredicateRuleTerms([string]$Predicate) {
     if ([string]::IsNullOrWhiteSpace($key)) { return @() }
 
     $parts = @($key -split '[-._:+]+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    $seen = @{}
-    $out = @()
-    function Add-PredicateTerm([string]$Term,[int]$Priority) {
-        $termKey = ConvertTo-LfoL3Key $Term
-        if ([string]::IsNullOrWhiteSpace($termKey) -or $seen.ContainsKey($termKey)) { return }
-        $seen[$termKey] = $true
-        $script:__lfoPredicateTerms += [pscustomobject]@{ Term=$Term; Priority=$Priority }
-    }
-
-    $script:__lfoPredicateTerms = @()
-    Add-PredicateTerm $Predicate 130
+    $candidates = @(
+        [pscustomobject]@{ Term=$Predicate; Priority=130 }
+    )
     if ($parts.Count -gt 1) {
-        Add-PredicateTerm ($parts -join ' ') 120
+        $candidates += [pscustomobject]@{ Term=($parts -join ' '); Priority=120 }
     }
 
     $genericSuffix = @('gb','mb','tb','kb','count','id','value','name','flag','bool','boolean','enabled')
     foreach ($part in $parts) {
         if ($part -in $genericSuffix) { continue }
-        Add-PredicateTerm $part 100
+        $candidates += [pscustomobject]@{ Term=$part; Priority=100 }
     }
-    $out = @($script:__lfoPredicateTerms)
-    Remove-Variable -Scope Script -Name __lfoPredicateTerms -ErrorAction SilentlyContinue
-    return $out
+
+    $seen = @{}
+    $out = @()
+    foreach ($candidate in @($candidates | Sort-Object @{Expression='Priority';Descending=$true})) {
+        $termKey = ConvertTo-LfoL3Key ([string]$candidate.Term)
+        if ([string]::IsNullOrWhiteSpace($termKey) -or $seen.ContainsKey($termKey)) { continue }
+        $seen[$termKey] = $true
+        $out += $candidate
+    }
+    return @($out)
 }
 
 function Sync-LfoL3PredicateRulesFromL2(
