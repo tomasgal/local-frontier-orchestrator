@@ -518,4 +518,48 @@ The first runtime adapter still resolves an L0 turn reference by scanning the re
 
 The runtime gate also verifies exact fallback parity for an unclassified query: enabling L3 must produce the same memory block as disabling L3 when no safe L3 plan exists.
 
-This gate is **IMPLEMENTED / VALIDATION PENDING** until `tests/Invoke-L3RuntimeOffline.ps1` passes under Windows PowerShell 5.1. No Ollama/model call is part of this test.
+This gate is **PASS**. User-supplied Windows PowerShell 5.1 evidence on `9cfec292a566e13927f9e3a5fe23cafa63874f6f` completed 6/6 suites with `ModelCalls=0` and `ProductionMemoryTouched=False`. The test asserts both memory-block and final model-message character reduction on the eligible fixture, plus exact fallback parity for an unclassified query. Exact savings were recorded in the test log but were not surfaced in the aggregate runner output, so no percentage claim is made here.
+
+
+## 17. Automatic post-turn indexing / maintenance
+
+The next gate removes the manual-fixture assumption from L3. Automatic indexing is implemented on branch commit `660f577d461b51a1cedba3ebd440a78a5c99531b`.
+
+### Maintenance timing
+
+The hook runs inside `Persist-TurnAndMemory` **after the user-visible answer and timing line have already been printed** and after the L2 write phase. It therefore does not contribute to the reported `AnswerSeconds` critical-path latency, although its own duration is measured separately as `l3_index_seconds`.
+
+### Deterministic sources of metadata
+
+- **topics**: explicit configured topic rules only;
+- **entities**: aliases/names synchronized from L2 and keyed by stable `l2:<entity_id>` identities;
+- **kind**: small versioned generic rule set (decision/configuration/result/preference);
+- **temporal state**: derived directly from L2 current/history status.
+
+No model call is added.
+
+### Correction handling
+
+When an L2 correction supersedes a previous fact, the indexer processes facts whose `source_turn` or `valid_to_turn` equals the current turn:
+
+- the new fact receives `temporal:current`;
+- the superseded fact receives `temporal:historical`;
+- historical L2 facts receive `retrieval:exclude`;
+- a fact that is current has any stale `retrieval:exclude` removed.
+
+This keeps L3 retrieval consistent with L2 current-state semantics without making L3 authoritative.
+
+### Unknown / unclassified turns
+
+If the current user prompt does not match any configured topic/entity/kind signal and no L2 fact was touched, the L0 turn is simply not materialized into L3. Absence remains an explicit safe outcome; the runtime read path then falls back to baseline retrieval when needed.
+
+### Opt-in controls
+
+The runtime configuration recognizes:
+
+- `Memory.L3IndexEnabled` — default false when absent;
+- `Memory.L3TopicRules` — optional controlled topic-rule list.
+
+Existing configs that do not define these fields remain unchanged in behavior.
+
+The automatic-indexing gate is **IMPLEMENTED / VALIDATION PENDING**. `tests/Invoke-L3IndexerOffline.ps1` re-runs all prior L2/L3 tests plus the new indexer/correction semantics test. No Ollama call or production memory is used.
