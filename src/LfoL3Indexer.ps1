@@ -213,7 +213,10 @@ function Invoke-LfoL3PostTurnIndex(
     [int]$Epoch,
     [string]$L2Path,
     [string]$L3Path,
-    [object[]]$TopicRules
+    [object[]]$TopicRules,
+    [string]$L0SourceFile = $null,
+    [Nullable[int64]]$L0ByteOffset = $null,
+    [Nullable[int64]]$L0ByteLength = $null
 ) {
     $result = [ordered]@{
         Status = 'disabled'
@@ -224,6 +227,7 @@ function Invoke-LfoL3PostTurnIndex(
         TopicRulesSynced = 0
         EntityRulesSynced = 0
         PredicateRulesSynced = 0
+        L0LocatorWritten = $false
         Error = $null
     }
     if ($TurnId -le 0 -or $Epoch -le 0 -or
@@ -247,6 +251,12 @@ function Invoke-LfoL3PostTurnIndex(
         if ($classification.Status -eq 'ok') {
             $turnItem = Set-LfoL3Item $db $scopeId 'L0' ("turn:$TurnId") $TurnId $null
             $result.FacetsWritten += Add-LfoL3ClassificationToItem $db $turnItem.id $classification
+            if (-not [string]::IsNullOrWhiteSpace($L0SourceFile) -and
+                $null -ne $L0ByteOffset -and $null -ne $L0ByteLength -and
+                [int64]$L0ByteOffset -ge 0 -and [int64]$L0ByteLength -gt 0) {
+                [void](Set-LfoL3L0Locator $db ([int64]$turnItem.id) $L0SourceFile ([int64]$L0ByteOffset) ([int64]$L0ByteLength))
+                $result.L0LocatorWritten = $true
+            }
             $result.TurnIndexed = $true
         }
 
