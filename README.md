@@ -10,6 +10,8 @@
 
 DEV5's architecture-first optimization direction was materially informed by Daniel Correa Villa's *Pushing Four Raspberry Pis to the Memory Wall* (DOI `10.5281/zenodo.20357376`). LFO transfers the general principle of eliminating unnecessary work and context/data movement before hardware-specific tuning; it does not claim a reproduction of the paper or transfer of its Raspberry Pi measurements. The exact accepted mapping is documented in [docs/DEV5_IMPLEMENTATION_SUMMARY.md](docs/DEV5_IMPLEMENTATION_SUMMARY.md).
 
+**DEV5 technical note:** the bounded transferability results are now published as *Reducing Context and Generation Traffic in a Local-First LLM Orchestrator: A Transferability Case Study* on Zenodo, DOI [10.5281/zenodo.23318551](https://doi.org/10.5281/zenodo.23318551). The note reports the accepted A+B mechanism and R5 observations with the same evidence boundaries as the frozen baseline; it is not presented as a replication of the motivating Raspberry Pi study or as a universal speedup claim.
+
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
 The project starts from a simple premise: a local model does not need to outperform a frontier model in general intelligence to be useful. It can remain the always-available conversational layer, handle inexpensive or privacy-sensitive work locally, preserve conversational continuity, and selectively escalate tasks that require fresh information, external verification, stronger reasoning, or broader tool access.

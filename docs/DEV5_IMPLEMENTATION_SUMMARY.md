@@ -136,6 +136,8 @@ its reported numerical results.
 
 ## Related records
 
+- [Published DEV5 transferability technical note](https://doi.org/10.5281/zenodo.23318551): *Reducing Context and Generation Traffic in a Local-First LLM Orchestrator: A Transferability Case Study* (DOI 10.5281/zenodo.23318551)
+
 - [Frozen L2 contract and results](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_BASELINE.md)
 - [Frozen file manifest](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_MANIFEST.json)
 - [Historical DEV5 performance experiments](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/DEV5_PERFORMANCE_EXPERIMENTS.md)

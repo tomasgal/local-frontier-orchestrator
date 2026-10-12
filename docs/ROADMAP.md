@@ -6,6 +6,8 @@
 
 See the [canonical closure record](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_BASELINE.md) for exact evidence and limitations, the [DEV5 implementation/provenance summary](DEV5_IMPLEMENTATION_SUMMARY.md) for the accepted A+B mapping and research attribution, and the [fixed file manifest](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_MANIFEST.json). `main` keeps its v9.3 runtime unchanged. No L2 retuning or repeated model benchmark is a prerequisite for future work.
 
+**DEV5 dissemination (2026-10-12):** a citable technical note, *Reducing Context and Generation Traffic in a Local-First LLM Orchestrator: A Transferability Case Study*, has been published on Zenodo (DOI [10.5281/zenodo.23318551](https://doi.org/10.5281/zenodo.23318551)). It documents the bounded cross-environment transferability result and preserves the frozen baseline's limitations; it does not reopen L2 or establish a universal performance claim.
+
 Next: specify L3 semantic retrieval, entity resolution and selective reranking against the frozen L2 contract; then scope L4 epistemic mediation separately. Neither is implemented by this closure.
 
 ## Historical roadmap â€” superseded by the closure above
