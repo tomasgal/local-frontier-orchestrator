@@ -76,6 +76,60 @@ The local model is therefore more than a router. It remains part of the conversa
 - **Policy/config separation:** routing/system policy, synthesis policy, frontier-subagent instructions, hard gates, and generation defaults are externalized from the transport/orchestration script so they can be reviewed and changed without editing process-control code.
 - **Traceable experimentation:** longer-term failures and corrections are more informative than tuning the system around one or two prompts.
 
+## Hardware-independent scaling strategy
+
+LFO is designed as an **orchestration/control plane**, not as the inference engine itself. The memory, routing, policy and context layers should therefore remain stable while the local inference substrate scales independently.
+
+```text
+LFO control plane
+  |- routing / policy
+  |- L0 / L1 / L2 / L3 memory
+  |- context assembly
+  |- LOCAL / FRONTIER decision
+  |- telemetry
+  |
+  v
+local inference endpoint
+  |- CPU-only runtime
+  |- single small GPU
+  |- single large GPU
+  |- multi-GPU model parallelism
+  |- multiple local replicas / specialists
+  `- future accelerator or internal inference service
+```
+
+The architectural contract is deliberately endpoint-oriented: LFO asks a local model service to perform inference; it does not need to own GPU placement, tensor parallelism, model sharding or replica scheduling. Those concerns belong to the inference runtime/profile.
+
+This means that hardware growth should primarily change **capacity and the LOCAL/FRONTIER capability boundary**, not the LFO memory semantics or orchestration design.
+
+Examples:
+
+| Deployment | Intended scaling behaviour |
+| --- | --- |
+| CPU-only / constrained notebook | Smaller quantized LOCAL model; more tasks may escalate to FRONTIER. |
+| 6-32 GB single GPU | Same LFO stack; change model, quantization, context and runtime placement through the host profile. |
+| 48-96 GB single GPU | Run a larger LOCAL model, larger context or more concurrent sessions without changing L0-L3 contracts. |
+| 2-4 GPU workstation/server | The inference backend may shard one larger model across GPUs, expose several model replicas, or host specialist models behind the same orchestration boundary. |
+| Example: 3 x 32 GB GPU server | LFO can still see one logical LOCAL endpoint while the backend uses the three GPUs for model/tensor parallelism; alternatively the GPUs can host independent replicas or specialists. The routing and memory layers do not require refactoring. |
+| Multi-user / small server cluster | Add an inference gateway/scheduler behind LFO; the control-plane contract remains the same. |
+| Larger multi-node cluster | Distribution, batching, KV-cache placement and HA move into the serving layer. LFO may need deployment adapters, but not a redesign of its memory architecture. |
+
+The preferred scaling rule is:
+
+> **Scale the inference substrate first; change LFO semantics only when a demonstrated orchestration or memory requirement demands it.**
+
+In practical terms, moving from a 4B LOCAL model on modest hardware to a 70B-class or other larger model on a multi-GPU host should not require rewriting L0/L1/L2/L3. The stronger LOCAL tier should simply satisfy more requests locally and reduce the frequency of FRONTIER escalation.
+
+A multi-GPU host can be used in three broad ways without changing the core LFO architecture:
+
+1. **one larger sharded LOCAL model** exposed as one endpoint;
+2. **multiple replicas of the same LOCAL model** for throughput/concurrency;
+3. **multiple local specialists** with a thin model-selection layer above the same frozen memory/context contracts.
+
+The current reference implementation is not yet fully platform-neutral: it is PowerShell/Windows-oriented, uses the Windows SQLite substrate in the validated path, Ollama as the reference local serving endpoint and Codex CLI for the frontier path. Therefore LFO is currently **portable by architecture, not yet portable by implementation**. A Linux or alternate-runtime port should replace host/runtime adapters while preserving the higher-level orchestration and frozen L2/L3 semantics.
+
+The design target is therefore **automatic or configuration-driven scaling without semantic refactoring**: hardware-specific model placement, quantization, context sizing and multi-GPU scheduling belong in runtime profiles or the inference backend, while routing, memory provenance, retrieval and fallback contracts remain stable.
+
 ## Why not simply run the frontier model for everything?
 
 The project explores a heterogeneous architecture in which different computational tiers have different roles.
