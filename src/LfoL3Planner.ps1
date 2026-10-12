@@ -97,6 +97,7 @@ function Get-LfoL3CandidateItems(
                     EntityMatches = 0
                     KindMatches = 0
                     PredicateMatches = 0
+                    PredicateValues = @()
                 }
             }
             $byId[$id].Score += [int]$q.Weight
@@ -104,7 +105,12 @@ function Get-LfoL3CandidateItems(
                 'topic' { $byId[$id].TopicMatches++ }
                 'entity' { $byId[$id].EntityMatches++ }
                 'kind' { $byId[$id].KindMatches++ }
-                'predicate' { $byId[$id].PredicateMatches++ }
+                'predicate' {
+                    $byId[$id].PredicateMatches++
+                    if (@($byId[$id].PredicateValues) -cnotcontains [string]$q.ValueKey) {
+                        $byId[$id].PredicateValues = @($byId[$id].PredicateValues) + @([string]$q.ValueKey)
+                    }
+                }
             }
         }
         foreach ($row in @(Get-LfoL3ItemsByFacet $Connection $scope $q.Dimension $q.ValueKey -1)) {
@@ -138,6 +144,7 @@ function Get-LfoL3CandidateItems(
             EntityMatches = [int]$entry.EntityMatches
             KindMatches = [int]$entry.KindMatches
             PredicateMatches = [int]$entry.PredicateMatches
+            PredicateValues = @($entry.PredicateValues)
             Priority = $priority.ContainsKey($id)
         }
     }
@@ -153,15 +160,35 @@ function Get-LfoL3CandidateItems(
             $_.SourceLayer -eq 'L2' -and $_.EntityMatches -gt 0 -and $_.PredicateMatches -gt 0
         })
         if ($matchingL2.Count -gt 0) {
-            # The requested predicate(s) are represented by current L2 facts.
-            # Drop sibling L2 facts and same-entity/same-predicate L0 narration
-            # before evidence resolution. This avoids spending the remaining
-            # item budget on redundant historical prose.
+            $requestedPredicateKeys = @(
+                $queryFacets |
+                Where-Object { $_.Dimension -eq 'predicate' } |
+                ForEach-Object { [string]$_.ValueKey } |
+                Sort-Object -Unique
+            )
+            $coveredPredicateKeys = @(
+                $matchingL2 |
+                ForEach-Object { @($_.PredicateValues) } |
+                ForEach-Object { [string]$_ } |
+                Sort-Object -Unique
+            )
+            $fullPredicateCoverage = $true
+            foreach ($predicateKey in $requestedPredicateKeys) {
+                if ($coveredPredicateKeys -cnotcontains $predicateKey) {
+                    $fullPredicateCoverage = $false
+                    break
+                }
+            }
+
+            # Always suppress unrelated L2 siblings once at least one requested
+            # predicate is matched. Suppress same-entity L0 narration only when
+            # current L2 covers every requested predicate; otherwise L0 remains
+            # available as evidence for the missing part of the question.
             $out = @($out | Where-Object {
                 if ($_.SourceLayer -eq 'L2') {
                     return ($_.EntityMatches -gt 0 -and $_.PredicateMatches -gt 0)
                 }
-                if ($_.SourceLayer -eq 'L0' -and $_.EntityMatches -gt 0 -and $_.PredicateMatches -gt 0) {
+                if ($fullPredicateCoverage -and $_.SourceLayer -eq 'L0' -and $_.EntityMatches -gt 0) {
                     return $false
                 }
                 return $true
@@ -262,6 +289,7 @@ function New-LfoL3ContextPlan(
             EntityMatches = [int]$candidate.EntityMatches
             KindMatches = [int]$candidate.KindMatches
             PredicateMatches = [int]$candidate.PredicateMatches
+            PredicateValues = @($candidate.PredicateValues)
             LexicalScore = [int]$lexical
             Score = ([int]$candidate.MetadataScore * 1000) + $layerAuthority + ([int]$lexical * 5)
             Priority = [bool]$candidate.Priority
