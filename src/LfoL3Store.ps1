@@ -481,10 +481,12 @@ function Get-LfoL3Classification(
     $Connection,
     [string]$Text,
     [int]$MaxTopics = 2,
-    [int]$MaxEntities = 3
+    [int]$MaxEntities = 3,
+    [int]$MaxPredicates = 4
 ) {
     $maxTopicsBounded = [Math]::Min(2, [Math]::Max(0, $MaxTopics))
     $maxEntitiesBounded = [Math]::Min(3, [Math]::Max(0, $MaxEntities))
+    $maxPredicatesBounded = [Math]::Min(4, [Math]::Max(0, $MaxPredicates))
     $keys = @(Get-LfoL3TextKeys $Text 4 96)
 
     if ($null -eq $Connection -or $keys.Count -eq 0) {
@@ -493,6 +495,7 @@ function Get-LfoL3Classification(
             QueryKeys = $keys.Count
             Topics = @()
             Entities = @()
+            Predicates = @()
             Kind = $null
             Facets = @()
         }
@@ -512,6 +515,7 @@ WHERE active = 1
             QueryKeys = $keys.Count
             Topics = @()
             Entities = @()
+            Predicates = @()
             Kind = $null
             Facets = @()
         }
@@ -550,6 +554,13 @@ WHERE active = 1
                     @{Expression='ValueKey';Descending=$false} |
         Select-Object -First $maxEntitiesBounded
     )
+    $predicateRows = @(
+        $best | Where-Object { $_.Dimension -eq 'predicate' } |
+        Sort-Object @{Expression='Priority';Descending=$true},
+                    @{Expression={([string]$_.MatchKey).Length};Descending=$true},
+                    @{Expression='ValueKey';Descending=$false} |
+        Select-Object -First $maxPredicatesBounded
+    )
     $kindRows = @(
         $best | Where-Object { $_.Dimension -eq 'kind' } |
         Sort-Object @{Expression='Priority';Descending=$true},
@@ -558,7 +569,7 @@ WHERE active = 1
         Select-Object -First 1
     )
     $kind = if ($kindRows.Count -eq 1) { $kindRows[0] } else { $null }
-    $facets = @($topics) + @($entities)
+    $facets = @($topics) + @($entities) + @($predicateRows)
     if ($null -ne $kind) { $facets += $kind }
 
     return [pscustomobject]@{
@@ -566,6 +577,7 @@ WHERE active = 1
         QueryKeys = $keys.Count
         Topics = @($topics)
         Entities = @($entities)
+        Predicates = @($predicateRows)
         Kind = $kind
         Facets = @($facets)
     }
