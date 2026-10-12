@@ -79,6 +79,19 @@ function Initialize-QwenMemoryConfiguration(
     $script:L2ReadMaxChars = if ($script:Config.Memory.ContainsKey('StructuredReadMaxChars')) {
         [Math]::Max(0, [Math]::Min(1200, [int]$script:Config.Memory.StructuredReadMaxChars))
     } else { 800 }
+
+    # L3 is a separate opt-in derived retrieval/index database. Default OFF.
+    $script:L3ReadEnabled = $script:MemoryEnabled -and
+        $script:Config.Memory.ContainsKey('L3ReadEnabled') -and
+        [bool]$script:Config.Memory.L3ReadEnabled
+    $script:L3Path = Join-Path $script:StateDir 'l3-index.db'
+    $script:L3ReadMaxItems = if ($script:Config.Memory.ContainsKey('L3ReadMaxItems')) {
+        [Math]::Max(1, [Math]::Min(6, [int]$script:Config.Memory.L3ReadMaxItems))
+    } else { 3 }
+    $script:L3ReadMaxChars = if ($script:Config.Memory.ContainsKey('L3ReadMaxChars')) {
+        [Math]::Max(80, [Math]::Min(2500, [int]$script:Config.Memory.L3ReadMaxChars))
+    } else { 1200 }
+
     $script:Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 }
 
@@ -615,30 +628,41 @@ function Get-RelevantDataContext([string]$Query) {
     return ($parts -join "`n")
 }
 
-function Get-MemoryContextData([string]$Query = '') {
+function Get-MemoryCoreContextData {
     if (-not $script:MemoryEnabled) {
         return [pscustomobject]@{ Block = ''; Core = ''; RetrievedOldData = '' }
     }
 
     $state = Get-WorkingMemoryRaw
     $pending = Get-PendingNotesText
-    $core = "STATE:$state`nPENDING:$pending"
+    $core = 'STATE:' + $state + [Environment]::NewLine + 'PENDING:' + $pending
 
     if ($script:MemoryContextMaxChars -gt 0 -and
         $core.Length -gt $script:MemoryContextMaxChars) {
         $core = Get-BoundedText $core $script:MemoryContextMaxChars
     }
 
+    return [pscustomobject]@{
+        Block = $core
+        Core = $core
+        RetrievedOldData = ''
+    }
+}
+
+function Get-MemoryContextData([string]$Query = '') {
+    $base = Get-MemoryCoreContextData
+    if (-not $script:MemoryEnabled) { return $base }
+
     $retrieved = Get-RelevantDataContext $Query
     $block = if (-not [string]::IsNullOrWhiteSpace($retrieved)) {
-        "$core`nRELEVANT OLD DATA:`n$retrieved"
+        [string]$base.Core + [Environment]::NewLine + 'RELEVANT OLD DATA:' + [Environment]::NewLine + $retrieved
     } else {
-        $core
+        [string]$base.Core
     }
 
     return [pscustomobject]@{
         Block = $block
-        Core = $core
+        Core = [string]$base.Core
         RetrievedOldData = $retrieved
     }
 }
@@ -739,21 +763,64 @@ function Get-LfoRelevantCurrentL2([string]$Query) {
 # One read-only L0/L1/recent-message snapshot per turn. Post-write state is rebuilt.
 function Start-LfoTurnContext([string]$Query) {
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    $memory = Get-MemoryContextData $Query
     $recent = @(Get-RecentConversationMessages)
-    $l2 = [pscustomobject]@{ Text=''; Count=0; CandidateKeys=0; Status='disabled'; Error=$null }
-    $l2Seconds = 0.0
-    if ($script:L2ReadEnabled) {
-        $l2Sw = [Diagnostics.Stopwatch]::StartNew()
-        $l2 = Get-LfoRelevantCurrentL2 $Query
-        $l2Sw.Stop()
-        $l2Seconds = $l2Sw.Elapsed.TotalSeconds
-        Add-LfoTurnPhase -Phase 'l2_retrieval' -Kind 'retrieval' -WallSeconds $l2Seconds -Success ($l2.Status -ne 'failed') -InputChars $Query.Length
+    $scopeId = "conversation:$([int]$script:RuntimeState.epoch)"
+
+    $l3 = [pscustomobject]@{
+        Status='disabled'; L0Text=''; L2Text=''; L0Count=0; L2Count=0
+        PacketChars=0; CandidateCount=0; SelectedCount=0; DroppedChars=0
+        DuplicateDrops=0; Error=$null
     }
+    $l3Seconds = 0.0
+    $useL3 = $false
+
+    if ($script:L3ReadEnabled -and
+        -not (Test-DeclarativeStateUpdatePrompt $Query) -and
+        (Get-Command Get-LfoL3RuntimeContextPlan -ErrorAction SilentlyContinue)) {
+        $l3Sw = [Diagnostics.Stopwatch]::StartNew()
+        $l3 = Get-LfoL3RuntimeContextPlan $Query $scopeId $script:L3Path $script:StructuredMemoryPath $script:LogDir ([int]$script:RuntimeState.epoch) $script:L3ReadMaxItems $script:L3ReadMaxChars
+        $l3Sw.Stop()
+        $l3Seconds = $l3Sw.Elapsed.TotalSeconds
+        $useL3 = ($l3.Status -eq 'ok')
+        Add-LfoTurnPhase -Phase 'l3_retrieval' -Kind 'retrieval' -WallSeconds $l3Seconds -Success ($l3.Status -ne 'failed') -InputChars $Query.Length
+    }
+
+    if ($useL3) {
+        $memory = Get-MemoryCoreContextData
+        $retrieved = [string]$l3.L0Text
+        if (-not [string]::IsNullOrWhiteSpace($retrieved)) {
+            $memory = [pscustomobject]@{
+                Core = [string]$memory.Core
+                RetrievedOldData = $retrieved
+                Block = [string]$memory.Core + [Environment]::NewLine + 'RELEVANT OLD DATA:' + [Environment]::NewLine + $retrieved
+            }
+        }
+        $l2 = [pscustomobject]@{
+            Text = [string]$l3.L2Text
+            Count = [int]$l3.L2Count
+            CandidateKeys = 0
+            Status = $(if ([int]$l3.L2Count -gt 0) { 'l3_ok' } else { 'l3_no_l2' })
+            Error = $null
+        }
+        $l2Seconds = 0.0
+    } else {
+        # Fail open to the existing L0/L1 + L2 retrieval path.
+        $memory = Get-MemoryContextData $Query
+        $l2 = [pscustomobject]@{ Text=''; Count=0; CandidateKeys=0; Status='disabled'; Error=$null }
+        $l2Seconds = 0.0
+        if ($script:L2ReadEnabled) {
+            $l2Sw = [Diagnostics.Stopwatch]::StartNew()
+            $l2 = Get-LfoRelevantCurrentL2 $Query
+            $l2Sw.Stop()
+            $l2Seconds = $l2Sw.Elapsed.TotalSeconds
+            Add-LfoTurnPhase -Phase 'l2_retrieval' -Kind 'retrieval' -WallSeconds $l2Seconds -Success ($l2.Status -ne 'failed') -InputChars $Query.Length
+        }
+    }
+
     $assembledBlock = [string]$memory.Block
     $l2Added = ''
     if ($l2.Count -gt 0) {
-        $l2Added = "`nCURRENT STRUCTURED FACTS (L2; recorded state, not independently verified):`n$($l2.Text)"
+        $l2Added = [Environment]::NewLine + 'CURRENT STRUCTURED FACTS (L2; recorded state, not independently verified):' + [Environment]::NewLine + [string]$l2.Text
         $assembledBlock += $l2Added
     }
 
@@ -772,6 +839,15 @@ function Start-LfoTurnContext([string]$Query) {
         l2_read_seconds = [Math]::Round($l2Seconds, 4)
         l2_read_error = $l2.Error
         l2_max_chars = [int]$script:L2ReadMaxChars
+        l3_used = [bool]$useL3
+        l3_status = [string]$l3.Status
+        l3_candidates = [int]$l3.CandidateCount
+        l3_selected = [int]$l3.SelectedCount
+        l3_packet_chars = [int]$l3.PacketChars
+        l3_dropped_chars = [int]$l3.DroppedChars
+        l3_duplicate_drops = [int]$l3.DuplicateDrops
+        l3_seconds = [Math]::Round($l3Seconds, 4)
+        l3_error = $l3.Error
         recent_messages = $recent.Count
         recent_messages_chars = $recentChars
         assembly_seconds = 0.0
@@ -779,8 +855,6 @@ function Start-LfoTurnContext([string]$Query) {
     $script:LfoTurnContext = [pscustomobject]@{
         Query = $Query
         MemoryBlock = $assembledBlock
-        # Separately snapshot lower-trust evidence for dev5 C without
-        # changing the legacy combined block, logging or dev4 write guard.
         L1MemoryBlock = [string]$memory.Block
         L2EvidenceText = [string]$l2.Text
         RetrievedOldData = [string]$memory.RetrievedOldData
