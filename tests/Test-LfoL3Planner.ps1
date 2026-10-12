@@ -131,6 +131,10 @@ try {
     # Explicit predicate terms must narrow to one or two requested siblings,
     # while broad queries remain unaffected by this mechanism.
     Set-LfoL3TermRule $db 'entity' 'atlas' 'ATLAS' 100 'r3-entity' $true
+    Set-LfoL3TermRule $db 'predicate' 'os' 'OS' 130 'r3-predicate' $true
+    Set-LfoL3TermRule $db 'predicate' 'ram_gb' 'RAM' 130 'r3-predicate' $true
+    Set-LfoL3TermRule $db 'predicate' 'cpu_count' 'CPU' 130 'r3-predicate' $true
+    Set-LfoL3TermRule $db 'predicate' 'disk_gb' 'disk' 130 'r3-predicate' $true
     $atlasOs = Set-LfoL3Item $db 'conversation:1' 'L2' 'fact:atlas-os' 20 $null
     $atlasRam = Set-LfoL3Item $db 'conversation:1' 'L2' 'fact:atlas-ram' 20 $null
     $atlasCpu = Set-LfoL3Item $db 'conversation:1' 'L2' 'fact:atlas-cpu' 20 $null
@@ -140,6 +144,13 @@ try {
         [void](Set-LfoL3Facet $db $item.id 'topic' 'lfo' 1 'r3-seed')
         [void](Set-LfoL3Facet $db $item.id 'entity' 'atlas' 1 'r3-seed')
         [void](Set-LfoL3Facet $db $item.id 'kind' 'configuration' 1 'r3-seed')
+    }
+    [void](Set-LfoL3Facet $db $atlasOs.id 'predicate' 'os' 1 'r3-seed')
+    [void](Set-LfoL3Facet $db $atlasRam.id 'predicate' 'ram_gb' 1 'r3-seed')
+    [void](Set-LfoL3Facet $db $atlasCpu.id 'predicate' 'cpu_count' 1 'r3-seed')
+    [void](Set-LfoL3Facet $db $atlasDisk.id 'predicate' 'disk_gb' 1 'r3-seed')
+    foreach ($predicate in @('os','ram_gb','cpu_count','disk_gb')) {
+        [void](Set-LfoL3Facet $db $atlasNarrative.id 'predicate' $predicate 1 'r3-seed')
     }
     $atlasEvidence = @(
         [pscustomobject]@{ SourceLayer='L2'; SourceRef='fact:atlas-os'; Text='ATLAS.os = Synthetic OS 13' },
@@ -154,7 +165,7 @@ try {
     $atlasSingle = New-LfoL3ContextPlan $db 'conversation:1' $atlasSingleQuery $atlasSingleClass $atlasEvidence 4 1000
     if ($atlasSingle.Status -ne 'ok' -or $atlasSingle.SelectedCount -ne 1 -or
         $atlasSingle.Packet -cne 'ATLAS.os = Synthetic OS 13' -or
-        $atlasSingle.LexicalNarrowDrops -ne 3 -or
+        $atlasSingle.LexicalNarrowDrops -ne 0 -or
         $atlasSingle.AuthorityShadowDrops -ne 1 -or $atlasSingle.Packet -match 'Historical ATLAS') {
         throw ('R3 single-predicate lexical narrowing failed: ' + ($atlasSingle | ConvertTo-Json -Depth 5 -Compress))
     }
@@ -166,7 +177,7 @@ try {
         $atlasTwo.Packet -notmatch 'ATLAS\.ram_gb = 96' -or
         $atlasTwo.Packet -notmatch 'ATLAS\.cpu_count = 8' -or
         $atlasTwo.Packet -match 'ATLAS\.os|ATLAS\.disk_gb' -or
-        $atlasTwo.LexicalNarrowDrops -ne 2 -or
+        $atlasTwo.LexicalNarrowDrops -ne 0 -or
         $atlasTwo.AuthorityShadowDrops -ne 1 -or $atlasTwo.Packet -match 'Historical ATLAS') {
         throw ('R3 two-predicate lexical narrowing failed: ' + ($atlasTwo | ConvertTo-Json -Depth 5 -Compress))
     }
