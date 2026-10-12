@@ -41,14 +41,25 @@ foreach ($case in @($doc.cases)) {
         'single_current' {
             if (-not $l.l3_used -or [string]$l.l3_status -cne 'ok' -or
                 [int]$l.l2_items -ne 1 -or [int]$b.l2_items -le 1) { throw 'Invalid single_current shape.' }
+            if (@($l.predicate_keys).Count -ne 1 -or @($l.predicate_keys) -notcontains 'os') {
+                throw 'single_current did not use the os predicate dimension.'
+            }
         }
         'two_current' {
             if (-not $l.l3_used -or [string]$l.l3_status -cne 'ok' -or
                 [int]$l.l2_items -ne 2 -or [int]$b.l2_items -lt 2) { throw 'Invalid two_current shape.' }
+            if (@($l.predicate_keys).Count -ne 2 -or
+                @($l.predicate_keys) -notcontains 'ram_gb' -or
+                @($l.predicate_keys) -notcontains 'cpu_count') {
+                throw 'two_current did not use ram_gb + cpu_count predicate dimensions.'
+            }
         }
         'corrected_current' {
             if (-not $l.l3_used -or [string]$l.l3_status -cne 'ok' -or [int]$l.l2_items -lt 1) {
                 throw 'Invalid corrected_current shape.'
+            }
+            if (@($l.predicate_keys).Count -ne 1 -or @($l.predicate_keys) -notcontains 'os') {
+                throw 'corrected_current did not use the os predicate dimension.'
             }
             if ([string]::IsNullOrWhiteSpace([string]$case.historical_marker) -or
                 [string]::IsNullOrWhiteSpace([string]$case.current_marker)) {
