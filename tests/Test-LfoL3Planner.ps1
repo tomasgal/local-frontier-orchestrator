@@ -171,6 +171,14 @@ try {
         throw ('R3 two-predicate lexical narrowing failed: ' + ($atlasTwo | ConvertTo-Json -Depth 5 -Compress))
     }
 
+    $atlasBroadQuery = 'For LFO, show the ATLAS configuration.'
+    $atlasBroadClass = Get-LfoL3Classification $db $atlasBroadQuery
+    $atlasBroad = New-LfoL3ContextPlan $db 'conversation:1' $atlasBroadQuery $atlasBroadClass $atlasEvidence 5 1000
+    if ($atlasBroad.Status -ne 'ok' -or $atlasBroad.SelectedCount -ne 5 -or
+        $atlasBroad.LexicalNarrowDrops -ne 0 -or $atlasBroad.AuthorityShadowDrops -ne 0) {
+        throw ('R3 broad-query preservation failed: ' + ($atlasBroad | ConvertTo-Json -Depth 5 -Compress))
+    }
+
     [pscustomobject]@{
         PASS = $true
         CandidateCount = $plan.CandidateCount
