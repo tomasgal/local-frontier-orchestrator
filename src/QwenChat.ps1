@@ -95,7 +95,7 @@ if (-not (Test-Path -LiteralPath $memoryModule)) {
 . $memoryModule
 
 # L3 modules are loaded unconditionally but remain inert unless Memory.L3ReadEnabled is true.
-foreach ($l3ModuleName in @('LfoL3Store.ps1','LfoL3Planner.ps1','LfoL3Runtime.ps1')) {
+foreach ($l3ModuleName in @('LfoL3Store.ps1','LfoL3Planner.ps1','LfoL3Runtime.ps1','LfoL3Indexer.ps1')) {
     $l3Module = Join-Path $PSScriptRoot $l3ModuleName
     if (-not (Test-Path -LiteralPath $l3Module)) { throw "L3 module not found: $l3Module" }
     . $l3Module
