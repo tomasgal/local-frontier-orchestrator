@@ -1,9 +1,9 @@
-# L3 Candidate Checkpoint — selective tagged SQL retrieval
+# L3 Historical Candidate Checkpoint — selective tagged SQL retrieval
 
 **Date:** 2026-10-12  
 **Branch:** `v9.5-l3-selective-index`  
 **Checkpoint base:** `2e93bd0daa11023a03ba44fa2c387360b72c0d45`  
-**Status:** candidate solution; not frozen yet.
+**Status:** historical checkpoint. L3 is now closed; see `L3_FROZEN_BASELINE.md`.
 
 ## Candidate solution
 
@@ -107,7 +107,7 @@ Accepted finding:
 
 ## Engineering progress
 
-**Estimated progress toward a freeze-ready L3 candidate: 95%.**
+**Final engineering progress: 100%.**
 
 This is a milestone-based engineering estimate, not a statistical measurement.
 
@@ -120,15 +120,19 @@ This is a milestone-based engineering estimate, not a statistical measurement.
 | automatic post-turn indexing/correction maintenance | 15% | done |
 | first valid end-to-end live proof | 10% | done |
 | broader multi-case live validation | 15% | **done — LIVE2 substantive PASS** |
-| closure hardening + freeze/publish decision | 5% | **pending** |
+| closure hardening + freeze/publish decision | 5% | **done** |
 
-Completed weighted milestones: **95/100**.
+Completed weighted milestones: **100/100**.
 
 The optional L0 source-locator/I/O optimization is **not required for L3 functional closure**. It should be attempted only after the broader live corpus confirms that prompt/context selection is robust enough to justify further optimization.
 
-## Required next test plan
+## Historical test plan (completed)
 
-### Gate L3-LIVE2 — broader live corpus
+The plan below is retained as development history. LIVE2, hardening, source-locator measurement, and closure are complete. The normative state is `docs/L3_FROZEN_BASELINE.md`.
+
+### Previously required LIVE2 plan
+
+#### Gate L3-LIVE2 — broader live corpus
 
 Run the same baseline-vs-L3 comparison on at least these five retrieval shapes:
 
