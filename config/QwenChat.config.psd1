@@ -7,6 +7,9 @@
 
     Memory = @{
         Enabled = $true
+        # Optional L0 source-stage capture for future L4 observation provenance.
+        # Independent of ResearchLogging; no extra model call or prompt data.
+        L0StageSourcesEnabled = $false
         DataDirectory = '%LOCALAPPDATA%\LocalFrontierOrchestrator'
 
         # Shared semantics; host launchers may override capacity parameters.

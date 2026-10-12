@@ -747,6 +747,10 @@ function Invoke-Qwen([string]$Prompt) {
     $memoryRecoveryReason = $null
     $memoryRecoverySuccess = $null
     $memoryNoteSource = 'single-pass'
+    $stageSources = New-Object 'System.Collections.Generic.List[object]'
+    $finalProducer = 'WRAPPER'
+    $finalPhase = 'wrapper'
+    Add-LfoL0StageSource $stageSources 'USER' 'INPUT' 'input' 'USER' $Prompt 'received' 'user'
 
     if (-not [string]::IsNullOrWhiteSpace($policyReason)) {
         $route = 'FRONTIER'
@@ -759,6 +763,7 @@ function Invoke-Qwen([string]$Prompt) {
         Show-QwenThinking $r
         $candidate = Get-CleanQwenContent $r
         $localRaw = $candidate
+        Add-LfoL0StageSource $stageSources 'LOCAL' 'LOCAL_RESPONSE' 'initial' 'LOCAL' $candidate
         $structured = ConvertFrom-QwenStructuredContent $candidate -ExpectRoute
 
         if ($structured.Success) {
@@ -768,6 +773,8 @@ function Invoke-Qwen([string]$Prompt) {
             } else {
                 Write-Host "`n[Qwen route -> LOCAL]" -ForegroundColor DarkGray
                 $finalContent = [string]$structured.Answer
+                $finalProducer = 'LOCAL'
+                $finalPhase = 'initial'
                 $inlineMemoryNote = $structured.MemoryNote
                 $inlineMemoryOps = $structured.MemoryOps
                 if (Test-QwenInvalidFinalAnswer $finalContent) {
@@ -780,6 +787,8 @@ function Invoke-Qwen([string]$Prompt) {
                         $answerRecoveryReason = 'local-declarative-ack'
                         $answerRecoverySuccess = $true
                         $finalContent = 'OK.'
+                        $finalProducer = 'WRAPPER'
+                        $finalPhase = 'declarative_ack'
                         Write-Host "[Qwen answer invalid; using deterministic declarative acknowledgement.]" -ForegroundColor DarkGray
                     } else {
                         $answerRecoveryReason = if ($finalContent -eq '-') {
@@ -792,10 +801,14 @@ function Invoke-Qwen([string]$Prompt) {
                         try {
                             $recoveryResponse = Invoke-QwenAnswerRecovery $Prompt
                             Show-QwenThinking $recoveryResponse
-                            $recoveredAnswer = Get-QwenRecoveredAnswer (Get-CleanQwenContent $recoveryResponse)
+                            $recoveryContent = Get-CleanQwenContent $recoveryResponse
+                            Add-LfoL0StageSource $stageSources 'LOCAL' 'LOCAL_RESPONSE' 'answer_recovery' 'LOCAL' $recoveryContent
+                            $recoveredAnswer = Get-QwenRecoveredAnswer $recoveryContent
                             if ([string]$recoveryResponse.done_reason -ne 'length' -and
                                 -not (Test-QwenInvalidFinalAnswer $recoveredAnswer)) {
                                 $finalContent = $recoveredAnswer
+                                $finalProducer = 'LOCAL'
+                                $finalPhase = 'answer_recovery'
                                 $answerRecoverySuccess = $true
                             }
                         } catch {
@@ -803,6 +816,8 @@ function Invoke-Qwen([string]$Prompt) {
                         }
                         if (-not $answerRecoverySuccess) {
                             $finalContent = 'The local model could not produce a usable answer. Please try again.'
+                            $finalProducer = 'WRAPPER'
+                            $finalPhase = 'recovery_failed'
                         }
                     }
                 }
@@ -812,6 +827,8 @@ function Invoke-Qwen([string]$Prompt) {
             Write-Host "`n[Qwen structured output malformed; fail-closed -> LOCAL]" -ForegroundColor Yellow
             $route = 'LOCAL'
             $finalContent = $candidate
+            $finalProducer = 'LOCAL'
+            $finalPhase = 'malformed_output'
             $inlineMemoryNote = $structured.MemoryNote
         }
         $localPostSw.Stop()
@@ -860,11 +877,15 @@ $recentContext
         }
 
         if ($frontierResult -like 'ask_codex failed:*') {
+            Add-LfoL0StageSource $stageSources 'FRONTIER' 'FRONTIER_RESPONSE' 'handoff' 'WRAPPER' $frontierResult 'failed'
             $finalContent = $frontierResult
+            $finalPhase = 'frontier_failed'
         } else {
+            Add-LfoL0StageSource $stageSources 'FRONTIER' 'FRONTIER_RESPONSE' 'handoff' 'FRONTIER' $frontierResult
             $r = Invoke-QwenSynthesis $Prompt $frontierResult
             Show-QwenThinking $r
             $candidate = Get-CleanQwenContent $r
+            Add-LfoL0StageSource $stageSources 'LOCAL' 'LOCAL_RESPONSE' 'synthesis' 'LOCAL' $candidate
             $structuredSynthesis = ConvertFrom-QwenStructuredContent $candidate
 
             $invalidSynthesisAnswer = $structuredSynthesis.Success -and
@@ -875,6 +896,8 @@ $recentContext
                     (Test-UnfinishedSynthesis $r ([string]$structuredSynthesis.Answer)))) {
                 Write-Host "`n[Qwen synthesis did not complete cleanly; showing the frontier result directly.]" -ForegroundColor Yellow
                 $finalContent = $frontierResult
+                $finalProducer = 'FRONTIER'
+                $finalPhase = 'synthesis_fallback'
                 $inlineMemoryNote = $null
                 $inlineMemoryOps = [pscustomobject]@{
                     Valid = @()
@@ -883,6 +906,8 @@ $recentContext
             } elseif ($invalidSynthesisAnswer) {
                 Write-Host "`n[Qwen synthesis answer invalid; showing the frontier result directly.]" -ForegroundColor Yellow
                 $finalContent = $frontierResult
+                $finalProducer = 'FRONTIER'
+                $finalPhase = 'synthesis_fallback'
                 $inlineMemoryNote = $structuredSynthesis.MemoryNote
                 $inlineMemoryOps = $structuredSynthesis.MemoryOps
                 $answerRecoveryUsed = $true
@@ -894,6 +919,8 @@ $recentContext
                 $answerRecoverySuccess = $true
             } else {
                 $finalContent = [string]$structuredSynthesis.Answer
+                $finalProducer = 'LOCAL'
+                $finalPhase = 'synthesis'
                 $inlineMemoryNote = $structuredSynthesis.MemoryNote
                 $inlineMemoryOps = $structuredSynthesis.MemoryOps
             }
@@ -929,6 +956,8 @@ $recentContext
 
         if (-not $memoryRecoverySuccess) {
             $finalContent = 'The explicit memory request could not be persisted reliably. Please try again.'
+            $finalProducer = 'WRAPPER'
+            $finalPhase = 'memory_recovery_failed'
         }
     }
 
@@ -940,6 +969,8 @@ $recentContext
         $answerRecoveryReason = 'raw-sentinel'
         $answerRecoverySuccess = $false
         $finalContent = 'The model did not produce a usable answer. Please try again.'
+        $finalProducer = 'WRAPPER'
+        $finalPhase = 'raw_sentinel'
     }
 
     $sw.Stop()
@@ -972,7 +1003,9 @@ $recentContext
     }
 
     if (-not [string]::IsNullOrWhiteSpace($finalContent)) {
+        Add-LfoL0StageSource $stageSources 'FINAL' 'FINAL_RESPONSE' $finalPhase $finalProducer $finalContent 'delivered' 'assistant'
         Persist-TurnAndMemory `
+            -StageSources $stageSources.ToArray() `
             -Prompt $Prompt `
             -FinalContent $finalContent `
             -Route $route `

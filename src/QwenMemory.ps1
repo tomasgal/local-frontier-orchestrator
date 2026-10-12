@@ -10,6 +10,10 @@ function Initialize-QwenMemoryConfiguration(
     [Nullable[int]]$MemoryRetrievalMaxItems
 ) {
     $script:MemoryEnabled = [bool]$script:Config.Memory.Enabled
+    # L4 prerequisite: capture source stages in L0 only, never in model context.
+    $script:L0StageSourcesEnabled = $script:MemoryEnabled -and
+        $script:Config.Memory.ContainsKey('L0StageSourcesEnabled') -and
+        [bool]$script:Config.Memory.L0StageSourcesEnabled
     $script:MemoryRecentTurns = if ($null -ne $MemoryRecentTurns) {
         [int]$MemoryRecentTurns
     } else {
@@ -130,6 +134,27 @@ function Append-JsonLine([string]$Path, $Object) {
 function Get-MonthlyLogPath([string]$Kind) {
     $month = (Get-Date).ToString('yyyy-MM')
     return (Join-Path $script:LogDir ("{0}-{1}.jsonl" -f $Kind, $month))
+}
+
+function Add-LfoL0StageSource {
+    param($Sources, [string]$Actor, [string]$Stage, [string]$Phase,
+        [string]$Producer, [AllowEmptyString()][string]$Content,
+        [string]$Status = 'returned', [string]$SourceField = '')
+    if (-not $script:L0StageSourcesEnabled) { return }
+    $entry = [ordered]@{
+        stage_id = ('s{0}' -f ($Sources.Count + 1))
+        actor = $Actor
+        stage = $Stage
+        phase = $Phase
+        producer = $Producer
+        captured_at = [DateTime]::UtcNow.ToString('o')
+        status = $Status
+        model = $(if ($Producer -eq 'LOCAL') { [string]$Model } else { $null })
+    }
+    # USER/FINAL reference existing authoritative fields instead of copying them.
+    if ($SourceField) { $entry.source_field = $SourceField }
+    else { $entry.content = $Content }
+    [void]$Sources.Add([pscustomobject]$entry)
 }
 
 function New-DefaultRuntimeState {
@@ -1378,7 +1403,8 @@ function Persist-TurnAndMemory(
     [bool]$MemoryRecoveryUsed,
     [string]$MemoryRecoveryReason,
     $MemoryRecoverySuccess,
-    [string]$MemoryNoteSource
+    [string]$MemoryNoteSource,
+    [object[]]$StageSources = @()
 ) {
     if (-not $script:MemoryEnabled -and
         -not [bool]$script:Config.ResearchLogging.Enabled) {
@@ -1446,7 +1472,7 @@ function Persist-TurnAndMemory(
             [int64](Get-Item -LiteralPath $conversationLogPath).Length
         } else { [int64]0 }
 
-        Append-JsonLine $conversationLogPath ([ordered]@{
+        $conversationRow = [ordered]@{
             event = 'turn'
             timestamp = $timestamp
             turn_id = $turnId
@@ -1454,7 +1480,12 @@ function Persist-TurnAndMemory(
             route = $Route
             user = $Prompt
             assistant = $FinalContent
-        })
+        }
+        if ($script:L0StageSourcesEnabled) {
+            $conversationRow.stage_sources_schema = 1
+            $conversationRow.stage_sources = @($StageSources)
+        }
+        Append-JsonLine $conversationLogPath $conversationRow
 
         $conversationByteLength = [int64](Get-Item -LiteralPath $conversationLogPath).Length - [int64]$conversationByteOffset
         if ($conversationByteLength -le 0) {

@@ -1,6 +1,6 @@
 # L4 design — Epistemic Observatory & Balancer
 
-Status: **design/scoping accepted; implementation not started**
+Status: **design/scoping accepted; L0 source-capture prerequisite implemented on a separate development branch; SurrealDB R1 not started**
 
 Date: 2026-10-12
 
@@ -266,6 +266,10 @@ This does not require three separate services. It is a semantic separation of
 responsibilities within L4.
 
 ## R1 — recommended first implementation milestone
+
+Prerequisite patch: [L0 stage source capture](L0_STAGE_SOURCE_CAPTURE.md) adds
+default-OFF conversation-stage provenance without changing L2/L3 semantics.
+Its isolated synthetic tests pass on PowerShell 7; Windows acceptance is pending.
 
 **L4-R1: Epistemic Observation Store**
 
