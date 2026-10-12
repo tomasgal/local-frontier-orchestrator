@@ -6,7 +6,7 @@
 
 **Start here:** [Frozen L2 contract, decisions and evidence](docs/L2_FROZEN_BASELINE.md) · [Frozen file manifest](docs/L2_FROZEN_MANIFEST.json) · [Next: L3, then L4](docs/ROADMAP.md). Existing default switches remain OFF. The explicit [accepted L2 profile](config/QwenChat-L2Frozen.config.psd1) selects A+B and the bounded mixed-current-user path; C and grouped extraction are not adopted. No repeated L2 tuning or model runs are a prerequisite for beginning L3 design.
 
-**L3 candidate checkpoint (2026-10-12):** the selective tagged SQL retrieval layer is now approximately **80% toward freeze-ready status**. Store, deterministic tagging, context planner, opt-in runtime integration, automatic indexing and the first valid live comparison have passed. On the bounded eligible live case, L3 reduced model input from **1165 to 973 prompt tokens (-16.48%)** and model-visible context from **5519 to 4618 chars (-16.33%)** at matched correctness. Broader five-case live validation and closure hardening remain before freeze. See [L3 candidate checkpoint and test plan](docs/L3_CANDIDATE_CHECKPOINT.md).
+**L3 complete and frozen for the accepted scope (2026-10-12): `v9.5-l3-frozen`.** The reconstructible schema-v4 faceted SQLite retrieval layer passed the final **8/8 offline suite**, five-shape LIVE2 validation, focused no-match fallback retest, and focused live L0-locator smoke with production memory untouched. Predicate-aware eligible reads reduced prompt tokens by **10.72–12.67%** at matched correctness in the broader live corpus. The final verified L0 byte locator preserved exact evidence while reducing median synthetic 20k-turn source resolution from **9879.59 ms to 28.52 ms**; this is a source-resolution microbenchmark, not a whole-turn speedup claim. See [L3 frozen baseline](docs/L3_FROZEN_BASELINE.md) and [historical candidate checkpoint](docs/L3_CANDIDATE_CHECKPOINT.md). **Next milestone: L4 / Local Epistemic Balancer.**
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
@@ -16,7 +16,7 @@ The current reference implementation uses **Qwen via Ollama** as the local conve
 
 For v9.2 memory validation, the project uses a **conservative 90% engineering acceptance floor** for qualitative semantic behavior. This is not a claim that measured reliability is 90% or below 99%: the development smoke suite performed materially better than the acceptance floor, but its size and construction do not support a statistically defensible 99%-class reliability estimate.
 
-The project remains a research prototype. L2 is now frozen; future retrieval and bias-balancing development proceeds above its fixed contract.
+The project remains a research prototype. L2 and the accepted L3 retrieval layer are now frozen; L4 epistemic mediation proceeds above those fixed contracts.
 
 For the rationale behind the conversational-memory architecture, trade-offs against other memory systems, and the planned path from single-pass micro-memory to pressure-triggered and eventually keyed/deterministic memory updates, see [docs/MEMORY_STRATEGY.md](docs/MEMORY_STRATEGY.md).
 
@@ -30,7 +30,7 @@ As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validatio
 - **R5:** four protected read trials PASS; A+B eliminates redundant write output/instructions on eligible reads. FULL still proposed two memory operations per trial, safely suppressed by the existing guard. No production memory touched.
 - **R6:** accept the conservative write contract, integrity guards and selective A+B; retain bounded mixed writes and observability; defer grouped extraction and C; reject the 2040-character policy as the frozen default.
 
-L2 is closed for this scope. Historical results, failed candidates, source pins and remaining limitations are preserved in [the freeze record](docs/L2_FROZEN_BASELINE.md) and [historical experiments](docs/DEV5_PERFORMANCE_EXPERIMENTS.md). The next active design milestone is L3; L4 epistemic mediation follows. Human–AI bias-checker quality has not been established by these memory tests.
+L2 is closed for this scope. Historical results, failed candidates, source pins and remaining limitations are preserved in [the freeze record](docs/L2_FROZEN_BASELINE.md) and [historical experiments](docs/DEV5_PERFORMANCE_EXPERIMENTS.md). L3 retrieval is also closed for its accepted scope; the next active design milestone is L4 epistemic mediation. Human–AI bias-checker quality has not been established by these memory tests.
 
 ## Core architecture
 
