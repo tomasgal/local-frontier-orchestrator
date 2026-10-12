@@ -19,6 +19,19 @@ try {
     foreach ($name in $tests) {
         $file = Join-Path $PSScriptRoot $name
         if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing test: $name" }
+
+        # Parse every test before executing any one of them. This prevents a
+        # malformed later regression file from being discovered only after
+        # earlier suites have already run.
+        $tokens = $null
+        $parseErrors = $null
+        [void][Management.Automation.Language.Parser]::ParseFile(
+            $file,[ref]$tokens,[ref]$parseErrors)
+        if (@($parseErrors).Count -gt 0) {
+            throw ("Syntax FAIL {0}: {1}" -f $name,
+                (($parseErrors | ForEach-Object Message) -join '; '))
+        }
+
         $log = Join-Path $root ($name + '.log')
         $sw = [Diagnostics.Stopwatch]::StartNew()
         $pass = $false
