@@ -205,7 +205,14 @@ function New-LfoL3ContextPlan(
         $candidateChars += $text.Length
 
         $lexical = Get-LfoL3EvidenceLexicalScore $text $terms
-        $layerBonus = if ([string]$candidate.SourceLayer -eq 'L2') { 2 } else { 0 }
+
+        # Ranking is intentionally lexicographic in effect:
+        #   1) metadata relevance dominates,
+        #   2) for equal metadata relevance, compact/current L2 evidence
+        #      outranks a more verbose L0 wording,
+        #   3) lexical richness only breaks ties inside that authority class.
+        # Max lexical contribution is bounded below the L2 authority step.
+        $layerAuthority = if ([string]$candidate.SourceLayer -eq 'L2') { 200 } else { 0 }
         $resolved += [pscustomobject]@{
             Id = [int64]$candidate.Id
             SourceLayer = [string]$candidate.SourceLayer
@@ -215,7 +222,7 @@ function New-LfoL3ContextPlan(
             Text = $text
             MetadataScore = [int]$candidate.MetadataScore
             LexicalScore = [int]$lexical
-            Score = ([int]$candidate.MetadataScore * 100) + ([int]$lexical * 5) + $layerBonus
+            Score = ([int]$candidate.MetadataScore * 1000) + $layerAuthority + ([int]$lexical * 5)
             Priority = [bool]$candidate.Priority
         }
     }
