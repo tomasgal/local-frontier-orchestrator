@@ -149,10 +149,22 @@ function Get-LfoL3CandidateItems(
     $predicateQueryCount = @($queryFacets | Where-Object { $_.Dimension -eq 'predicate' }).Count
     $entityQueryCount = @($queryFacets | Where-Object { $_.Dimension -eq 'entity' }).Count
     if ($predicateQueryCount -gt 0 -and $entityQueryCount -eq 1) {
-        $matchingL2 = @($out | Where-Object { $_.SourceLayer -eq 'L2' -and $_.PredicateMatches -gt 0 })
+        $matchingL2 = @($out | Where-Object {
+            $_.SourceLayer -eq 'L2' -and $_.EntityMatches -gt 0 -and $_.PredicateMatches -gt 0
+        })
         if ($matchingL2.Count -gt 0) {
+            # The requested predicate(s) are represented by current L2 facts.
+            # Drop sibling L2 facts and same-entity/same-predicate L0 narration
+            # before evidence resolution. This avoids spending the remaining
+            # item budget on redundant historical prose.
             $out = @($out | Where-Object {
-                $_.SourceLayer -ne 'L2' -or $_.PredicateMatches -gt 0
+                if ($_.SourceLayer -eq 'L2') {
+                    return ($_.EntityMatches -gt 0 -and $_.PredicateMatches -gt 0)
+                }
+                if ($_.SourceLayer -eq 'L0' -and $_.EntityMatches -gt 0 -and $_.PredicateMatches -gt 0) {
+                    return $false
+                }
+                return $true
             })
         }
     }
