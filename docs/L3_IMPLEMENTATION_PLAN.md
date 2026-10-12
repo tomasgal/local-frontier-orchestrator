@@ -579,3 +579,22 @@ Fix:
 Fix/test checkpoint: `144b7fc6dbb10ac659f467916548fd54eabf9c41`.
 
 Automatic indexing remains **IMPLEMENTED / VALIDATION PENDING** until the full seven-suite runner passes on this fix.
+
+
+### Automatic-indexing second-run correction — malformed regression file
+
+The second Windows PowerShell 5.1 indexer run did not reach the authority-ordering assertion. The new planner regression file itself was malformed by a previous text patch: the final regex/string block was truncated and part of the closing output block was duplicated.
+
+This was a test-generation defect, not a planner/runtime result.
+
+Correction:
+
+- `Test-LfoL3Planner.ps1` was restored from the last clean R3 version and the L0-vs-L2 authority regression was inserted again as a standalone block;
+- `Invoke-L3IndexerOffline.ps1` now parses **all seven test scripts before executing the first test**, so a malformed later suite fails immediately at preflight.
+
+Fix checkpoints:
+
+- valid restored regression: `6a2a53ef2ff5ccbfcab1606dc680759db93acc0e`;
+- suite-wide parser preflight: `b2a6a0df3f2c7467c8074ad27d1ca83e08dd84f3`.
+
+Automatic indexing remains **IMPLEMENTED / VALIDATION PENDING** until the seven-suite runner passes on this checkpoint or later.
