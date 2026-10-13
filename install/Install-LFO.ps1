@@ -3,7 +3,6 @@ param(
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'LFO'),
     [string]$SourceRef = 'build/windows-bootstrap-v1',
     [string]$BaseModel = 'qwen3.5:4b-q4_K_M',
-    [string]$WorkingDirectory,
     [switch]$SkipModelPull
 )
 
@@ -15,13 +14,6 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 [Console]::InputEncoding = $utf8
 [Console]::OutputEncoding = $utf8
 $OutputEncoding = $utf8
-
-if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
-    if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) { $WorkingDirectory = $PSScriptRoot }
-    else { $WorkingDirectory = (Get-Location).Path }
-}
-$WorkingDirectory = [IO.Path]::GetFullPath($WorkingDirectory)
-New-Item -ItemType Directory -Path $WorkingDirectory -Force | Out-Null
 
 $RepoUrl = 'https://github.com/tomasgal/local-frontier-orchestrator.git'
 $OllamaMinVersion = [version]'0.34.4'
@@ -485,29 +477,21 @@ foreach($name in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Star
 }
 # Launcher copies use their own PSScriptRoot for wrappers, while Start-LFO resolves service scripts from AppRoot via install-state.
 
-Step 'Publish short launchers in working directory'
-$workingGpu=Join-Path $WorkingDirectory 'Start-LFO-GPU.ps1'
-$workingCpu=Join-Path $WorkingDirectory 'Start-LFO-CPU.ps1'
-$installedGpu=Join-Path $LaunchRoot 'Start-LFO-GPU.ps1'
-$installedCpu=Join-Path $LaunchRoot 'Start-LFO-CPU.ps1'
-$gpuWrapper="& '"+(Quote-PsSingle $installedGpu)+"' -InstallRoot '"+(Quote-PsSingle $InstallRoot)+"'`r`nexit `$LASTEXITCODE`r`n"
-$cpuWrapper="& '"+(Quote-PsSingle $installedCpu)+"' -InstallRoot '"+(Quote-PsSingle $InstallRoot)+"'`r`nexit `$LASTEXITCODE`r`n"
-[IO.File]::WriteAllText($workingGpu,$gpuWrapper,$utf8)
-[IO.File]::WriteAllText($workingCpu,$cpuWrapper,$utf8)
-
 Step 'Bootstrap complete'
 Write-Host ('Install root:  '+$InstallRoot) -ForegroundColor Green
 Write-Host ('Source:        '+$SourceCommit) -ForegroundColor Green
 Write-Host ('SQLite:       PASS '+$sqliteVersion) -ForegroundColor Green
 Write-Host ('Ollama:       '+$ollamaApiVersion+' @ '+$ollamaBase) -ForegroundColor Green
 Write-Host ('SurrealDB:    '+$SurrealVersion+' @ '+$surrealBase) -ForegroundColor Green
-Write-Host ('Working dir:   '+$WorkingDirectory) -ForegroundColor Green
+$installedLaunchDir=Join-Path $InstallRoot 'launch'
+Write-Host ('Launch dir:    '+$installedLaunchDir) -ForegroundColor Green
 Write-Host ''
-Write-Host 'Start LFO from the working directory with:' -ForegroundColor Cyan
-Write-Host ("  Set-Location '"+(Quote-PsSingle $WorkingDirectory)+"'")
-Write-Host '  .\Start-LFO-GPU.ps1'
+Write-Host 'To start LFO from PowerShell:' -ForegroundColor Cyan
+Write-Host ("  Set-Location '"+(Quote-PsSingle $installedLaunchDir)+"'")
 Write-Host '  .\Start-LFO-CPU.ps1'
+Write-Host '  .\Start-LFO-GPU.ps1'
 Write-Host ''
-Write-Host 'Opening the working directory in Windows Explorer...' -ForegroundColor Cyan
-try { Start-Process explorer.exe -ArgumentList ('"'+$WorkingDirectory+'"') | Out-Null } catch { Warn ("Unable to open Explorer: "+$_.Exception.Message) }
+Write-Host 'No shortcuts are created outside the LFO install tree; create any Windows shortcuts where you prefer.'
+Write-Host 'Opening the LFO install directory in Windows Explorer...' -ForegroundColor Cyan
+try { Start-Process explorer.exe -ArgumentList ('"'+$InstallRoot+'"') | Out-Null } catch { Warn ("Unable to open Explorer: "+$_.Exception.Message) }
 Write-Host 'The first clean-build acceptance should be executed through these installed-tree launchers, not from a development checkout.'
