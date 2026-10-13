@@ -1,0 +1,93 @@
+{
+    "schema":  "lfo-l4-a2-interaction-contract-v1",
+    "milestone":  "L4-A2 recurrence/interaction analytics",
+    "status":  "frozen",
+    "dependency_tag":  "v9.6-l4-d1-frozen",
+    "scope":  {
+                  "store_epoch":  "exactly one store_id and one epoch",
+                  "windows":  "explicit inclusive source-turn windows",
+                  "chronology":  "source.epoch + source.turn_id; numeric stage_id tie-break",
+                  "max_support_ids_per_result":  50
+              },
+    "questions":  [
+                      {
+                          "id":  "A2-Q6",
+                          "name":  "recurrence_density",
+                          "purpose":  "Describe repeated stored annotation signatures with distinct-turn normalization.",
+                          "signatures":  [
+                                             "actor|observation_type",
+                                             "parent_actor-\u003echild_actor|child_interaction"
+                                         ],
+                          "outputs":  [
+                                          "occurrence_count",
+                                          "distinct_turn_count",
+                                          "window_turn_count",
+                                          "annotated_turn_count",
+                                          "distinct_turn_fraction",
+                                          "annotated_turn_fraction",
+                                          "supporting_observation_ids"
+                                      ]
+                      },
+                      {
+                          "id":  "A2-Q7",
+                          "name":  "two_edge_chain_motifs",
+                          "purpose":  "Describe explicit two-edge related-observation chains when all three observations are inside the selected window.",
+                          "outputs":  [
+                                          "actor_chain",
+                                          "interaction_sequence",
+                                          "type_chain",
+                                          "count",
+                                          "supporting_observation_ids",
+                                          "excluded_boundary_chains"
+                                      ]
+                      },
+                      {
+                          "id":  "A2-Q8",
+                          "name":  "response_balance",
+                          "purpose":  "Describe linked response interaction counts by child actor.",
+                          "interactions":  [
+                                               "REINFORCED",
+                                               "CHALLENGED",
+                                               "CORRECTED",
+                                               "IGNORED"
+                                           ],
+                          "outputs":  [
+                                          "linked_response_count",
+                                          "interaction_counts",
+                                          "interaction_fractions",
+                                          "supporting_observation_ids"
+                                      ]
+                      },
+                      {
+                          "id":  "A2-Q9",
+                          "name":  "adjacent_window_signature_presence",
+                          "purpose":  "Compare annotation-signature presence in two adjacent explicit windows.",
+                          "statuses":  [
+                                           "PRESENT_BOTH",
+                                           "ONLY_A",
+                                           "ONLY_B"
+                                       ],
+                          "semantics":  "presence/absence and counts only; not persistence of a latent trait, improvement, deterioration, or causal trend"
+                      },
+                      {
+                          "id":  "A2-Q10",
+                          "name":  "provenance_backing",
+                          "purpose":  "Every aggregate carries bounded observation IDs resolvable through frozen A1 provenance drill-back."
+                      }
+                  ],
+    "guardrails":  [
+                       "Observation remains annotation, not fact.",
+                       "Density is density of stored annotations in an explicit window, not behavioral prevalence.",
+                       "Explicit links are analyzed structurally; unlinked causality is never inferred.",
+                       "Adjacent-window presence is not a psychological trait or longitudinal diagnosis.",
+                       "No cross-store or cross-epoch aggregation.",
+                       "Detector predictions are not silently mixed with human/manual observations.",
+                       "No automatic R1 write.",
+                       "No prompt injection, answer rewrite, or Balancer intervention.",
+                       "No mandatory model call."
+                   ],
+    "acceptance":  {
+                       "synthetic":  "exact recurrence, chain, response-balance, boundary, adjacent-window and provenance behavior on deterministic fixture",
+                       "non_synthetic":  "read-only aggregate sanity check on a private curated real-development store; private source text is not published"
+                   }
+}

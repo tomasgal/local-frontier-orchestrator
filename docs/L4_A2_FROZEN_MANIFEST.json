@@ -1,0 +1,36 @@
+{
+    "schema":  "lfo-l4-a2-frozen-manifest-v1",
+    "status":  "frozen",
+    "closure_date":  "2026-10-13",
+    "milestone":  "L4-A2 recurrence/interaction analytics",
+    "immutable_tag":  "v9.6-l4-a2-frozen",
+    "development_branch":  "v9.6-l4-a2-interaction",
+    "dependency_tag":  "v9.6-l4-d1-frozen",
+    "evidence":  {
+                     "synthetic_observations":  25,
+                     "synthetic_turns":  8,
+                     "synthetic_chain_occurrences":  9,
+                     "window_b_excluded_boundary_links":  1,
+                     "window_b_excluded_boundary_chains":  1,
+                     "adjacent_present_both":  12,
+                     "adjacent_only_a":  1,
+                     "adjacent_only_b":  4,
+                     "private_turns":  5,
+                     "private_observations":  10,
+                     "private_final_linked_responses":  5,
+                     "private_chains":  0,
+                     "private_provenance_refs":  5,
+                     "model_calls":  0,
+                     "automatic_r1_writes":  0,
+                     "production_memory_touched":  false
+                 },
+    "hashes":  {
+                   "config/L4A2Interaction.contract.json":  "3a504ff7c33b8a9af9f01e1d6a9c11e23a15b2eb603a009e61e79c00f5aaa5b3",
+                   "src/LfoEpistemicInteractionAnalytics.ps1":  "c2f37d742643978d3fce67953363ab36d1c7105947af4eb831e8fb15274d98f1",
+                   "tests/Test-LfoEpistemicInteractionAnalytics.ps1":  "6c1854be0ae41d8456bfd735f974f6fabf74dc70606453cbb76b2a99e37e15be",
+                   "tests/fixtures/l4-a2-interaction/annotation-plan.json":  "0dade7f81d72abd32c410d5ab0546bd7b1eab922d075a2b8198a43ab25b70036",
+                   "tests/fixtures/l4-a2-interaction/conversation-2026-10.jsonl":  "352fa3edf769220b01311f1deff9d5e714dfd852a5cbd49c1cf793db3c4a77ce",
+                   "docs/L4_A2_INTERACTION_ANALYTICS.md":  "0a70cf3cf4c01a2675007bb992c767d333351ed1f67086cf0606e7cafcaf5d4f"
+               },
+    "next_milestone":  "L4-P1 rare-trigger Policy Capsule"
+}

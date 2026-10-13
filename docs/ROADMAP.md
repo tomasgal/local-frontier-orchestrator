@@ -71,10 +71,24 @@ Transport/schema failures are hard failures and are never scored as abstentions.
 
 Decision: **DOES_NOT_YET_BEAT_RELIABLE_BASELINE**.
 
-### Next: L4-A2 recurrence/interaction analytics
+### L4-A2 closure — recurrence/interaction analytics
 
-Use frozen A1 analytics and D1 detector evidence only as research inputs.
-Detection remains separate from intervention.
+**L4-A2 is CLOSED/FROZEN for the bounded recurrence/interaction analytics
+scope.** See [L4_A2_FROZEN_BASELINE.md](L4_A2_FROZEN_BASELINE.md).
+
+A2 adds recurrence-density normalization, explicit two-edge chain motifs,
+linked-response balance, adjacent-window signature presence, and provenance
+support. The deterministic synthetic gate covers repeated motifs and
+cross-window boundaries; a separate private read-only curated real-development
+store confirms recurrence/response/presence behavior without publishing source
+text. No model call, detector promotion, R1 write, prompt injection or response
+intervention is introduced.
+
+### Next: L4-P1 rare-trigger Policy Capsule
+
+Define a separately reviewable intervention-policy contract that consumes only
+bounded explicit Observatory evidence and remains default-OFF. Detection,
+analytics and intervention remain separate.
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED
