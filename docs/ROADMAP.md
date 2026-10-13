@@ -62,12 +62,21 @@ curated exact-excerpt corpus of real development interactions also demonstrated
 the practical usefulness of all five query surfaces. Private source text is not
 published.
 
-### Next: L4-D1 bounded detector experiment
+### L4-D1 active — bounded detector experiment
 
-Use frozen human/manual annotations as evaluation targets for an offline,
-bounded detector experiment. Detection remains separate from intervention:
-no automatic Balancer, ordinary prompt injection or mandatory online model call
-is implied.
+D1-A/B defines the detector/evaluation contract and implements a deterministic
+zero-model-call text-local baseline. The held-out benchmark contains 30 scored
+cases plus four relational/contextual cases on which the text-local detector
+must abstain. The gate records exact TP/FP/FN/TN, precision/recall/F1,
+exact-set accuracy, coverage and abstention rather than imposing an artificial
+quality floor.
+
+The baseline deliberately does not infer relational/contextual annotation types
+or interaction labels from isolated text.
+
+**Next within D1: D1-C bounded offline local-model comparison against the same
+labels plus a small private curated non-synthetic evaluation.** Detection
+remains disconnected from runtime intervention.
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED

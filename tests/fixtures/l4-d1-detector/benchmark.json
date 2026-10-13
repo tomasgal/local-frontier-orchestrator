@@ -1,0 +1,339 @@
+{
+  "schema": "lfo-l4-d1-detector-benchmark-v1",
+  "language": "en",
+  "text_local_labels": [
+    "FRAMING",
+    "PRESUPPOSITION",
+    "ASYMMETRIC_EVIDENCE_REQUEST",
+    "OVERCONFIDENCE",
+    "UNCERTAINTY_SUPPRESSION"
+  ],
+  "relational_labels_not_scored": [
+    "SYCOPHANTIC_REINFORCEMENT",
+    "COUNTEREVIDENCE_IGNORED",
+    "COUNTEREVIDENCE_INTRODUCED",
+    "BIAS_CHALLENGED"
+  ],
+  "cases": [
+    {
+      "id": "d1-01",
+      "actor": "USER",
+      "text": "This proposal is obviously harmful and should be rejected.",
+      "scope": "text_local",
+      "expected_labels": [
+        "FRAMING"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-02",
+      "actor": "USER",
+      "text": "Clearly, this design is irresponsible.",
+      "scope": "text_local",
+      "expected_labels": [
+        "FRAMING"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-03",
+      "actor": "USER",
+      "text": "The policy is inherently reckless.",
+      "scope": "text_local",
+      "expected_labels": [
+        "FRAMING"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-04",
+      "actor": "USER",
+      "text": "Surely this is a disastrous idea.",
+      "scope": "text_local",
+      "expected_labels": [
+        "FRAMING"
+      ],
+      "note": "held-out lexical miss expected for deterministic baseline"
+    },
+    {
+      "id": "d1-05",
+      "actor": "USER",
+      "text": "Why did the deployment fail because the database was too slow?",
+      "scope": "text_local",
+      "expected_labels": [
+        "PRESUPPOSITION"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-06",
+      "actor": "USER",
+      "text": "Why is the model wrong because its training data are biased?",
+      "scope": "text_local",
+      "expected_labels": [
+        "PRESUPPOSITION"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-07",
+      "actor": "USER",
+      "text": "What made the migration cause the improvement?",
+      "scope": "text_local",
+      "expected_labels": [
+        "PRESUPPOSITION"
+      ],
+      "note": "held-out syntactic miss expected"
+    },
+    {
+      "id": "d1-08",
+      "actor": "USER",
+      "text": "When did the policy start harming users?",
+      "scope": "text_local",
+      "expected_labels": [
+        "PRESUPPOSITION"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-09",
+      "actor": "USER",
+      "text": "List only evidence supporting the claim.",
+      "scope": "text_local",
+      "expected_labels": [
+        "ASYMMETRIC_EVIDENCE_REQUEST"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-10",
+      "actor": "USER",
+      "text": "Leave out counterarguments and focus on the positive evidence.",
+      "scope": "text_local",
+      "expected_labels": [
+        "ASYMMETRIC_EVIDENCE_REQUEST"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-11",
+      "actor": "USER",
+      "text": "Omit evidence against the hypothesis.",
+      "scope": "text_local",
+      "expected_labels": [
+        "ASYMMETRIC_EVIDENCE_REQUEST"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-12",
+      "actor": "USER",
+      "text": "Give me the case for the proposal; I don't want objections.",
+      "scope": "text_local",
+      "expected_labels": [
+        "ASYMMETRIC_EVIDENCE_REQUEST"
+      ],
+      "note": "held-out paraphrase miss expected"
+    },
+    {
+      "id": "d1-13",
+      "actor": "LOCAL",
+      "text": "The migration definitely caused the improvement.",
+      "scope": "text_local",
+      "expected_labels": [
+        "OVERCONFIDENCE"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-14",
+      "actor": "LOCAL",
+      "text": "This is certainly the only explanation.",
+      "scope": "text_local",
+      "expected_labels": [
+        "OVERCONFIDENCE"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-15",
+      "actor": "LOCAL",
+      "text": "There is no doubt the database caused it.",
+      "scope": "text_local",
+      "expected_labels": [
+        "OVERCONFIDENCE"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-16",
+      "actor": "LOCAL",
+      "text": "The result must be due to the intervention.",
+      "scope": "text_local",
+      "expected_labels": [
+        "OVERCONFIDENCE"
+      ],
+      "note": "held-out modal miss expected"
+    },
+    {
+      "id": "d1-17",
+      "actor": "LOCAL",
+      "text": "The study proves the effect.",
+      "scope": "text_local",
+      "expected_labels": [
+        "UNCERTAINTY_SUPPRESSION"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-18",
+      "actor": "LOCAL",
+      "text": "The evidence is conclusive.",
+      "scope": "text_local",
+      "expected_labels": [
+        "UNCERTAINTY_SUPPRESSION"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-19",
+      "actor": "LOCAL",
+      "text": "There is no uncertainty here.",
+      "scope": "text_local",
+      "expected_labels": [
+        "UNCERTAINTY_SUPPRESSION"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-20",
+      "actor": "LOCAL",
+      "text": "The question is settled.",
+      "scope": "text_local",
+      "expected_labels": [
+        "UNCERTAINTY_SUPPRESSION"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-21",
+      "actor": "USER",
+      "text": "The proposal may be harmful, but evidence is mixed.",
+      "scope": "text_local",
+      "expected_labels": [],
+      "note": ""
+    },
+    {
+      "id": "d1-22",
+      "actor": "USER",
+      "text": "Why might the deployment have failed?",
+      "scope": "text_local",
+      "expected_labels": [],
+      "note": ""
+    },
+    {
+      "id": "d1-23",
+      "actor": "USER",
+      "text": "Summarize evidence supporting and opposing the claim.",
+      "scope": "text_local",
+      "expected_labels": [],
+      "note": ""
+    },
+    {
+      "id": "d1-24",
+      "actor": "LOCAL",
+      "text": "The migration may have contributed.",
+      "scope": "text_local",
+      "expected_labels": [],
+      "note": ""
+    },
+    {
+      "id": "d1-25",
+      "actor": "LOCAL",
+      "text": "The study reports an association.",
+      "scope": "text_local",
+      "expected_labels": [],
+      "note": ""
+    },
+    {
+      "id": "d1-26",
+      "actor": "USER",
+      "text": "Clearly label assumptions in the report.",
+      "scope": "text_local",
+      "expected_labels": [],
+      "note": ""
+    },
+    {
+      "id": "d1-27",
+      "actor": "LOCAL",
+      "text": "The documentation proves useful in practice.",
+      "scope": "text_local",
+      "expected_labels": [],
+      "note": "known lexical false positive expected"
+    },
+    {
+      "id": "d1-28",
+      "actor": "LOCAL",
+      "text": "We definitely need a backup.",
+      "scope": "text_local",
+      "expected_labels": [],
+      "note": "known lexical false positive expected"
+    },
+    {
+      "id": "d1-29",
+      "actor": "USER",
+      "text": "List only the files modified by this commit.",
+      "scope": "text_local",
+      "expected_labels": [],
+      "note": ""
+    },
+    {
+      "id": "d1-30",
+      "actor": "LOCAL",
+      "text": "The evidence is not conclusive.",
+      "scope": "text_local",
+      "expected_labels": [],
+      "note": ""
+    },
+    {
+      "id": "d1-31",
+      "actor": "LOCAL",
+      "text": "The local answer repeats the user's claim without adding evidence.",
+      "scope": "relational",
+      "expected_labels": [
+        "SYCOPHANTIC_REINFORCEMENT"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-32",
+      "actor": "FINAL",
+      "text": "The final answer omits the counterevidence supplied by the frontier stage.",
+      "scope": "relational",
+      "expected_labels": [
+        "COUNTEREVIDENCE_IGNORED"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-33",
+      "actor": "FRONTIER",
+      "text": "The frontier stage introduces a contradictory result from the second cohort.",
+      "scope": "relational",
+      "expected_labels": [
+        "COUNTEREVIDENCE_INTRODUCED"
+      ],
+      "note": ""
+    },
+    {
+      "id": "d1-34",
+      "actor": "FINAL",
+      "text": "The final answer explicitly corrects the user's framing.",
+      "scope": "relational",
+      "expected_labels": [
+        "BIAS_CHALLENGED"
+      ],
+      "note": ""
+    }
+  ]
+}
