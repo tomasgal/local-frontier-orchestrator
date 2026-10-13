@@ -100,7 +100,12 @@ $freeGB=[math]::Round($driveInfo.Free/1GB,2)
 if($freeGB -lt 8){throw "At least 8 GiB free space is required; detected $freeGB GiB."}
 if($freeGB -lt 12){Write-Warning "Only $freeGB GiB free. 12+ GiB is recommended."}
 $sqliteVersion=Test-WindowsSqlite
-Write-Host ("Windows={0}; PowerShell={1}; SQLite={2}; free={3} GiB" -f [Environment]::OSVersion.Version,$PSVersionTable.PSVersion,$sqliteVersion,$freeGB)
+$computer=Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+$ramGB=[math]::Round(([double]$computer.TotalPhysicalMemory/1GB),1)
+if($ramGB -lt 8){throw "At least 8 GiB physical RAM is required; detected $ramGB GiB."}
+$gpuNames=@(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue|ForEach-Object{[string]$_.Name}|Where-Object{-not [string]::IsNullOrWhiteSpace($_)})
+Write-Host ("Windows={0}; PowerShell={1}; SQLite={2}; RAM={3} GiB; free={4} GiB" -f [Environment]::OSVersion.Version,$PSVersionTable.PSVersion,$sqliteVersion,$ramGB,$freeGB)
+if($gpuNames.Count){Write-Host ('Display adapters: '+($gpuNames -join '; '))}else{Write-Warning 'No display adapter metadata found; GPU launcher will let Ollama fall back as needed.'}
 
 $git=Resolve-Git
 $gitVersion=& $git --version
@@ -223,6 +228,8 @@ $installState=[ordered]@{
     l4_runtime_credential=$l4Credential
     default_profile=$DefaultProfile
     sqlite_version=$sqliteVersion
+    ram_gb=$ramGB
+    display_adapters=@($gpuNames)
     codex_found=[bool]$codex
 }
 $statePath=Join-Path $InstallRoot 'install-state.json'
