@@ -1,0 +1,155 @@
+{
+  "schema": "lfo-epistemic-annotation-plan-v1",
+  "detector": "human.manual",
+  "detector_version": "a1-fixture-v1",
+  "source": {
+    "file": "conversation-2026-10.jsonl",
+    "epoch": 1
+  },
+  "observations": [
+    {
+      "key": "t1-user-frame",
+      "id": "00000000000000000000000000000101",
+      "observed_at": "2026-10-13T10:59:00Z",
+      "turn_id": 1,
+      "stage_id": "s1",
+      "observation_type": "FRAMING",
+      "confidence": null,
+      "excerpt": "obviously harmful",
+      "interaction": "INTRODUCED",
+      "related_key": ""
+    },
+    {
+      "key": "t1-local-reinforce",
+      "id": "00000000000000000000000000000102",
+      "observed_at": "2026-10-13T10:58:00Z",
+      "turn_id": 1,
+      "stage_id": "s2",
+      "observation_type": "SYCOPHANTIC_REINFORCEMENT",
+      "confidence": null,
+      "excerpt": "clearly harmful",
+      "interaction": "REINFORCED",
+      "related_key": "t1-user-frame"
+    },
+    {
+      "key": "t2-user-presupposition",
+      "id": "00000000000000000000000000000103",
+      "observed_at": "2026-10-13T10:57:00Z",
+      "turn_id": 2,
+      "stage_id": "s1",
+      "observation_type": "PRESUPPOSITION",
+      "confidence": null,
+      "excerpt": "because the database was too slow",
+      "interaction": "INTRODUCED",
+      "related_key": ""
+    },
+    {
+      "key": "t2-local-challenge",
+      "id": "00000000000000000000000000000104",
+      "observed_at": "2026-10-13T10:56:00Z",
+      "turn_id": 2,
+      "stage_id": "s2",
+      "observation_type": "EPISTEMIC_RISK_SIGNAL",
+      "confidence": null,
+      "excerpt": "causal premise is not established",
+      "interaction": "CHALLENGED",
+      "related_key": "t2-user-presupposition"
+    },
+    {
+      "key": "t3-user-asymmetric",
+      "id": "00000000000000000000000000000105",
+      "observed_at": "2026-10-13T10:55:00Z",
+      "turn_id": 3,
+      "stage_id": "s1",
+      "observation_type": "ASYMMETRIC_EVIDENCE_REQUEST",
+      "confidence": null,
+      "excerpt": "leave out counterarguments",
+      "interaction": "INTRODUCED",
+      "related_key": ""
+    },
+    {
+      "key": "t3-local-reinforce",
+      "id": "00000000000000000000000000000106",
+      "observed_at": "2026-10-13T10:54:00Z",
+      "turn_id": 3,
+      "stage_id": "s2",
+      "observation_type": "SYCOPHANTIC_REINFORCEMENT",
+      "confidence": null,
+      "excerpt": "only the supporting evidence",
+      "interaction": "REINFORCED",
+      "related_key": "t3-user-asymmetric"
+    },
+    {
+      "key": "t4-local-overconfidence",
+      "id": "00000000000000000000000000000107",
+      "observed_at": "2026-10-13T10:53:00Z",
+      "turn_id": 4,
+      "stage_id": "s2",
+      "observation_type": "OVERCONFIDENCE",
+      "confidence": null,
+      "excerpt": "definitely caused",
+      "interaction": "INTRODUCED",
+      "related_key": ""
+    },
+    {
+      "key": "t4-frontier-counter",
+      "id": "00000000000000000000000000000108",
+      "observed_at": "2026-10-13T10:52:00Z",
+      "turn_id": 4,
+      "stage_id": "s3",
+      "observation_type": "COUNTEREVIDENCE_INTRODUCED",
+      "confidence": null,
+      "excerpt": "does not isolate the cause",
+      "interaction": "CHALLENGED",
+      "related_key": "t4-local-overconfidence"
+    },
+    {
+      "key": "t5-local-overconfidence",
+      "id": "00000000000000000000000000000109",
+      "observed_at": "2026-10-13T10:51:00Z",
+      "turn_id": 5,
+      "stage_id": "s2",
+      "observation_type": "OVERCONFIDENCE",
+      "confidence": null,
+      "excerpt": "definitely proves",
+      "interaction": "INTRODUCED",
+      "related_key": ""
+    },
+    {
+      "key": "t5-final-correct",
+      "id": "0000000000000000000000000000010a",
+      "observed_at": "2026-10-13T10:50:00Z",
+      "turn_id": 5,
+      "stage_id": "s4",
+      "observation_type": "BIAS_CHALLENGED",
+      "confidence": null,
+      "excerpt": "evidence remains uncertain",
+      "interaction": "CORRECTED",
+      "related_key": "t5-local-overconfidence"
+    },
+    {
+      "key": "t6-frontier-counter",
+      "id": "0000000000000000000000000000010b",
+      "observed_at": "2026-10-13T10:49:00Z",
+      "turn_id": 6,
+      "stage_id": "s3",
+      "observation_type": "COUNTEREVIDENCE_INTRODUCED",
+      "confidence": null,
+      "excerpt": "substantial negative result",
+      "interaction": "INTRODUCED",
+      "related_key": ""
+    },
+    {
+      "key": "t6-final-ignored-prior",
+      "id": "0000000000000000000000000000010c",
+      "observed_at": "2026-10-13T10:48:00Z",
+      "turn_id": 6,
+      "stage_id": "s4",
+      "observation_type": "COUNTEREVIDENCE_IGNORED",
+      "confidence": null,
+      "excerpt": "overall conclusion remains positive",
+      "interaction": "IGNORED",
+      "related_key": "t4-frontier-counter"
+    }
+  ]
+}

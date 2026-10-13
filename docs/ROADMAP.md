@@ -51,16 +51,20 @@ ordinary prompt injection, response intervention or mandatory model call.
 
 ### L4-A1 active — Observatory analytics
 
-A1-A defines the bounded Observatory contract in
-[L4_A1_OBSERVATORY_CONTRACT.md](L4_A1_OBSERVATORY_CONTRACT.md) and
-`config/L4A1Observatory.contract.json`: explicit source-turn windows,
-antecedent→response linked transitions, recurrence across distinct turns,
-descriptive non-overlapping window comparison and bounded provenance
-drill-back.
+A1-A analytic contract is implemented on branch `v9.6-l4-a1-observatory`.
+A1-B now implements Q1-Q5 as a bounded read-only Observatory surface:
+source-turn window summaries, semantic antecedent→response transitions,
+recurrence across distinct turns, descriptive non-overlapping window
+comparison and bounded provenance drill-back.
 
-Next within A1: implement Q1-Q5 read-only and validate them on deterministic
-fixtures. No automatic detector, prompt injection, Balancer intervention or
-mandatory model call is part of A1.
+The deterministic A1-B gate includes pagination, annotation timestamps that are
+deliberately out of conversation order, and a cross-window related link. No
+automatic detector, prompt injection, response intervention or mandatory model
+call is added.
+
+**Next within A1: A1-C evidence/usefulness validation on the deterministic
+fixture plus a small explicitly curated non-synthetic corpus, then closure
+decision.**
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED
