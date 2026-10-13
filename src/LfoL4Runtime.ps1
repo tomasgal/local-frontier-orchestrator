@@ -113,7 +113,7 @@ function Test-LfoL4AsymmetricEvidenceRequest([string]$Text){
 function Test-LfoL4ExplicitFraming([string]$Text){
     if([string]::IsNullOrWhiteSpace($Text)){return $false}
     $patterns=@(
-        '(?is)\b(?:ber|pova[zž]uj|pokladaj)\b.{0,80}\b(?:za\s+fakt|za\s+preuk[aá]zan[eé]|za\s+dok[aá]zan[eé])\b',
+        '(?is)\b(?:ber|pova[zž]uj|pokladaj)\b.{0,80}\b(?:(?:za|ako)\s+fakt|za\s+preuk[aá]zan[eé]|za\s+dok[aá]zan[eé])\b',
         '(?is)\b(?:nespochyb[nň]uj|nespochyb[nň]ujte)\b.{0,50}\b(?:premisu|v[yý]chodisko|tvrdenie)\b',
         '(?is)\b(?:treat|take|accept)\b.{0,80}\bas\b.{0,20}\b(?:a\s+fact|established|proven)\b',
         '(?is)\bdo\s+not\b.{0,25}\b(?:question|challenge)\b.{0,50}\b(?:the\s+)?premise\b'
