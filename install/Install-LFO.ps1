@@ -475,6 +475,13 @@ foreach($name in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Star
     $src=Join-Path $AppRoot ('launch\'+$name);Assert-Lfo (Test-Path -LiteralPath $src -PathType Leaf) "Required launcher missing from source: $name"
     Copy-Item -LiteralPath $src -Destination (Join-Path $LaunchRoot $name) -Force
 }
+# Add double-clickable BAT wrappers without changing the PowerShell launch contract.
+$cpuBat=Join-Path $LaunchRoot 'Start-LFO-CPU.bat'
+$gpuBat=Join-Path $LaunchRoot 'Start-LFO-GPU.bat'
+$cpuBatText="@echo off`r`npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"%~dp0Start-LFO-CPU.ps1`"`r`nexit /b %ERRORLEVEL%`r`n"
+$gpuBatText="@echo off`r`npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"%~dp0Start-LFO-GPU.ps1`"`r`nexit /b %ERRORLEVEL%`r`n"
+[IO.File]::WriteAllText($cpuBat,$cpuBatText,[Text.Encoding]::ASCII)
+[IO.File]::WriteAllText($gpuBat,$gpuBatText,[Text.Encoding]::ASCII)
 # Launcher copies use their own PSScriptRoot for wrappers, while Start-LFO resolves service scripts from AppRoot via install-state.
 
 Step 'Bootstrap complete'
@@ -486,12 +493,13 @@ Write-Host ('SurrealDB:    '+$SurrealVersion+' @ '+$surrealBase) -ForegroundColo
 $installedLaunchDir=Join-Path $InstallRoot 'launch'
 Write-Host ('Launch dir:    '+$installedLaunchDir) -ForegroundColor Green
 Write-Host ''
-Write-Host 'To start LFO from PowerShell:' -ForegroundColor Cyan
-Write-Host ("  Set-Location '"+(Quote-PsSingle $installedLaunchDir)+"'")
-Write-Host '  .\Start-LFO-CPU.ps1'
-Write-Host '  .\Start-LFO-GPU.ps1'
+Write-Host 'Launch options:' -ForegroundColor Cyan
+Write-Host '  Start-LFO-CPU.bat   (double-click or Command Prompt)'
+Write-Host '  Start-LFO-GPU.bat   (double-click or Command Prompt)'
+Write-Host '  .\Start-LFO-CPU.ps1 (PowerShell)'
+Write-Host '  .\Start-LFO-GPU.ps1 (PowerShell)'
 Write-Host ''
 Write-Host 'No shortcuts are created outside the LFO install tree; create any Windows shortcuts where you prefer.'
-Write-Host 'Opening the LFO install directory in Windows Explorer...' -ForegroundColor Cyan
-try { Start-Process explorer.exe -ArgumentList ('"'+$InstallRoot+'"') | Out-Null } catch { Warn ("Unable to open Explorer: "+$_.Exception.Message) }
+Write-Host 'Opening the LFO launch directory in Windows Explorer...' -ForegroundColor Cyan
+try { Start-Process explorer.exe -ArgumentList ('"'+$installedLaunchDir+'"') | Out-Null } catch { Warn ("Unable to open Explorer: "+$_.Exception.Message) }
 Write-Host 'The first clean-build acceptance should be executed through these installed-tree launchers, not from a development checkout.'
