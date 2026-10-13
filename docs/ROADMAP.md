@@ -38,18 +38,23 @@ automatic detector, turn hook, response intervention, persistent user profile,
 continuous prompt injection, graph/vector machinery or mandatory model call.
 LFO continues to operate without L4.
 
-### Next: smallest L4 step — explicit annotation pilot
+### L4-R2 closure — Explicit Annotation Pilot
 
-Before designing L4-A longitudinal analytics or L4-P intervention policy, create
-a small explicit human/offline annotation workflow that writes a bounded seed
-corpus through the frozen R1 API and resolves each record back to L0. The pilot
-must remain outside the ordinary QwenChat turn path and must not alter answers,
-L2/L3, or production-memory semantics.
+**L4-R2 is CLOSED/FROZEN for its explicit human/offline annotation-pilot
+scope.** See [L4_R2_FROZEN_BASELINE.md](L4_R2_FROZEN_BASELINE.md) and
+[L4_R2_FROZEN_MANIFEST.json](L4_R2_FROZEN_MANIFEST.json).
 
-Its purpose is evidence generation: learn which observation fields, query
-patterns and interaction links are actually useful before adding automatic
-detection or policy machinery. Automatic detectors and Balancer interventions
-remain deferred until this corpus demonstrates a concrete requirement.
+R2 adds a strict annotation-plan workflow over frozen R1, a reproducible
+synthetic 17-observation linked corpus with 17/17 L0 provenance resolution,
+and bounded deterministic pilot analytics. It adds no automatic detector,
+ordinary prompt injection, response intervention or mandatory model call.
+
+### Next: L4-A1 Observatory analytics
+
+Use the frozen R2 workflow as the evidence-producing layer and define the
+smallest useful longitudinal/interaction analytic surface. Automatic detector
+work should follow only after the analytic targets are explicit enough to
+evaluate; Balancer policy/intervention remains deferred.
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED

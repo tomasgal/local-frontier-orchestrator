@@ -1,6 +1,6 @@
 # L4-R2 — Explicit Annotation Pilot
 
-Status: **R2-A implementation candidate**.
+Status: **CLOSED/FROZEN for the R2 explicit annotation-pilot scope.**
 
 R2 starts only after the frozen L4-R1 store/API contract. It does not reopen R1.
 The purpose of R2 is to create the first bounded, auditable annotation corpus

@@ -1,0 +1,24 @@
+{
+  "schema": "lfo-l4-r2-frozen-manifest-v1",
+  "closure_date": "2026-10-13",
+  "milestone": "L4-R2 Explicit Annotation Pilot",
+  "status": "frozen",
+  "immutable_tag": "v9.6-l4-r2-frozen",
+  "development_branch": "v9.6-l4-r2-annotation-pilot",
+  "r1_dependency_tag": "v9.6-l4-r1-frozen",
+  "r1_dependency_commit": "cd8f83b993c9fa2620d61a750b684ba3e2597503",
+  "r2a_commit": "b226e86ed752875f4fc7474568a5cc68464fb51c",
+  "r2b_commit": "277ca4ad75dc0f23b987a4b18c30a32e05b755df",
+  "closure_document": "docs/L4_R2_FROZEN_BASELINE.md",
+  "acceptance": {
+    "r2a_checks": 13,
+    "r2b_checks": 13,
+    "seed_turns": 6,
+    "seed_observations": 17,
+    "seed_provenance_resolved": 17,
+    "seed_related_links": 11,
+    "model_calls": 0,
+    "production_memory_touched": false
+  },
+  "next_milestone": "L4-A1 Observatory analytics design"
+}
