@@ -1,0 +1,45 @@
+name: Windows bootstrap parse gate
+
+on:
+  push:
+    branches:
+      - build/windows-bootstrap-v1
+  workflow_dispatch:
+
+jobs:
+  parse-windows-powershell:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Parse bootstrap and launch scripts with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $targets = @(
+            'install\Install-LFO.ps1',
+            'launch\Start-LFO.ps1',
+            'launch\Start-LFO-GPU.ps1',
+            'launch\Start-LFO-CPU.ps1',
+            'launch\Start-SurrealDB.ps1',
+            'launch\Watch-LFOService.ps1'
+          )
+          $failed = $false
+          foreach ($target in $targets) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $PWD $target),
+              [ref]$tokens,
+              [ref]$errors
+            )
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Host "PARSE FAIL: $target" -ForegroundColor Red
+              $errors | ForEach-Object {
+                Write-Host ("  line {0}, column {1}: {2}" -f $_.Extent.StartLineNumber,$_.Extent.StartColumnNumber,$_.Message) -ForegroundColor Red
+              }
+            } else {
+              Write-Host "PARSE PASS: $target" -ForegroundColor Green
+            }
+          }
+          if ($failed) { throw 'Windows PowerShell parse gate failed.' }
