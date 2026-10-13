@@ -164,6 +164,33 @@ try {
     if ($freeGiB -lt 8) { Warn 'Fresh Ollama + 4B model installation may require substantially more free space.' }
 } catch {}
 
+Step 'Frontier adapter detection'
+$codexPath=$null
+foreach($name in @('codex.cmd','codex.exe','codex')) {
+    $candidate=Resolve-CommandPath $name
+    if($candidate){$codexPath=$candidate;break}
+}
+$codexVersion=$null
+if($codexPath){
+    try {
+        $old=$ErrorActionPreference;$ErrorActionPreference='Continue'
+        $codexVersion=(& $codexPath --version 2>&1 | Out-String).Trim()
+        $exit=$LASTEXITCODE
+        $ErrorActionPreference=$old
+        if($exit -ne 0 -or [string]::IsNullOrWhiteSpace($codexVersion)){$codexVersion='version unavailable'}
+    } catch {
+        $codexVersion='version unavailable'
+    }
+    Info "Codex CLI: FOUND"
+    Info "Executable: $codexPath"
+    Info "Version: $codexVersion"
+    Info "Frontier adapter availability: CODEX_AVAILABLE"
+} else {
+    Warn 'Codex CLI: NOT FOUND'
+    Info 'Frontier adapter availability: NONE'
+    Info 'This bootstrap does not install or configure a frontier adapter yet; LFO installation will continue.'
+}
+
 $AppRoot=Join-Path $InstallRoot 'app'
 $RuntimeRoot=Join-Path $InstallRoot 'runtime'
 $ModelsRoot=Join-Path $InstallRoot 'models'
@@ -477,6 +504,7 @@ $state=[ordered]@{
     SQLite=[ordered]@{Provider='winsqlite3.dll';Path=$systemSqlite;Version=$sqliteVersion;SelfTest='PASS'}
     Ollama=[ordered]@{Executable=$ollamaExe;ExecutableVersion=[string]$ollamaExeVersion;ApiVersion=$ollamaApiVersion;Managed=$ollamaManaged;BaseUri=$ollamaBase;HostAddress=$hostAddress;ModelsDirectory=$ollamaModelsDir;BaseModel=$BaseModel;GPUModel=$GpuModel;CPUModel=$CpuModel}
     SurrealDB=[ordered]@{Executable=$surrealExe;Version=$SurrealVersion;SHA256=$surrealHash;Managed=$surrealManaged;BaseUri=$surrealBase;Port=$surrealPort;DataDirectory=$surrealData;BootstrapCredentialPath=$bootstrapCredPath;RuntimeCredentialPath=$runtimeCredPath;Namespace='lfo';Database='epistemic'}
+    Frontier=[ordered]@{CodexDetected=[bool]$codexPath;CodexExecutable=$codexPath;CodexVersion=$codexVersion;AdapterSelection='PENDING'}
     LFO=[ordered]@{ConfigPath=$installConfigPath;MemoryDirectory=$memoryDir;L0StageSourcesEnabled=$true;L4ObservabilityEnvironment=$true}
 }
 $statePath=Join-Path $ConfigRoot 'install-state.json'
@@ -502,6 +530,11 @@ Write-Host ('Source:        '+$SourceCommit) -ForegroundColor Green
 Write-Host ('SQLite:       PASS '+$sqliteVersion) -ForegroundColor Green
 Write-Host ('Ollama:       '+$ollamaApiVersion+' @ '+$ollamaBase) -ForegroundColor Green
 Write-Host ('SurrealDB:    '+$SurrealVersion+' @ '+$surrealBase) -ForegroundColor Green
+if($codexPath){
+    Write-Host ('Codex:        FOUND ('+$codexVersion+')') -ForegroundColor Green
+} else {
+    Write-Host 'Codex:        NOT FOUND (frontier onboarding pending)' -ForegroundColor Yellow
+}
 $installedLaunchDir=Join-Path $InstallRoot 'launch'
 Write-Host ('Launch dir:    '+$installedLaunchDir) -ForegroundColor Green
 Write-Host ''
