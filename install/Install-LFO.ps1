@@ -3,6 +3,7 @@ param(
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'LFO'),
     [string]$SourceRef = 'build/windows-bootstrap-v1',
     [string]$BaseModel = 'qwen3.5:4b-q4_K_M',
+    [string]$WorkingDirectory,
     [switch]$SkipModelPull
 )
 
@@ -14,6 +15,13 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 [Console]::InputEncoding = $utf8
 [Console]::OutputEncoding = $utf8
 $OutputEncoding = $utf8
+
+if ([string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+    if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) { $WorkingDirectory = $PSScriptRoot }
+    else { $WorkingDirectory = (Get-Location).Path }
+}
+$WorkingDirectory = [IO.Path]::GetFullPath($WorkingDirectory)
+New-Item -ItemType Directory -Path $WorkingDirectory -Force | Out-Null
 
 $RepoUrl = 'https://github.com/tomasgal/local-frontier-orchestrator.git'
 $OllamaMinVersion = [version]'0.34.4'
@@ -181,8 +189,6 @@ if ($git) {
         $dirty=(& $git -C $AppRoot status --porcelain 2>&1 | Out-String).Trim()
         if ($LASTEXITCODE -ne 0) { throw 'Existing LFO app checkout is not readable by Git.' }
         if ($dirty) { throw "Installer-managed LFO checkout has local changes: $AppRoot. Preserve them elsewhere before reinstall/update." }
-        & $git -C $AppRoot fetch --prune origin | Out-Host
-        if ($LASTEXITCODE -ne 0) { throw 'git fetch failed.' }
     } else {
         if (Test-Path -LiteralPath $AppRoot) {
             $items=@(Get-ChildItem -LiteralPath $AppRoot -Force -ErrorAction SilentlyContinue)
@@ -191,14 +197,14 @@ if ($git) {
         & $git clone $RepoUrl $AppRoot | Out-Host
         if ($LASTEXITCODE -ne 0) { throw 'git clone failed.' }
     }
-    & $git -C $AppRoot checkout --force $SourceRef | Out-Host
-    if ($LASTEXITCODE -ne 0) {
-        & $git -C $AppRoot fetch origin $SourceRef | Out-Host
-        if ($LASTEXITCODE -ne 0) { throw "Unable to fetch source ref $SourceRef." }
-        & $git -C $AppRoot checkout --force FETCH_HEAD | Out-Host
-        if ($LASTEXITCODE -ne 0) { throw "Unable to checkout source ref $SourceRef." }
-    }
+    & $git -C $AppRoot fetch --prune origin $SourceRef | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "Unable to fetch source ref $SourceRef." }
+    $targetCommit=(& $git -C $AppRoot rev-parse FETCH_HEAD 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $targetCommit -notmatch '^[0-9a-f]{40}$') { throw "Unable to resolve fetched source ref $SourceRef to an exact commit." }
+    & $git -C $AppRoot checkout --detach --force $targetCommit | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "Unable to checkout fetched source commit $targetCommit." }
     $SourceCommit=(& $git -C $AppRoot rev-parse HEAD 2>&1 | Out-String).Trim()
+    Assert-Lfo ($SourceCommit -ceq $targetCommit) 'Installed LFO checkout does not match the fetched source commit.'
 } else {
     Info 'Git not found; using GitHub source archive fallback.'
     $tmpRoot=Join-Path ([IO.Path]::GetTempPath()) ('LFO-source-'+[guid]::NewGuid().ToString('N'))
