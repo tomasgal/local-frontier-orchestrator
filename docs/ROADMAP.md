@@ -49,22 +49,25 @@ synthetic 17-observation linked corpus with 17/17 L0 provenance resolution,
 and bounded deterministic pilot analytics. It adds no automatic detector,
 ordinary prompt injection, response intervention or mandatory model call.
 
-### L4-A1 active — Observatory analytics
+### L4-A1 closure — Observatory analytics
 
-A1-A analytic contract is implemented on branch `v9.6-l4-a1-observatory`.
-A1-B now implements Q1-Q5 as a bounded read-only Observatory surface:
-source-turn window summaries, semantic antecedent→response transitions,
-recurrence across distinct turns, descriptive non-overlapping window
-comparison and bounded provenance drill-back.
+**L4-A1 is CLOSED/FROZEN for the explicit read-only Observatory scope.** See
+[L4_A1_FROZEN_BASELINE.md](L4_A1_FROZEN_BASELINE.md).
 
-The deterministic A1-B gate includes pagination, annotation timestamps that are
-deliberately out of conversation order, and a cross-window related link. No
-automatic detector, prompt injection, response intervention or mandatory model
-call is added.
+A1 formalizes and implements five bounded questions: source-turn window
+summary, semantic antecedent→response transitions, recurrence across distinct
+turns, descriptive comparison of ordered non-overlapping windows, and bounded
+provenance drill-back. Deterministic A1-A/A1-B gates pass; a separate private
+curated exact-excerpt corpus of real development interactions also demonstrated
+the practical usefulness of all five query surfaces. Private source text is not
+published.
 
-**Next within A1: A1-C evidence/usefulness validation on the deterministic
-fixture plus a small explicitly curated non-synthetic corpus, then closure
-decision.**
+### Next: L4-D1 bounded detector experiment
+
+Use frozen human/manual annotations as evaluation targets for an offline,
+bounded detector experiment. Detection remains separate from intervention:
+no automatic Balancer, ordinary prompt injection or mandatory online model call
+is implied.
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED

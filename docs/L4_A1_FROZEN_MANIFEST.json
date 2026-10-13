@@ -1,0 +1,32 @@
+{
+    "schema":  "lfo-l4-a1-frozen-manifest-v1",
+    "status":  "frozen",
+    "closure_date":  "2026-10-13",
+    "milestone":  "L4-A1 Observatory analytics",
+    "immutable_tag":  "v9.6-l4-a1-frozen",
+    "development_branch":  "v9.6-l4-a1-observatory",
+    "dependency_tag":  "v9.6-l4-r2-frozen",
+    "a1a_commit":  "4b156fa4602f24ac9a317c022d9227fc932d0791",
+    "a1b_commit":  "255ce8318bae87856e3d018a57a000d6581e1a59",
+    "acceptance":  {
+                       "a1a_checks":  20,
+                       "a1b_checks":  24,
+                       "questions":  5,
+                       "curated_turns":  5,
+                       "curated_observations":  10,
+                       "curated_provenance_resolved":  10,
+                       "curated_user_to_final_links":  5,
+                       "curated_private_source_not_published":  true,
+                       "model_calls":  0,
+                       "production_memory_touched":  false
+                   },
+    "hashes":  {
+                   "config/L4A1Observatory.contract.json":  "331ba3204ccaa6ed3cccac6b0f8a141e351c130d06d6042182c28ddd49117d6f",
+                   "src/LfoEpistemicObservatory.ps1":  "310a385e298377571bac34e88a357d0d215d5a04a16c322a1ed3f447a67401d7",
+                   "docs/L4_A1_OBSERVATORY_CONTRACT.md":  "48084801056146e408a9306e605a1dbcddad0e59c97d49f0813384b82acd01d3",
+                   "docs/L4_A1_IMPLEMENTATION.md":  "6ff18b153ff466977f48178f68b3733e8c9b8f3f364182f28abe28d21549c6f2",
+                   "tests/Test-LfoEpistemicObservatoryContract.ps1":  "a6291c9c2316973587378d6aec42a14671ddff81c609d168a6af2e758fdaf556",
+                   "tests/Test-LfoEpistemicObservatory.ps1":  "0e323398fba5a65a7d93f17902b59f06a6b942b1f0e38e9ed23dc8bc2088a555"
+               },
+    "next_milestone":  "L4-D1 bounded detector experiment"
+}

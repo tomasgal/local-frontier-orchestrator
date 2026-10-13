@@ -1,109 +1,109 @@
 {
-  "schema": "lfo-l4-a1-observatory-contract-v1",
-  "milestone": "L4-A1 Observatory analytics",
-  "status": "candidate",
-  "dependency_tag": "v9.6-l4-r2-frozen",
-  "chronology": {
-    "primary": [
-      "source.epoch",
-      "source.turn_id"
-    ],
-    "stage_tie_break": "source.stage_id numeric suffix",
-    "observed_at_role": "annotation metadata only; never conversation chronology"
-  },
-  "window": {
-    "scope": "one source store_id and one epoch",
-    "first_turn_inclusive": true,
-    "last_turn_inclusive": true,
-    "default_excerpt": false,
-    "max_support_ids_per_result": 50
-  },
-  "questions": [
-    {
-      "id": "A1-Q1",
-      "name": "window_summary",
-      "purpose": "Describe annotations inside an explicit turn window.",
-      "outputs": [
-        "observation_count",
-        "distinct_annotated_turn_count",
-        "counts_by_actor",
-        "counts_by_stage",
-        "counts_by_observation_type",
-        "counts_by_interaction"
-      ]
-    },
-    {
-      "id": "A1-Q2",
-      "name": "linked_response_transitions",
-      "purpose": "Describe direct linked responses in semantic antecedent-to-response direction.",
-      "direction": "related_observation -> current_observation",
-      "outputs": [
-        "parent_actor_to_child_actor",
-        "parent_type_to_child_type",
-        "child_interaction",
-        "supporting_observation_ids"
-      ],
-      "boundary_policy": "count only links whose parent and child are both inside the selected window; report excluded_boundary_links separately"
-    },
-    {
-      "id": "A1-Q3",
-      "name": "recurrence",
-      "purpose": "Find repeated annotation signatures across distinct source turns in the selected window.",
-      "minimum_distinct_turns": 2,
-      "signatures": [
-        "actor|observation_type",
-        "parent_actor->child_actor|child_interaction"
-      ],
-      "outputs": [
-        "signature",
-        "occurrence_count",
-        "distinct_turn_count",
-        "supporting_observation_ids"
-      ],
-      "semantics": "recurrence is repeated stored annotation structure, not a persistent trait or diagnosis"
-    },
-    {
-      "id": "A1-Q4",
-      "name": "window_comparison",
-      "purpose": "Compare two explicit non-overlapping turn windows in the same store and epoch.",
-      "outputs": [
-        "count_delta_by_observation_type",
-        "count_delta_by_interaction",
-        "distinct_turn_delta_by_recurrence_signature"
-      ],
-      "semantics": "descriptive delta only; no causal, trend, improvement, deterioration, or prevalence claim"
-    },
-    {
-      "id": "A1-Q5",
-      "name": "provenance_drillback",
-      "purpose": "Return bounded source references supporting an aggregate without exposing raw history by default.",
-      "outputs": [
-        "observation_id",
-        "source.store_id",
-        "source.file",
-        "source.epoch",
-        "source.turn_id",
-        "source.stage_id",
-        "source.content_sha256"
-      ],
-      "raw_source_policy": "explicit resolver call only; no automatic excerpt/history expansion"
-    }
-  ],
-  "guardrails": [
-    "Observation is annotation, not fact.",
-    "Counts are not truth, importance, prevalence, diagnosis, or detector accuracy.",
-    "Recurrence is not a persistent user trait.",
-    "No cross-store aggregation in A1.",
-    "No cross-epoch aggregation in A1.",
-    "No automatic detector in A1.",
-    "No ordinary prompt injection in A1.",
-    "No response rewrite or Balancer intervention in A1.",
-    "No mandatory model call in A1.",
-    "No graph/vector/plugin dependency in A1."
-  ],
-  "acceptance": {
-    "A1-A": "contract is machine-readable, internally consistent, and frozen dependencies are explicit",
-    "A1-B": "read-only implementation answers Q1-Q5 exactly on deterministic fixtures with bounded provenance support",
-    "A1-C": "synthetic plus explicitly curated non-synthetic evidence demonstrates practical usefulness without violating guardrails"
-  }
+    "schema":  "lfo-l4-a1-observatory-contract-v1",
+    "milestone":  "L4-A1 Observatory analytics",
+    "status":  "frozen",
+    "dependency_tag":  "v9.6-l4-r2-frozen",
+    "chronology":  {
+                       "primary":  [
+                                       "source.epoch",
+                                       "source.turn_id"
+                                   ],
+                       "stage_tie_break":  "source.stage_id numeric suffix",
+                       "observed_at_role":  "annotation metadata only; never conversation chronology"
+                   },
+    "window":  {
+                   "scope":  "one source store_id and one epoch",
+                   "first_turn_inclusive":  true,
+                   "last_turn_inclusive":  true,
+                   "default_excerpt":  false,
+                   "max_support_ids_per_result":  50
+               },
+    "questions":  [
+                      {
+                          "id":  "A1-Q1",
+                          "name":  "window_summary",
+                          "purpose":  "Describe annotations inside an explicit turn window.",
+                          "outputs":  [
+                                          "observation_count",
+                                          "distinct_annotated_turn_count",
+                                          "counts_by_actor",
+                                          "counts_by_stage",
+                                          "counts_by_observation_type",
+                                          "counts_by_interaction"
+                                      ]
+                      },
+                      {
+                          "id":  "A1-Q2",
+                          "name":  "linked_response_transitions",
+                          "purpose":  "Describe direct linked responses in semantic antecedent-to-response direction.",
+                          "direction":  "related_observation -\u003e current_observation",
+                          "outputs":  [
+                                          "parent_actor_to_child_actor",
+                                          "parent_type_to_child_type",
+                                          "child_interaction",
+                                          "supporting_observation_ids"
+                                      ],
+                          "boundary_policy":  "count only links whose parent and child are both inside the selected window; report excluded_boundary_links separately"
+                      },
+                      {
+                          "id":  "A1-Q3",
+                          "name":  "recurrence",
+                          "purpose":  "Find repeated annotation signatures across distinct source turns in the selected window.",
+                          "minimum_distinct_turns":  2,
+                          "signatures":  [
+                                             "actor|observation_type",
+                                             "parent_actor-\u003echild_actor|child_interaction"
+                                         ],
+                          "outputs":  [
+                                          "signature",
+                                          "occurrence_count",
+                                          "distinct_turn_count",
+                                          "supporting_observation_ids"
+                                      ],
+                          "semantics":  "recurrence is repeated stored annotation structure, not a persistent trait or diagnosis"
+                      },
+                      {
+                          "id":  "A1-Q4",
+                          "name":  "window_comparison",
+                          "purpose":  "Compare two explicit non-overlapping turn windows in the same store and epoch.",
+                          "outputs":  [
+                                          "count_delta_by_observation_type",
+                                          "count_delta_by_interaction",
+                                          "distinct_turn_delta_by_recurrence_signature"
+                                      ],
+                          "semantics":  "descriptive delta only; no causal, trend, improvement, deterioration, or prevalence claim"
+                      },
+                      {
+                          "id":  "A1-Q5",
+                          "name":  "provenance_drillback",
+                          "purpose":  "Return bounded source references supporting an aggregate without exposing raw history by default.",
+                          "outputs":  [
+                                          "observation_id",
+                                          "source.store_id",
+                                          "source.file",
+                                          "source.epoch",
+                                          "source.turn_id",
+                                          "source.stage_id",
+                                          "source.content_sha256"
+                                      ],
+                          "raw_source_policy":  "explicit resolver call only; no automatic excerpt/history expansion"
+                      }
+                  ],
+    "guardrails":  [
+                       "Observation is annotation, not fact.",
+                       "Counts are not truth, importance, prevalence, diagnosis, or detector accuracy.",
+                       "Recurrence is not a persistent user trait.",
+                       "No cross-store aggregation in A1.",
+                       "No cross-epoch aggregation in A1.",
+                       "No automatic detector in A1.",
+                       "No ordinary prompt injection in A1.",
+                       "No response rewrite or Balancer intervention in A1.",
+                       "No mandatory model call in A1.",
+                       "No graph/vector/plugin dependency in A1."
+                   ],
+    "acceptance":  {
+                       "A1-A":  "contract is machine-readable, internally consistent, and frozen dependencies are explicit",
+                       "A1-B":  "read-only implementation answers Q1-Q5 exactly on deterministic fixtures with bounded provenance support",
+                       "A1-C":  "synthetic plus explicitly curated non-synthetic evidence demonstrates practical usefulness without violating guardrails"
+                   }
 }
