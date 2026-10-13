@@ -101,6 +101,10 @@ foreach ($l3ModuleName in @('LfoL3Store.ps1','LfoL3Planner.ps1','LfoL3Runtime.ps
     . $l3Module
 }
 
+$l4RuntimeModule=Join-Path $PSScriptRoot 'LfoL4Runtime.ps1'
+if(-not (Test-Path -LiteralPath $l4RuntimeModule)){throw "L4 runtime module not found: $l4RuntimeModule"}
+. $l4RuntimeModule
+
 $ThinkEnabled = [bool]$Think
 Initialize-QwenMemoryConfiguration `
     $ContextLengthHint `
@@ -573,6 +577,7 @@ function Invoke-QwenAnswerRecovery([string]$Prompt) {
         $systemText += [Environment]::NewLine + [Environment]::NewLine +
             'PERSISTENT CONVERSATION CONTEXT:' + [Environment]::NewLine + $memoryBlock
     }
+    if(Get-Command Add-LfoL4InterventionToSystemText -ErrorAction SilentlyContinue){$systemText=Add-LfoL4InterventionToSystemText $systemText}
     $recentMessages = @(Get-LfoTurnRecentMessages)
     if ($recentMessages.Count -eq 0 -or [string]$recentMessages[-1].role -ne 'user') {
         $recentMessages += @{ role = 'user'; content = $Prompt }
@@ -607,6 +612,7 @@ Do not behave as a passive pipe and do not mechanically store every frontier det
 '@
     $synthesisSystem += [Environment]::NewLine + [Environment]::NewLine +
         $script:L2StructuredMemoryTemplate.Replace('{{L2_EVIDENCE_SCOPE}}', $l2EvidenceScope.Trim())
+    if(Get-Command Add-LfoL4InterventionToSystemText -ErrorAction SilentlyContinue){$synthesisSystem=Add-LfoL4InterventionToSystemText $synthesisSystem}
     $memoryBlock = Get-LfoTurnMemoryBlock $OriginalPrompt
     $recentConversation = Get-RecentConversationText -ExcludeLastUser
 
@@ -717,6 +723,7 @@ function Test-UnfinishedSynthesis($Response, [string]$Content) {
 
 function Invoke-Qwen([string]$Prompt) {
     Refresh-SystemPrompt
+    if(Get-Command Start-LfoL4RuntimeTurn -ErrorAction SilentlyContinue){Start-LfoL4RuntimeTurn}
 
     # Capture context before appending the current user turn.
     $recentContext = Get-HardGateContext $Prompt
@@ -1029,11 +1036,12 @@ $recentContext
 
 
 Initialize-PersistentMemory
+if(Get-Command Initialize-LfoL4Runtime -ErrorAction SilentlyContinue){$null=Initialize-LfoL4Runtime -LogDirectory $script:LogDir -MemoryEnabled:$script:MemoryEnabled -L0StageSourcesEnabled:$script:L0StageSourcesEnabled}
 $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Local Frontier Orchestrator - local chat | v9.6 integrated baseline" -ForegroundColor Cyan
+Write-Host "Local Frontier Orchestrator - local chat | v9.6.1 L4 runtime candidate" -ForegroundColor Cyan
 Write-Host "Local model: Qwen via Ollama; ordinary turns stay local when routing allows."
 Write-Host "Frontier escalation: ask_codex is read-only and limited to at most one call per user turn."
 Write-Host "Routing: deterministic hard gates plus Qwen LOCAL/FRONTIER routing; the local model has no direct Ollama tool access."

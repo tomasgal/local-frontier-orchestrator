@@ -1,0 +1,41 @@
+name: L4 v9.6.1 runtime gate
+on:
+  push:
+    branches: [fix/v9.6.1-l4-runtime]
+  workflow_dispatch:
+jobs:
+  windows-powershell-51:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Parse
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $targets=@('src\LfoL4Runtime.ps1','src\QwenChat.ps1','src\QwenMemory.ps1','launch\Start-LFO.ps1','tests\Test-LfoL4RuntimeDetector.ps1','tests\Test-LfoL4RuntimeIntegration.ps1')
+          foreach($target in $targets){$tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $target),[ref]$tokens,[ref]$errors);if($errors.Count){$errors|ForEach-Object{Write-Host $_};throw "PARSE FAIL: $target"};Write-Host "PARSE PASS: $target"}
+      - name: SurrealDB
+        shell: powershell
+        run: |
+          $p=Join-Path $env:RUNNER_TEMP 'surreal.exe';Invoke-WebRequest -UseBasicParsing 'https://github.com/surrealdb/surrealdb/releases/download/v3.3.0/surreal-v3.3.0.windows-amd64.exe' -OutFile $p
+          $h=(Get-FileHash -Algorithm SHA256 -LiteralPath $p).Hash.ToLowerInvariant();if($h -cne '3e5e9d363a352be81f5a983d53f0bc0cd77a90e305f01e2fed929987cf79735c'){throw "hash $h"}
+      - name: T1
+        shell: powershell
+        run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File tests\Test-LfoL4RuntimeDetector.ps1
+      - name: R1 regression
+        shell: powershell
+        run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File tests\Test-LfoEpistemicStore.ps1 -SurrealBinary "$env:RUNNER_TEMP\surreal.exe"
+      - name: A1 regression
+        shell: powershell
+        run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File tests\Test-LfoEpistemicObservatory.ps1 -SurrealBinary "$env:RUNNER_TEMP\surreal.exe"
+      - name: A2 regression
+        shell: powershell
+        run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File tests\Test-LfoEpistemicInteractionAnalytics.ps1 -SurrealBinary "$env:RUNNER_TEMP\surreal.exe"
+      - name: P2 integrity
+        shell: powershell
+        run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File tests\Test-LfoEpistemicInterventionIntegrity.ps1 -ResultPath "$env:RUNNER_TEMP\p2.json"
+      - name: Runtime integration
+        shell: powershell
+        run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File tests\Test-LfoL4RuntimeIntegration.ps1 -SurrealBinary "$env:RUNNER_TEMP\surreal.exe"

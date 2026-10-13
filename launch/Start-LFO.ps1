@@ -27,11 +27,11 @@ $monitor = Join-Path $state.AppRoot 'launch\Watch-LFOService.ps1'
 
 Write-Host ''
 Write-Host 'Local Frontier Orchestrator (LFO) - Windows runtime' -ForegroundColor Cyan
-Write-Host 'Integrated baseline: v9.6 | Windows bootstrap/build candidate'
+Write-Host 'Integrated baseline: v9.6.1 | L4 ordinary-runtime candidate'
 Write-Host 'Local-first path: Qwen via Ollama handles ordinary conversation and routing.'
 Write-Host 'Frontier path: authenticated Codex CLI is called only when routing/policy requires stronger or fresh external reasoning.'
 Write-Host 'Memory path: local L0/L1/L2/L3 state preserves conversation evidence, working memory and structured retrieval.'
-Write-Host 'L4 datastore: SurrealDB endpoint is prepared for epistemic observability; automatic intervention is not enabled by this launcher.'
+Write-Host 'L4 runtime: observations and bounded P1 review enabled; P2 response intervention remains explicit opt-in.'
 Write-Host 'Service policy: reuse compatible running services where safe; do not stop unrelated services.'
 Write-Host ("Selected profile: {0}" -f $Profile)
 Write-Host ''
@@ -74,6 +74,9 @@ $ctx = if ($Profile -eq 'CPU') { 5120 } else { 8192 }
 $env:LFO_INSTALL_ROOT = $InstallRoot
 $env:LFO_L4_ENDPOINT = $surrealUri
 $env:LFO_L4_RUNTIME_CREDENTIAL = [string]$state.SurrealDB.RuntimeCredentialPath
+$env:LFO_L4_ENABLED = '1'
+$env:LFO_L4_POLICY = '1'
+if ([string]::IsNullOrWhiteSpace($env:LFO_L4_INTERVENTION)) { $env:LFO_L4_INTERVENTION = '0' }
 $env:LFO_L4_OBSERVABILITY = '1'
 $chat = Join-Path $state.AppRoot 'src\QwenChat.ps1'
 $config = [string]$state.LFO.ConfigPath

@@ -1059,6 +1059,7 @@ Do not derive L2 operations from old STATE, PENDING, RELEVANT OLD DATA, CURRENT 
             'The wrapper will not save new L1 or L2 facts from this turn.'
     }
 
+    if(Get-Command Add-LfoL4InterventionToSystemText -ErrorAction SilentlyContinue){$systemText=Add-LfoL4InterventionToSystemText $systemText}
     $out = @(
         @{ role = 'system'; content = $systemText }
     )
@@ -1495,6 +1496,7 @@ function Persist-TurnAndMemory(
 
         $script:RuntimeState.next_turn_id = $turnId + 1
         Save-RuntimeState
+        if(Get-Command Invoke-LfoL4PostTurn -ErrorAction SilentlyContinue){try{$null=Invoke-LfoL4PostTurn -Prompt $Prompt -FinalContent $FinalContent -TurnId $turnId -Epoch $epoch -SourceFile ([IO.Path]::GetFileName($conversationLogPath)) -Timestamp $timestamp -StageSources @($StageSources)}catch{Write-Warning 'L4 post-turn integration failed in isolation; ordinary persistence continues.'}}
     }
 
     $l2Scope = "conversation:$epoch"
