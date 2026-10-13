@@ -485,13 +485,26 @@ foreach($name in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Star
 }
 # Launcher copies use their own PSScriptRoot for wrappers, while Start-LFO resolves service scripts from AppRoot via install-state.
 
+Step 'Publish short launchers in working directory'
+$workingGpu=Join-Path $WorkingDirectory 'Start-LFO-GPU.ps1'
+$workingCpu=Join-Path $WorkingDirectory 'Start-LFO-CPU.ps1'
+$installedGpu=Join-Path $LaunchRoot 'Start-LFO-GPU.ps1'
+$installedCpu=Join-Path $LaunchRoot 'Start-LFO-CPU.ps1'
+$gpuWrapper="& '"+(Quote-PsSingle $installedGpu)+"' -InstallRoot '"+(Quote-PsSingle $InstallRoot)+"'`r`nexit `$LASTEXITCODE`r`n"
+$cpuWrapper="& '"+(Quote-PsSingle $installedCpu)+"' -InstallRoot '"+(Quote-PsSingle $InstallRoot)+"'`r`nexit `$LASTEXITCODE`r`n"
+[IO.File]::WriteAllText($workingGpu,$gpuWrapper,$utf8)
+[IO.File]::WriteAllText($workingCpu,$cpuWrapper,$utf8)
+
 Step 'Bootstrap complete'
 Write-Host ('Install root:  '+$InstallRoot) -ForegroundColor Green
 Write-Host ('Source:        '+$SourceCommit) -ForegroundColor Green
 Write-Host ('SQLite:       PASS '+$sqliteVersion) -ForegroundColor Green
 Write-Host ('Ollama:       '+$ollamaApiVersion+' @ '+$ollamaBase) -ForegroundColor Green
 Write-Host ('SurrealDB:    '+$SurrealVersion+' @ '+$surrealBase) -ForegroundColor Green
-Write-Host ('GPU launcher: '+(Join-Path $LaunchRoot 'Start-LFO-GPU.ps1')) -ForegroundColor Green
-Write-Host ('CPU launcher: '+(Join-Path $LaunchRoot 'Start-LFO-CPU.ps1')) -ForegroundColor Green
+Write-Host ('Working dir:   '+$WorkingDirectory) -ForegroundColor Green
 Write-Host ''
-Write-Host 'The first clean-build acceptance should be executed from this installed tree, not from a development checkout.'
+Write-Host 'Start LFO from the working directory with:' -ForegroundColor Cyan
+Write-Host '  .\Start-LFO-GPU.ps1'
+Write-Host '  .\Start-LFO-CPU.ps1'
+Write-Host ''
+Write-Host 'The first clean-build acceptance should be executed through these installed-tree launchers, not from a development checkout.'
