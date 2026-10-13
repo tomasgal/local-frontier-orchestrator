@@ -23,27 +23,33 @@ Accepted L3 properties:
 
 Final closure progress: **100/100**.
 
-### Next: L4 / Epistemic Observatory & Balancer
+### L4-R1 closure — Epistemic Observation Store
 
-The L4 design/scoping pass is now documented in
-[L4_EPISTEMIC_OBSERVATORY_DESIGN.md](L4_EPISTEMIC_OBSERVATORY_DESIGN.md).
+**L4-R1 is CLOSED/FROZEN for its actual store/API scope.** The accepted public
+runtime is `d2e0c005b9f4907a4f3d9c47ae4610ca39386446`; the immutable closure tag is
+`v9.6-l4-r1-frozen`. See
+[L4_R1_FROZEN_BASELINE.md](L4_R1_FROZEN_BASELINE.md) and
+[L4_R1_FROZEN_MANIFEST.json](L4_R1_FROZEN_MANIFEST.json).
 
-L4 is an epistemic event, analytics and rare-event policy layer above frozen L2/L3.
-Its canonical store is **SurrealDB** (`namespace=lfo`, `database=epistemic`).
-The default online mode is **write-mostly, read-rarely**: record
-`EpistemicObservation` events, keep authoritative conversation text in L0, and
-read L4 history only after explicit or otherwise rare triggers. Bias is one
-observation class, not the definition of the layer; framing or presupposition are
-not automatically biases. L4 observations are never factual evidence about the
-external world.
+R1 provides the isolated SurrealDB `lfo / epistemic / observations` store,
+explicit create/read APIs, verified L0 provenance binding, append-only schema
+guards, bounded analytic reads and Windows/Linux acceptance. It does not add an
+automatic detector, turn hook, response intervention, persistent user profile,
+continuous prompt injection, graph/vector machinery or mandatory model call.
+LFO continues to operate without L4.
 
-Recommended first milestone: **L4-R1 Epistemic Observation Store** — SurrealDB
-runtime contract, `observations` records, source-turn provenance, actor/stage/type/
-confidence/detector metadata and basic analytic reads. Do not implement automatic
-response rewrites, graph/vector/plugin complexity or persistent user profiling in
-R1. Add Observatory analytics and Balancer interventions only after real
-observations justify them.
+### Next: smallest L4 step — explicit annotation pilot
 
+Before designing L4-A longitudinal analytics or L4-P intervention policy, create
+a small explicit human/offline annotation workflow that writes a bounded seed
+corpus through the frozen R1 API and resolves each record back to L0. The pilot
+must remain outside the ordinary QwenChat turn path and must not alter answers,
+L2/L3, or production-memory semantics.
+
+Its purpose is evidence generation: learn which observation fields, query
+patterns and interaction links are actually useful before adding automatic
+detection or policy machinery. Automatic detectors and Balancer interventions
+remain deferred until this corpus demonstrates a concrete requirement.
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED

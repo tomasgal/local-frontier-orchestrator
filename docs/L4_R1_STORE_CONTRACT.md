@@ -1,7 +1,8 @@
-﻿# L4-R1 â€” Epistemic Observation Store
+# L4-R1 â€” Epistemic Observation Store
 
-Status: implementation candidate, 2026-10-13. Store acceptance passed on Linux
-and Windows PowerShell 5.1.19041.7725.
+Status: **CLOSED/FROZEN for the L4-R1 observation-store scope, 2026-10-13.**
+Accepted public runtime commit: `d2e0c005b9f4907a4f3d9c47ae4610ca39386446`. Immutable closure tag: `v9.6-l4-r1-frozen`.
+Store acceptance passed on Linux and Windows PowerShell 5.1.19041.7725.
 Linux x86_64 / PowerShell 7.4.6 / real SurrealDB 3.3.0: 39 checks passed,
 including independent concurrent clients and forced-process restart.
 Initial Windows PowerShell 5.1 gate failed on the combined Unicode/null

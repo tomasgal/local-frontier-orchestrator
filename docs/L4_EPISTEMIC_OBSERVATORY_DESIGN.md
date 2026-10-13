@@ -1,6 +1,6 @@
 # L4 design — Epistemic Observatory & Balancer
 
-Status: **design/scoping accepted; L0 source-capture prerequisite implemented on a separate development branch; SurrealDB R1 implementation candidate; Linux and Windows store acceptance passed**
+Status: **design/scoping accepted; L4-R1 Epistemic Observation Store CLOSED/FROZEN; L4-A Observatory analytics and L4-P Balancer policy remain future work**
 
 Date: 2026-10-13
 
