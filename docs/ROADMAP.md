@@ -113,7 +113,36 @@ A P1 portability defect was documented: its declared rules byte hash differs
 from the committed frozen rules bytes. The P1 tag was not changed; P2 bound the
 dependency by immutable tag, commit and Git blob identity.
 
-Next: separately versioned broader/cross-host intervention replication before any runtime integration.
+### L4-I1 accepted integrated walkthrough — 2026-10-13
+
+**L4-I1 is ACCEPTED as end-to-end integration evidence.** See
+[L4_I1_INTEGRATION_EVIDENCE.md](L4_I1_INTEGRATION_EVIDENCE.md).
+
+The reviewed run was bound to canonical `main`
+`51a7b2a01fdccd36718a7429b0c13d9e2a484204` and passed **91/91**
+host/runtime boundary checks, **108/108** deterministic pre-inference checks and
+**128/128** integrated walkthrough checks. It used exactly **18** predeclared
+explicit synthetic annotations and **5** real local-model calls, exercised all
+five P1 decisions, proved SurrealDB persistence/reconnect and complete reverse
+provenance, and produced **0** unplanned R1 writes and **0** detector calls.
+Production memory remained untouched and runtime intervention remained
+default-OFF.
+
+One descriptive model outcome missed its predeclared target
+(`REQUEST_COUNTEREVIDENCE`: `SUPPORT_ONLY` vs `BOTH_SIDES`). This is retained
+as a stochastic model outcome, not promoted into an I1 integration failure or
+an efficacy estimate.
+
+**Next engineering gate:** construct the first complete Windows L0-L4 bootstrap
+and perform clean-install/build acceptance. The bootstrap must obtain/verify the
+runtime prerequisites, clone the canonical LFO source, provide generic CPU-only
+and GPU-capable launch profiles, expose visible Ollama and SurrealDB service
+consoles, preserve the L0-L3 baseline with L4 intervention OFF, and verify
+explicit L4 activation without unintended state mutation.
+
+Broader/cross-host replication remains valuable follow-up research/deployment
+evidence, but it is not a prerequisite for constructing or accepting this
+implementation-cycle build.
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED
