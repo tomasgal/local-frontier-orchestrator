@@ -1,0 +1,417 @@
+{
+    "schema":  "lfo-l4-p1-policy-acceptance-v1",
+    "rules_sha256":  "d837c9b6d62e387c6482b83449495d5dc5c4d2092976ef459892bceabe2ee7c3",
+    "cases":  [
+                  {
+                      "id":  "p1-01-default-off",
+                      "enabled":  false,
+                      "expected":  "NO_ACTION",
+                      "evidence":  {
+                                       "Schema":  "lfo-l4-p1-policy-evidence-v1",
+                                       "SourceSchema":  "lfo-l4-a2-interaction-analytics-v1",
+                                       "StoreId":  "11111111111111111111111111111111",
+                                       "Epoch":  1,
+                                       "FirstTurn":  1,
+                                       "LastTurn":  8,
+                                       "WindowTurnCount":  8,
+                                       "RecurrenceDensity":  [
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "USER|FRAMING",
+                                                                     "occurrence_count":  3,
+                                                                     "distinct_turn_count":  3,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  3,
+                                                                     "distinct_turn_fraction":  0.375,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "00000000000000000000000000000001",
+                                                                                                        "00000000000000000000000000000002",
+                                                                                                        "00000000000000000000000000000003"
+                                                                                                    ]
+                                                                 }
+                                                             ],
+                                       "ResponseBalance":  [
+
+                                                           ]
+                                   }
+                  },
+                  {
+                      "id":  "p1-02-neutral",
+                      "enabled":  true,
+                      "expected":  "NO_ACTION",
+                      "evidence":  {
+                                       "Schema":  "lfo-l4-p1-policy-evidence-v1",
+                                       "SourceSchema":  "lfo-l4-a2-interaction-analytics-v1",
+                                       "StoreId":  "11111111111111111111111111111111",
+                                       "Epoch":  1,
+                                       "FirstTurn":  1,
+                                       "LastTurn":  8,
+                                       "WindowTurnCount":  8,
+                                       "RecurrenceDensity":  [
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "USER|PRESUPPOSITION",
+                                                                     "occurrence_count":  1,
+                                                                     "distinct_turn_count":  1,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  1,
+                                                                     "distinct_turn_fraction":  0.125,
+                                                                     "supporting_observation_ids":  "0000000000000000000000000000000a"
+                                                                 }
+                                                             ],
+                                       "ResponseBalance":  [
+
+                                                           ]
+                                   }
+                  },
+                  {
+                      "id":  "p1-03-framing",
+                      "enabled":  true,
+                      "expected":  "REVIEW_FRAMING",
+                      "evidence":  {
+                                       "Schema":  "lfo-l4-p1-policy-evidence-v1",
+                                       "SourceSchema":  "lfo-l4-a2-interaction-analytics-v1",
+                                       "StoreId":  "11111111111111111111111111111111",
+                                       "Epoch":  1,
+                                       "FirstTurn":  1,
+                                       "LastTurn":  8,
+                                       "WindowTurnCount":  8,
+                                       "RecurrenceDensity":  [
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "USER|FRAMING",
+                                                                     "occurrence_count":  3,
+                                                                     "distinct_turn_count":  3,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  3,
+                                                                     "distinct_turn_fraction":  0.375,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "00000000000000000000000000000014",
+                                                                                                        "00000000000000000000000000000015",
+                                                                                                        "00000000000000000000000000000016"
+                                                                                                    ]
+                                                                 }
+                                                             ],
+                                       "ResponseBalance":  [
+
+                                                           ]
+                                   }
+                  },
+                  {
+                      "id":  "p1-04-framing-below",
+                      "enabled":  true,
+                      "expected":  "NO_ACTION",
+                      "evidence":  {
+                                       "Schema":  "lfo-l4-p1-policy-evidence-v1",
+                                       "SourceSchema":  "lfo-l4-a2-interaction-analytics-v1",
+                                       "StoreId":  "11111111111111111111111111111111",
+                                       "Epoch":  1,
+                                       "FirstTurn":  1,
+                                       "LastTurn":  8,
+                                       "WindowTurnCount":  8,
+                                       "RecurrenceDensity":  [
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "USER|FRAMING",
+                                                                     "occurrence_count":  2,
+                                                                     "distinct_turn_count":  2,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  2,
+                                                                     "distinct_turn_fraction":  0.25,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "0000000000000000000000000000001e",
+                                                                                                        "0000000000000000000000000000001f"
+                                                                                                    ]
+                                                                 }
+                                                             ],
+                                       "ResponseBalance":  [
+
+                                                           ]
+                                   }
+                  },
+                  {
+                      "id":  "p1-05-uncertainty",
+                      "enabled":  true,
+                      "expected":  "INCREASE_UNCERTAINTY_EXPLICITNESS",
+                      "evidence":  {
+                                       "Schema":  "lfo-l4-p1-policy-evidence-v1",
+                                       "SourceSchema":  "lfo-l4-a2-interaction-analytics-v1",
+                                       "StoreId":  "11111111111111111111111111111111",
+                                       "Epoch":  1,
+                                       "FirstTurn":  1,
+                                       "LastTurn":  8,
+                                       "WindowTurnCount":  8,
+                                       "RecurrenceDensity":  [
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "LOCAL|UNCERTAINTY_SUPPRESSION",
+                                                                     "occurrence_count":  4,
+                                                                     "distinct_turn_count":  4,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  4,
+                                                                     "distinct_turn_fraction":  0.5,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "00000000000000000000000000000028",
+                                                                                                        "00000000000000000000000000000029",
+                                                                                                        "0000000000000000000000000000002a",
+                                                                                                        "0000000000000000000000000000002b"
+                                                                                                    ]
+                                                                 }
+                                                             ],
+                                       "ResponseBalance":  [
+
+                                                           ]
+                                   }
+                  },
+                  {
+                      "id":  "p1-06-reinforcement",
+                      "enabled":  true,
+                      "expected":  "CHECK_REINFORCEMENT_PATTERN",
+                      "evidence":  {
+                                       "Schema":  "lfo-l4-p1-policy-evidence-v1",
+                                       "SourceSchema":  "lfo-l4-a2-interaction-analytics-v1",
+                                       "StoreId":  "11111111111111111111111111111111",
+                                       "Epoch":  1,
+                                       "FirstTurn":  1,
+                                       "LastTurn":  8,
+                                       "WindowTurnCount":  8,
+                                       "RecurrenceDensity":  [
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "LOCAL|SYCOPHANTIC_REINFORCEMENT",
+                                                                     "occurrence_count":  3,
+                                                                     "distinct_turn_count":  3,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  3,
+                                                                     "distinct_turn_fraction":  0.375,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "00000000000000000000000000000032",
+                                                                                                        "00000000000000000000000000000033",
+                                                                                                        "00000000000000000000000000000034"
+                                                                                                    ]
+                                                                 },
+                                                                 {
+                                                                     "signature_kind":  "linked_response",
+                                                                     "signature":  "USER-\u003eLOCAL|REINFORCED",
+                                                                     "occurrence_count":  3,
+                                                                     "distinct_turn_count":  3,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  3,
+                                                                     "distinct_turn_fraction":  0.375,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "0000000000000000000000000000003c",
+                                                                                                        "0000000000000000000000000000003d",
+                                                                                                        "0000000000000000000000000000003e"
+                                                                                                    ]
+                                                                 }
+                                                             ],
+                                       "ResponseBalance":  [
+
+                                                           ]
+                                   }
+                  },
+                  {
+                      "id":  "p1-07-reinforcement-partial",
+                      "enabled":  true,
+                      "expected":  "NO_ACTION",
+                      "evidence":  {
+                                       "Schema":  "lfo-l4-p1-policy-evidence-v1",
+                                       "SourceSchema":  "lfo-l4-a2-interaction-analytics-v1",
+                                       "StoreId":  "11111111111111111111111111111111",
+                                       "Epoch":  1,
+                                       "FirstTurn":  1,
+                                       "LastTurn":  8,
+                                       "WindowTurnCount":  8,
+                                       "RecurrenceDensity":  [
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "LOCAL|SYCOPHANTIC_REINFORCEMENT",
+                                                                     "occurrence_count":  4,
+                                                                     "distinct_turn_count":  4,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  4,
+                                                                     "distinct_turn_fraction":  0.5,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "00000000000000000000000000000046",
+                                                                                                        "00000000000000000000000000000047",
+                                                                                                        "00000000000000000000000000000048",
+                                                                                                        "00000000000000000000000000000049"
+                                                                                                    ]
+                                                                 }
+                                                             ],
+                                       "ResponseBalance":  [
+
+                                                           ]
+                                   }
+                  },
+                  {
+                      "id":  "p1-08-counterevidence",
+                      "enabled":  true,
+                      "expected":  "REQUEST_COUNTEREVIDENCE",
+                      "evidence":  {
+                                       "Schema":  "lfo-l4-p1-policy-evidence-v1",
+                                       "SourceSchema":  "lfo-l4-a2-interaction-analytics-v1",
+                                       "StoreId":  "11111111111111111111111111111111",
+                                       "Epoch":  1,
+                                       "FirstTurn":  1,
+                                       "LastTurn":  8,
+                                       "WindowTurnCount":  8,
+                                       "RecurrenceDensity":  [
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "USER|ASYMMETRIC_EVIDENCE_REQUEST",
+                                                                     "occurrence_count":  2,
+                                                                     "distinct_turn_count":  2,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  2,
+                                                                     "distinct_turn_fraction":  0.25,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "00000000000000000000000000000050",
+                                                                                                        "00000000000000000000000000000051"
+                                                                                                    ]
+                                                                 },
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "FINAL|COUNTEREVIDENCE_IGNORED",
+                                                                     "occurrence_count":  2,
+                                                                     "distinct_turn_count":  2,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  2,
+                                                                     "distinct_turn_fraction":  0.25,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "0000000000000000000000000000005a",
+                                                                                                        "0000000000000000000000000000005b"
+                                                                                                    ]
+                                                                 }
+                                                             ],
+                                       "ResponseBalance":  [
+
+                                                           ]
+                                   }
+                  },
+                  {
+                      "id":  "p1-09-priority",
+                      "enabled":  true,
+                      "expected":  "REQUEST_COUNTEREVIDENCE",
+                      "evidence":  {
+                                       "Schema":  "lfo-l4-p1-policy-evidence-v1",
+                                       "SourceSchema":  "lfo-l4-a2-interaction-analytics-v1",
+                                       "StoreId":  "11111111111111111111111111111111",
+                                       "Epoch":  1,
+                                       "FirstTurn":  1,
+                                       "LastTurn":  8,
+                                       "WindowTurnCount":  8,
+                                       "RecurrenceDensity":  [
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "USER|ASYMMETRIC_EVIDENCE_REQUEST",
+                                                                     "occurrence_count":  2,
+                                                                     "distinct_turn_count":  2,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  2,
+                                                                     "distinct_turn_fraction":  0.25,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "00000000000000000000000000000064",
+                                                                                                        "00000000000000000000000000000065"
+                                                                                                    ]
+                                                                 },
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "FINAL|COUNTEREVIDENCE_IGNORED",
+                                                                     "occurrence_count":  2,
+                                                                     "distinct_turn_count":  2,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  2,
+                                                                     "distinct_turn_fraction":  0.25,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "0000000000000000000000000000006e",
+                                                                                                        "0000000000000000000000000000006f"
+                                                                                                    ]
+                                                                 },
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "LOCAL|UNCERTAINTY_SUPPRESSION",
+                                                                     "occurrence_count":  4,
+                                                                     "distinct_turn_count":  4,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  4,
+                                                                     "distinct_turn_fraction":  0.5,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "00000000000000000000000000000078",
+                                                                                                        "00000000000000000000000000000079",
+                                                                                                        "0000000000000000000000000000007a",
+                                                                                                        "0000000000000000000000000000007b"
+                                                                                                    ]
+                                                                 },
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "USER|FRAMING",
+                                                                     "occurrence_count":  3,
+                                                                     "distinct_turn_count":  3,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  3,
+                                                                     "distinct_turn_fraction":  0.375,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "00000000000000000000000000000082",
+                                                                                                        "00000000000000000000000000000083",
+                                                                                                        "00000000000000000000000000000084"
+                                                                                                    ]
+                                                                 }
+                                                             ],
+                                       "ResponseBalance":  [
+
+                                                           ]
+                                   }
+                  },
+                  {
+                      "id":  "p1-10-support-bound",
+                      "enabled":  true,
+                      "expected":  "REVIEW_FRAMING",
+                      "evidence":  {
+                                       "Schema":  "lfo-l4-p1-policy-evidence-v1",
+                                       "SourceSchema":  "lfo-l4-a2-interaction-analytics-v1",
+                                       "StoreId":  "11111111111111111111111111111111",
+                                       "Epoch":  1,
+                                       "FirstTurn":  1,
+                                       "LastTurn":  8,
+                                       "WindowTurnCount":  8,
+                                       "RecurrenceDensity":  [
+                                                                 {
+                                                                     "signature_kind":  "actor_type",
+                                                                     "signature":  "USER|FRAMING",
+                                                                     "occurrence_count":  20,
+                                                                     "distinct_turn_count":  8,
+                                                                     "window_turn_count":  8,
+                                                                     "annotated_turn_count":  8,
+                                                                     "distinct_turn_fraction":  1,
+                                                                     "supporting_observation_ids":  [
+                                                                                                        "000000000000000000000000000000c8",
+                                                                                                        "000000000000000000000000000000c9",
+                                                                                                        "000000000000000000000000000000ca",
+                                                                                                        "000000000000000000000000000000cb",
+                                                                                                        "000000000000000000000000000000cc",
+                                                                                                        "000000000000000000000000000000cd",
+                                                                                                        "000000000000000000000000000000ce",
+                                                                                                        "000000000000000000000000000000cf",
+                                                                                                        "000000000000000000000000000000d0",
+                                                                                                        "000000000000000000000000000000d1",
+                                                                                                        "000000000000000000000000000000d2",
+                                                                                                        "000000000000000000000000000000d3",
+                                                                                                        "000000000000000000000000000000d4",
+                                                                                                        "000000000000000000000000000000d5",
+                                                                                                        "000000000000000000000000000000d6",
+                                                                                                        "000000000000000000000000000000d7",
+                                                                                                        "000000000000000000000000000000d8",
+                                                                                                        "000000000000000000000000000000d9",
+                                                                                                        "000000000000000000000000000000da",
+                                                                                                        "000000000000000000000000000000db"
+                                                                                                    ]
+                                                                 }
+                                                             ],
+                                       "ResponseBalance":  [
+
+                                                           ]
+                                   }
+                  }
+              ]
+}

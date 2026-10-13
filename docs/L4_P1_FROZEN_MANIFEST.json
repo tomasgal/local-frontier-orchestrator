@@ -1,0 +1,48 @@
+{
+    "schema":  "lfo-l4-p1-frozen-manifest-v1",
+    "status":  "frozen",
+    "closure_date":  "2026-10-13",
+    "milestone":  "L4-P1 rare-trigger Policy Capsule",
+    "immutable_tag":  "v9.6-l4-p1-frozen",
+    "development_branch":  "v9.6-l4-p1-policy",
+    "dependency_tag":  "v9.6-l4-a2-frozen",
+    "rules_sha256":  "d837c9b6d62e387c6482b83449495d5dc5c4d2092976ef459892bceabe2ee7c3",
+    "acceptance":  {
+                       "checks":  99,
+                       "cases":  10,
+                       "active_cases":  6,
+                       "no_action_cases":  4,
+                       "private_sanity_pass":  true,
+                       "private_turns":  5,
+                       "private_observations":  10,
+                       "private_decision":  "NO_ACTION",
+                       "private_support_count":  0,
+                       "private_raw_text_published":  false,
+                       "private_store_identity_published":  false,
+                       "model_calls":  0,
+                       "automatic_r1_writes":  0,
+                       "production_memory_touched":  false
+                   },
+    "invariants":  [
+                       "default OFF",
+                       "bounded explicit A2 summary only",
+                       "deterministic frozen rules",
+                       "no model or detector call in policy decision",
+                       "no raw continuous history",
+                       "no cross-store or cross-epoch aggregation",
+                       "no automatic R1 write",
+                       "no response rewrite",
+                       "no persistent user trait/state",
+                       "bounded provenance support IDs"
+                   ],
+    "hashes":  {
+                   "config/L4P1Policy.contract.json":  "fba41551e36f2fedef71b6b3e6d02fbdcaf298cfa74e4d00eb80af67c9aebfa8",
+                   "config/L4P1Policy.rules.json":  "d837c9b6d62e387c6482b83449495d5dc5c4d2092976ef459892bceabe2ee7c3",
+                   "config/L4P1Policy.lock.json":  "fb212baa3d4c47eb11259f5c2384487f7913fc0ba3cb5bb108175d1122942b05",
+                   "src/LfoEpistemicPolicyCapsule.ps1":  "dbe1e57c37c225d73e25999f64260d68e790a75c32b98f31d68f2a7969514eda",
+                   "tests/Test-LfoEpistemicPolicyCapsule.ps1":  "4e841c7ad3764d255f134c0ee6ace6a4371ea245b4d7dd72bad8a4f2087c9d8d",
+                   "tests/fixtures/l4-p1-policy/cases.json":  "25f7049ee73cdd69695a475283ff09879ec450b14bfcef78fd713008072bc4cf",
+                   "docs/L4_P1_POLICY_CAPSULE.md":  "d78c3009cf9bad56000b825635686512300990a3931b4d2ee1f4cd9bbd53fdda"
+               },
+    "next_milestone":  "L4-P2 bounded intervention experiment"
+}

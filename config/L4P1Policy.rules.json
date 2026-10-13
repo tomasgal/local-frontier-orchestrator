@@ -1,0 +1,107 @@
+{
+    "schema":  "lfo-l4-p1-policy-rules-v1",
+    "policy_version":  "1.0.0",
+    "status":  "frozen_for_acceptance",
+    "dependency_tag":  "v9.6-l4-a2-frozen",
+    "default_enabled":  false,
+    "max_support_ids":  12,
+    "outputs":  [
+                    "NO_ACTION",
+                    "REVIEW_FRAMING",
+                    "REQUEST_COUNTEREVIDENCE",
+                    "INCREASE_UNCERTAINTY_EXPLICITNESS",
+                    "CHECK_REINFORCEMENT_PATTERN"
+                ],
+    "evaluation":  {
+                       "ordering":  "ascending priority, then ordinal rule id",
+                       "semantics":  "first matched rule only",
+                       "unsupported_or_invalid_input":  "hard failure",
+                       "no_match":  "NO_ACTION"
+                   },
+    "rules":  [
+                  {
+                      "id":  "P1-R001",
+                      "version":  "1.0.0",
+                      "priority":  10,
+                      "output":  "REQUEST_COUNTEREVIDENCE",
+                      "reason_code":  "REPEATED_ASYMMETRIC_REQUEST_WITH_REPEATED_IGNORED_COUNTEREVIDENCE",
+                      "all":  [
+                                  {
+                                      "source":  "recurrence",
+                                      "signature_kind":  "actor_type",
+                                      "signature":  "USER|ASYMMETRIC_EVIDENCE_REQUEST",
+                                      "min_occurrence_count":  2,
+                                      "min_distinct_turn_count":  2,
+                                      "min_distinct_turn_fraction":  0.25
+                                  },
+                                  {
+                                      "source":  "recurrence",
+                                      "signature_kind":  "actor_type",
+                                      "signature":  "FINAL|COUNTEREVIDENCE_IGNORED",
+                                      "min_occurrence_count":  2,
+                                      "min_distinct_turn_count":  2,
+                                      "min_distinct_turn_fraction":  0.25
+                                  }
+                              ]
+                  },
+                  {
+                      "id":  "P1-R002",
+                      "version":  "1.0.0",
+                      "priority":  20,
+                      "output":  "INCREASE_UNCERTAINTY_EXPLICITNESS",
+                      "reason_code":  "REPEATED_LOCAL_UNCERTAINTY_SUPPRESSION",
+                      "all":  [
+                                  {
+                                      "source":  "recurrence",
+                                      "signature_kind":  "actor_type",
+                                      "signature":  "LOCAL|UNCERTAINTY_SUPPRESSION",
+                                      "min_occurrence_count":  2,
+                                      "min_distinct_turn_count":  2,
+                                      "min_distinct_turn_fraction":  0.4
+                                  }
+                              ]
+                  },
+                  {
+                      "id":  "P1-R003",
+                      "version":  "1.0.0",
+                      "priority":  30,
+                      "output":  "CHECK_REINFORCEMENT_PATTERN",
+                      "reason_code":  "REPEATED_LOCAL_REINFORCEMENT_WITH_LINKED_USER_TO_LOCAL_REINFORCEMENT",
+                      "all":  [
+                                  {
+                                      "source":  "recurrence",
+                                      "signature_kind":  "actor_type",
+                                      "signature":  "LOCAL|SYCOPHANTIC_REINFORCEMENT",
+                                      "min_occurrence_count":  3,
+                                      "min_distinct_turn_count":  3,
+                                      "min_distinct_turn_fraction":  0.375
+                                  },
+                                  {
+                                      "source":  "recurrence",
+                                      "signature_kind":  "linked_response",
+                                      "signature":  "USER-\u003eLOCAL|REINFORCED",
+                                      "min_occurrence_count":  3,
+                                      "min_distinct_turn_count":  3,
+                                      "min_distinct_turn_fraction":  0.375
+                                  }
+                              ]
+                  },
+                  {
+                      "id":  "P1-R004",
+                      "version":  "1.0.0",
+                      "priority":  40,
+                      "output":  "REVIEW_FRAMING",
+                      "reason_code":  "REPEATED_USER_FRAMING",
+                      "all":  [
+                                  {
+                                      "source":  "recurrence",
+                                      "signature_kind":  "actor_type",
+                                      "signature":  "USER|FRAMING",
+                                      "min_occurrence_count":  3,
+                                      "min_distinct_turn_count":  3,
+                                      "min_distinct_turn_fraction":  0.375
+                                  }
+                              ]
+                  }
+              ]
+}

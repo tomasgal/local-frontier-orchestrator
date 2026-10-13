@@ -84,11 +84,23 @@ store confirms recurrence/response/presence behavior without publishing source
 text. No model call, detector promotion, R1 write, prompt injection or response
 intervention is introduced.
 
-### Next: L4-P1 rare-trigger Policy Capsule
+### L4-P1 closure - rare-trigger Policy Capsule
 
-Define a separately reviewable intervention-policy contract that consumes only
-bounded explicit Observatory evidence and remains default-OFF. Detection,
-analytics and intervention remain separate.
+**L4-P1 is CLOSED/FROZEN for the bounded default-OFF policy-capsule scope.**
+See [L4_P1_FROZEN_BASELINE.md](L4_P1_FROZEN_BASELINE.md) and
+[L4_P1_POLICY_CAPSULE.md](L4_P1_POLICY_CAPSULE.md).
+
+P1 adds a deterministic, hash-locked policy layer over bounded explicit A2
+summaries. It emits only `NO_ACTION` or a review recommendation, performs no
+model call, R1 write, prompt injection or answer rewrite, and creates no
+persistent user state. A deterministic synthetic acceptance corpus and a
+private read-only curated A2 sanity replay passed.
+
+### Next: L4-P2 bounded intervention experiment
+
+Design any actual intervention as a separately versioned, default-OFF experiment
+with an explicit effectiveness and safety evaluation. P1 itself remains a
+recommendation surface only.
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED

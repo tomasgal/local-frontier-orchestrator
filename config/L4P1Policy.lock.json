@@ -1,0 +1,7 @@
+{
+    "schema":  "lfo-l4-p1-policy-lock-v1",
+    "policy_version":  "1.0.0",
+    "rules_sha256":  "d837c9b6d62e387c6482b83449495d5dc5c4d2092976ef459892bceabe2ee7c3",
+    "locked_before_acceptance":  true,
+    "dependency_tag":  "v9.6-l4-a2-frozen"
+}

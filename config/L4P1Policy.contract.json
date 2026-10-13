@@ -1,0 +1,56 @@
+{
+    "schema":  "lfo-l4-p1-policy-contract-v1",
+    "milestone":  "L4-P1 rare-trigger Policy Capsule",
+    "status":  "frozen_for_acceptance",
+    "dependency_tag":  "v9.6-l4-a2-frozen",
+    "input":  {
+                  "schema":  "lfo-l4-p1-policy-evidence-v1",
+                  "source_schema":  "lfo-l4-a2-interaction-analytics-v1",
+                  "scope":  "exactly one explicit store_id, epoch and inclusive source-turn window",
+                  "allowed_surfaces":  [
+                                           "RecurrenceDensity",
+                                           "ResponseBalance"
+                                       ],
+                  "raw_history_allowed":  false,
+                  "raw_text_allowed":  false
+              },
+    "policy":  {
+                   "default_enabled":  false,
+                   "deterministic":  true,
+                   "model_calls":  0,
+                   "automatic_r1_writes":  0,
+                   "response_rewrite":  false,
+                   "persistent_user_state":  false,
+                   "rules_sha256":  "d837c9b6d62e387c6482b83449495d5dc5c4d2092976ef459892bceabe2ee7c3",
+                   "max_support_ids":  12
+               },
+    "outputs":  [
+                    "NO_ACTION",
+                    "REVIEW_FRAMING",
+                    "REQUEST_COUNTEREVIDENCE",
+                    "INCREASE_UNCERTAINTY_EXPLICITNESS",
+                    "CHECK_REINFORCEMENT_PATTERN"
+                ],
+    "non_no_action_required_fields":  [
+                                          "PolicyRuleId",
+                                          "PolicyRuleVersion",
+                                          "ReasonCode",
+                                          "Window",
+                                          "MatchedEvidence",
+                                          "SupportingObservationIds"
+                                      ],
+    "guardrails":  [
+                       "Policy consumes only a bounded explicit A2 summary or a synthetic equivalent.",
+                       "Stored annotations are evidence about annotation structure, not psychological facts or diagnoses.",
+                       "No detector/model call is required by the policy decision.",
+                       "No raw continuous L4 history enters an ordinary prompt.",
+                       "No implicit cross-store or cross-epoch aggregation.",
+                       "NO_ACTION is the default when disabled or when no frozen rule matches.",
+                       "Policy output is a recommendation only and never mutates the current answer.",
+                       "No automatic R1 write.",
+                       "No persistent user trait/state.",
+                       "Every trigger carries bounded supporting observation IDs.",
+                       "Rules and thresholds are hash-locked before acceptance execution."
+                   ],
+    "next_milestone":  "L4-P2 bounded intervention experiment"
+}
