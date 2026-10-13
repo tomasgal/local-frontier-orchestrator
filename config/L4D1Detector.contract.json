@@ -1,65 +1,68 @@
 {
-  "schema": "lfo-l4-d1-detector-contract-v1",
-  "milestone": "L4-D1 bounded detector experiment",
-  "status": "candidate",
-  "dependency_tag": "v9.6-l4-a1-frozen",
-  "goal": "Evaluate whether bounded offline detectors can reproduce useful human/manual L4 annotation labels well enough to justify later runtime research.",
-  "input": {
-    "required": [
-      "actor",
-      "text"
-    ],
-    "bounded_text": true,
-    "ordinary_prompt_history": false,
-    "l4_history": false,
-    "persistent_profile": false
-  },
-  "output": {
-    "kind": "candidate observation-type labels",
-    "calibrated_probability": false,
-    "interaction_prediction_in_text_local_baseline": false,
-    "automatic_r1_write": false
-  },
-  "text_local_labels": [
-    "FRAMING",
-    "PRESUPPOSITION",
-    "ASYMMETRIC_EVIDENCE_REQUEST",
-    "OVERCONFIDENCE",
-    "UNCERTAINTY_SUPPRESSION"
-  ],
-  "relational_labels_deferred": [
-    "SYCOPHANTIC_REINFORCEMENT",
-    "COUNTEREVIDENCE_IGNORED",
-    "COUNTEREVIDENCE_INTRODUCED",
-    "BIAS_CHALLENGED"
-  ],
-  "evaluation": {
-    "metrics": [
-      "TP",
-      "FP",
-      "FN",
-      "TN",
-      "micro_precision",
-      "micro_recall",
-      "micro_f1",
-      "macro_f1",
-      "exact_set_accuracy",
-      "coverage",
-      "abstention"
-    ],
-    "quality_floor_for_d1_ab": null,
-    "reason": "D1-A/B establishes a reproducible baseline; it must expose errors rather than tune the fixture to pass a target.",
-    "relational_cases": "not scored as text-local labels; deterministic text-local baseline should abstain"
-  },
-  "guardrails": [
-    "Detector output is candidate annotation evidence, not truth.",
-    "No detector output is automatically written to R1 during D1 evaluation.",
-    "No runtime turn hook in D1-A/B.",
-    "No prompt injection or response rewrite.",
-    "No Balancer intervention.",
-    "No mandatory online model call.",
-    "Synthetic benchmark performance is not ecological validity.",
-    "Interaction labels requiring antecedent/context are not inferred from isolated text in the baseline."
-  ],
-  "next": "D1-C may evaluate one bounded offline local-model detector against the same benchmark and a small private curated non-synthetic set."
+    "schema":  "lfo-l4-d1-detector-contract-v1",
+    "milestone":  "L4-D1 bounded detector experiment",
+    "status":  "frozen",
+    "dependency_tag":  "v9.6-l4-a1-frozen",
+    "goal":  "Evaluate whether bounded offline detectors can reproduce useful human/manual L4 annotation labels well enough to justify later runtime research.",
+    "input":  {
+                  "required":  [
+                                   "actor",
+                                   "text"
+                               ],
+                  "bounded_text":  true,
+                  "ordinary_prompt_history":  false,
+                  "l4_history":  false,
+                  "persistent_profile":  false
+              },
+    "output":  {
+                   "kind":  "candidate observation-type labels",
+                   "calibrated_probability":  false,
+                   "interaction_prediction_in_text_local_baseline":  false,
+                   "automatic_r1_write":  false
+               },
+    "text_local_labels":  [
+                              "FRAMING",
+                              "PRESUPPOSITION",
+                              "ASYMMETRIC_EVIDENCE_REQUEST",
+                              "OVERCONFIDENCE",
+                              "UNCERTAINTY_SUPPRESSION"
+                          ],
+    "relational_labels_deferred":  [
+                                       "SYCOPHANTIC_REINFORCEMENT",
+                                       "COUNTEREVIDENCE_IGNORED",
+                                       "COUNTEREVIDENCE_INTRODUCED",
+                                       "BIAS_CHALLENGED"
+                                   ],
+    "evaluation":  {
+                       "metrics":  [
+                                       "TP",
+                                       "FP",
+                                       "FN",
+                                       "TN",
+                                       "micro_precision",
+                                       "micro_recall",
+                                       "micro_f1",
+                                       "macro_f1",
+                                       "exact_set_accuracy",
+                                       "coverage",
+                                       "abstention"
+                                   ],
+                       "quality_floor_for_d1_ab":  null,
+                       "reason":  "D1-A/B establishes a reproducible baseline; it must expose errors rather than tune the fixture to pass a target.",
+                       "relational_cases":  "not scored as text-local labels; deterministic text-local baseline should abstain"
+                   },
+    "guardrails":  [
+                       "Detector output is candidate annotation evidence, not truth.",
+                       "No detector output is automatically written to R1 during D1 evaluation.",
+                       "No runtime turn hook in D1-A/B.",
+                       "No prompt injection or response rewrite.",
+                       "No Balancer intervention.",
+                       "No mandatory online model call.",
+                       "Synthetic benchmark performance is not ecological validity.",
+                       "Interaction labels requiring antecedent/context are not inferred from isolated text in the baseline."
+                   ],
+    "next":  "D1-C may evaluate one bounded offline local-model detector against the same benchmark and a small private curated non-synthetic set.",
+    "closure_decision":  "DOES_NOT_YET_BEAT_RELIABLE_BASELINE",
+    "evaluated_core_model":  "qwen3.5-4b-core-cpu5k:latest",
+    "model_protocol":  "schema"
 }

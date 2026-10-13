@@ -1,0 +1,41 @@
+{
+    "schema":  "lfo-l4-d1-frozen-manifest-v2",
+    "status":  "frozen",
+    "closure_date":  "2026-10-13",
+    "milestone":  "L4-D1 bounded detector experiment",
+    "immutable_tag":  "v9.6-l4-d1-frozen",
+    "development_branch":  "v9.6-l4-d1-detector",
+    "dependency_tag":  "v9.6-l4-a1-frozen",
+    "d1ab_commit":  "6c81b8d76ae7c17308da7ae0b9304123fdac1458",
+    "core_model":  "qwen3.5-4b-core-cpu5k:latest",
+    "protocol":  "schema",
+    "closure_decision":  "DOES_NOT_YET_BEAT_RELIABLE_BASELINE",
+    "acceptance":  {
+                       "baseline_checks":  15,
+                       "public_scored_cases":  30,
+                       "public_relational_cases":  4,
+                       "baseline_micro_f1":  0.84210526315789469,
+                       "baseline_exact":  0.8,
+                       "model_run1_f1":  0.80000000000000016,
+                       "model_run2_f1":  0.80000000000000016,
+                       "model_run1_exact":  0.73333333333333328,
+                       "model_run2_exact":  0.73333333333333328,
+                       "prediction_stability":  1,
+                       "private_cases":  10,
+                       "private_model_f1":  0.25,
+                       "valid_model_calls":  9,
+                       "accepted_schema_failures":  0,
+                       "automatic_r1_writes":  0,
+                       "production_memory_touched":  false
+                   },
+    "hashes":  {
+                   "config/L4D1Detector.contract.json":  "9d1d95acd39c28330cd949466315fa30eebae2564786694428e5267b4a8f5f38",
+                   "src/LfoEpistemicDetectorBaseline.ps1":  "14326b54ee954a30662d403131bb9a2b6a81dc3e9bdb0351ac439650f353801e",
+                   "src/LfoEpistemicDetectorModel.ps1":  "64ae5b040de74b191e468f7be9b987219c4480cbe31f7afbc0465aef43ee55c0",
+                   "tests/Test-LfoEpistemicDetectorBaseline.ps1":  "79fe1fffcb1b52d6239922528bb2de554ddeeb17bfb70d103896548aefa939ee",
+                   "tests/fixtures/l4-d1-detector/benchmark.json":  "49a89488656f8209dec0bd7a82d975ee4ba6f04131a56c21492758945298f2b4",
+                   "docs/L4_D1_DETECTOR_EXPERIMENT.md":  "f032eaa571ed5424733ed1b15bb9a838d0c0c622dc77d55304404aa874331ff9",
+                   "docs/L4_D1_EVALUATION_RESULTS.md":  "4d43063e63b2cbdb50387b7082e54be4646ef7d14bf665d8c2eb33f223777703"
+               },
+    "next_milestone":  "L4-A2 recurrence/interaction analytics"
+}

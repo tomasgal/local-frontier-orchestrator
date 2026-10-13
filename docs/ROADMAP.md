@@ -62,21 +62,19 @@ curated exact-excerpt corpus of real development interactions also demonstrated
 the practical usefulness of all five query surfaces. Private source text is not
 published.
 
-### L4-D1 active — bounded detector experiment
+### L4-D1 closure — bounded detector experiment
 
-D1-A/B defines the detector/evaluation contract and implements a deterministic
-zero-model-call text-local baseline. The held-out benchmark contains 30 scored
-cases plus four relational/contextual cases on which the text-local detector
-must abstain. The gate records exact TP/FP/FN/TN, precision/recall/F1,
-exact-set accuracy, coverage and abstention rather than imposing an artificial
-quality floor.
+**L4-D1 is CLOSED/FROZEN as an offline detector experiment.** The deterministic
+baseline and Core LOCAL model were evaluated against the same held-out labels,
+with two complete public runs and a private real-conversation sanity check.
+Transport/schema failures are hard failures and are never scored as abstentions.
 
-The baseline deliberately does not infer relational/contextual annotation types
-or interaction labels from isolated text.
+Decision: **DOES_NOT_YET_BEAT_RELIABLE_BASELINE**.
 
-**Next within D1: D1-C bounded offline local-model comparison against the same
-labels plus a small private curated non-synthetic evaluation.** Detection
-remains disconnected from runtime intervention.
+### Next: L4-A2 recurrence/interaction analytics
+
+Use frozen A1 analytics and D1 detector evidence only as research inputs.
+Detection remains separate from intervention.
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED
