@@ -95,15 +95,72 @@ function Assert-LfoP1Evidence {
     }
 }
 
+function Get-LfoP1Digest {
+    param([Parameter(Mandatory)][byte[]]$Bytes,[ValidateSet('SHA256','SHA1')][string]$Algorithm='SHA256')
+    $hasher=[Security.Cryptography.HashAlgorithm]::Create($Algorithm)
+    try{return ([BitConverter]::ToString($hasher.ComputeHash($Bytes))).Replace('-','').ToLowerInvariant()}
+    finally{$hasher.Dispose()}
+}
+
 function Get-LfoP1Rules {
-    param([string]$RulesPath=(Join-Path $PSScriptRoot '../config/L4P1Policy.rules.json'),[string]$LockPath=(Join-Path $PSScriptRoot '../config/L4P1Policy.lock.json'))
-    $rules=(Get-Content -Raw -LiteralPath $RulesPath -Encoding UTF8|ConvertFrom-Json)
+    param(
+        [string]$RulesPath=(Join-Path $PSScriptRoot '../config/L4P1Policy.rules.json'),
+        [string]$LockPath=(Join-Path $PSScriptRoot '../config/L4P1Policy.lock.json'),
+        [string]$CompatibilityPath=''
+    )
     $lock=(Get-Content -Raw -LiteralPath $LockPath -Encoding UTF8|ConvertFrom-Json)
-    if([string]$rules.schema -cne 'lfo-l4-p1-policy-rules-v1' -or [string]$rules.status -cne 'frozen_for_acceptance'){throw 'Invalid or unfrozen P1 rules.'}
     if([string]$lock.schema -cne 'lfo-l4-p1-policy-lock-v1' -or -not [bool]$lock.locked_before_acceptance){throw 'Invalid P1 policy lock.'}
-    $hash=Get-LfoP1Sha256File $RulesPath
-    if($hash -cne [string]$lock.rules_sha256){throw 'P1 rule hash differs from the pre-acceptance lock.'}
-    return [pscustomobject]@{Rules=$rules;RulesSha256=$hash}
+
+    # Historical frozen behavior remains the default path.
+    if([string]::IsNullOrWhiteSpace($CompatibilityPath)){
+        $rules=(Get-Content -Raw -LiteralPath $RulesPath -Encoding UTF8|ConvertFrom-Json)
+        if([string]$rules.schema -cne 'lfo-l4-p1-policy-rules-v1' -or [string]$rules.status -cne 'frozen_for_acceptance'){throw 'Invalid or unfrozen P1 rules.'}
+        $hash=Get-LfoP1Sha256File $RulesPath
+        if($hash -cne [string]$lock.rules_sha256){throw 'P1 rule hash differs from the pre-acceptance lock.'}
+        return [pscustomobject]@{Rules=$rules;RulesSha256=$hash;IntegrityContract='historical-lock'}
+    }
+
+    # Explicit compatibility mode binds the immutable P1 checkpoint by
+    # frozen commit + Git blob + canonical LF bytes without rewriting the
+    # historically incorrect pre-acceptance byte hash.
+    $utf8=New-Object Text.UTF8Encoding($false,$true)
+    $bytes=[IO.File]::ReadAllBytes($RulesPath)
+    $text=$utf8.GetString($bytes)
+    if($text.Length -gt 0 -and $text[0] -eq [char]0xFEFF){$text=$text.Substring(1)}
+    $canonical=$text.Replace(([string][char]13+[char]10),[string][char]10)
+    $canonicalBytes=$utf8.GetBytes($canonical)
+    $contract=[IO.File]::ReadAllText($CompatibilityPath,$utf8)|ConvertFrom-Json
+    if([string]$contract.schema -cne 'lfo-l4-p1-integrity-compatibility-v1' -or
+       [string]$contract.version -cne '1.0.0' -or
+       [string]$contract.canonicalization -cne 'utf8-optional-bom-crlf-to-lf-v1'){
+        throw 'Unsupported P1 integrity compatibility contract.'
+    }
+    if([string]$contract.frozen_tag -cne 'v9.6-l4-p1-frozen' -or
+       [string]$contract.frozen_commit -cne '28c0ba622761b03af445a8e08939b38396926e0c'){
+        throw 'P1 integrity contract must bind the accepted frozen checkpoint.'
+    }
+    if([string]$lock.rules_sha256 -cne [string]$contract.historical_declared_rules_sha256){
+        throw 'Historical P1 lock differs from the compatibility contract.'
+    }
+    $canonicalHash=Get-LfoP1Digest $canonicalBytes
+    if($canonicalHash -cne [string]$contract.canonical_rules_sha256){
+        throw 'P1 canonical rules differ from the compatibility contract.'
+    }
+    $header=[Text.Encoding]::ASCII.GetBytes(('blob '+$canonicalBytes.Length+[char]0))
+    $blobHash=Get-LfoP1Digest ([byte[]]($header+$canonicalBytes)) SHA1
+    if($blobHash -cne [string]$contract.frozen_rules_git_blob){
+        throw 'P1 rules differ from the frozen Git blob.'
+    }
+    $rules=$canonical|ConvertFrom-Json
+    if([string]$rules.schema -cne 'lfo-l4-p1-policy-rules-v1' -or [string]$rules.status -cne 'frozen_for_acceptance'){
+        throw 'Invalid or unfrozen P1 rules.'
+    }
+    return [pscustomobject]@{
+        Rules=$rules
+        RulesSha256=$canonicalHash
+        GitBlob=$blobHash
+        IntegrityContract=[string]$contract.schema
+    }
 }
 
 function Test-LfoP1Condition {
@@ -124,10 +181,11 @@ function Get-LfoEpistemicPolicyCapsule {
         [Parameter(Mandatory)]$Evidence,
         [switch]$Enabled,
         [string]$RulesPath=(Join-Path $PSScriptRoot '../config/L4P1Policy.rules.json'),
-        [string]$LockPath=(Join-Path $PSScriptRoot '../config/L4P1Policy.lock.json')
+        [string]$LockPath=(Join-Path $PSScriptRoot '../config/L4P1Policy.lock.json'),
+        [string]$CompatibilityPath=''
     )
     Assert-LfoP1Evidence $Evidence
-    $bundle=Get-LfoP1Rules -RulesPath $RulesPath -LockPath $LockPath
+    $bundle=Get-LfoP1Rules -RulesPath $RulesPath -LockPath $LockPath -CompatibilityPath $CompatibilityPath
     $rules=$bundle.Rules
 
     $window=[pscustomobject][ordered]@{StoreId=[string]$Evidence.StoreId;Epoch=[int]$Evidence.Epoch;FirstTurn=[int]$Evidence.FirstTurn;LastTurn=[int]$Evidence.LastTurn}
