@@ -341,9 +341,30 @@ if(-not $SkipModelPull){
         $sourceModel=$BaseModel
         if(@($tags.models | Where-Object {$_.name -ceq $BaseModel}).Count -eq 0){
             $compatible=@($tags.models | Where-Object {
-                $_.name -match '(?i)^qwen3\.5-4b-.*:latest
-        & $ollamaExe create $GpuModel -f $gpuFile | Out-Host; if($LASTEXITCODE -ne 0){throw 'Failed to create LFO GPU model alias.'}
-        & $ollamaExe create $CpuModel -f $cpuFile | Out-Host; if($LASTEXITCODE -ne 0){throw 'Failed to create LFO CPU model alias.'}
+                $_.name -match '(?i)^qwen3[.]5-4b-.*:latest$' -or
+                ($_.name -match '(?i)^qwen3[.]5.*4b' -and ($_.details.quantization_level -eq 'Q4_K_M' -or -not $_.details.quantization_level))
+            } | Select-Object -First 1)
+            if($compatible.Count -eq 1){
+                $sourceModel=[string]$compatible[0].name
+                Info "Reusing existing compatible local model as alias source: $sourceModel"
+            } else {
+                Info "Pulling $BaseModel"
+                & $ollamaExe pull $BaseModel | Out-Host
+                if($LASTEXITCODE -ne 0){throw "ollama pull failed for $BaseModel"}
+            }
+        } else {
+            Info "Base model already present: $BaseModel"
+        }
+        $modRoot=Join-Path $ConfigRoot 'modelfiles'
+        New-Item -ItemType Directory -Path $modRoot -Force | Out-Null
+        $gpuFile=Join-Path $modRoot 'Modelfile.GPU'
+        $cpuFile=Join-Path $modRoot 'Modelfile.CPU'
+        [IO.File]::WriteAllText($gpuFile,"FROM $sourceModel`nPARAMETER num_ctx 8192`nPARAMETER num_gpu 99`nPARAMETER temperature 0.1`n",$utf8)
+        [IO.File]::WriteAllText($cpuFile,"FROM $sourceModel`nPARAMETER num_ctx 5120`nPARAMETER num_gpu 0`nPARAMETER temperature 0.1`n",$utf8)
+        & $ollamaExe create $GpuModel -f $gpuFile | Out-Host
+        if($LASTEXITCODE -ne 0){throw 'Failed to create LFO GPU model alias.'}
+        & $ollamaExe create $CpuModel -f $cpuFile | Out-Host
+        if($LASTEXITCODE -ne 0){throw 'Failed to create LFO CPU model alias.'}
         $tags=Invoke-RestMethod -Uri ($ollamaBase+'/api/tags') -TimeoutSec 10
         Assert-Lfo (@($tags.models|Where-Object{$_.name -ceq $GpuModel}).Count -eq 1) 'GPU model alias missing after create.'
         Assert-Lfo (@($tags.models|Where-Object{$_.name -ceq $CpuModel}).Count -eq 1) 'CPU model alias missing after create.'
