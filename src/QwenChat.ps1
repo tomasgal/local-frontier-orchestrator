@@ -1100,37 +1100,3 @@ while ($true) {
         }
     }
 }
- {
-            Clear-PersistentConversationMemory
-            if(Get-Command Reset-LfoL4RuntimeSession -ErrorAction SilentlyContinue){Reset-LfoL4RuntimeSession}
-            Write-Host "Working memory and active conversation context cleared. Historical logs retained."
-            continue
-        }
-        '^/paste$' {
-            $clip = Get-Clipboard -Raw
-            if ([string]::IsNullOrWhiteSpace($clip)) {
-                Write-Host "Clipboard is empty." -ForegroundColor Yellow
-                continue
-            }
-            Write-Host ("[Sending clipboard: {0} characters]" -f $clip.Length) -ForegroundColor DarkGray
-            Invoke-Qwen $clip
-            continue
-        }
-        '^/think\s+on$' {
-            $ThinkEnabled = $true
-            Write-Host "Thinking enabled."
-            continue
-        }
-        '^/think\s+off$' {
-            $ThinkEnabled = $false
-            Write-Host "Thinking disabled."
-            continue
-        }
-        '^\s*$' {
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
