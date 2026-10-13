@@ -207,6 +207,7 @@ $installState=[ordered]@{
     repository=$Repository
     requested_ref=$Ref
     commit=$commit
+    git_exe=$git
     repo_root=$appRoot
     qwen_config=$qwenConfig
     ollama_version=$OllamaVersion
@@ -246,6 +247,11 @@ if(-not $SkipModelPull){
     }
 }
 
+Write-Step 'Running zero-model installed-build preflight'
+$preflightReport=Join-Path $InstallRoot 'build-preflight-report.json'
+& (Join-Path $appRoot 'tools\Test-LfoWindowsBuildPreflight.ps1') -InstallRoot $InstallRoot -ResultPath $preflightReport
+if($LASTEXITCODE -ne 0){throw 'Installed-build preflight failed.'}
+
 Write-Step 'Bootstrap complete'
 Write-Host ("Install root: {0}" -f $InstallRoot)
 Write-Host ("LFO commit:   {0}" -f $commit)
@@ -253,6 +259,7 @@ Write-Host ("Ollama:       {0}" -f $ollamaBase)
 Write-Host ("SurrealDB:    {0}" -f $l4Endpoint)
 Write-Host ("GPU launcher: {0}" -f (Join-Path $InstallRoot 'Start-LFO-GPU.ps1'))
 Write-Host ("CPU launcher: {0}" -f (Join-Path $InstallRoot 'Start-LFO-CPU.ps1'))
+Write-Host ("Preflight:    {0}" -f $preflightReport)
 Write-Host 'No existing service process was stopped. L4 policy/intervention remains default-OFF.'
 )][string]$Model = 'qwen3.5:4b-q4_K_M',
     [switch]$SkipModelPull,
