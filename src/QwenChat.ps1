@@ -1066,7 +1066,13 @@ while ($true) {
         '^/exit$' {
             exit 0
         }
-        '^/clear        '^/paste$' {
+        '^/clear$' {
+            Clear-PersistentConversationMemory
+            if(Get-Command Reset-LfoL4RuntimeSession -ErrorAction SilentlyContinue){Reset-LfoL4RuntimeSession}
+            Write-Host "Working memory and active conversation context cleared. Historical logs retained."
+            continue
+        }
+        '^/paste$' {
             $clip = Get-Clipboard -Raw
             if ([string]::IsNullOrWhiteSpace($clip)) {
                 Write-Host "Clipboard is empty." -ForegroundColor Yellow

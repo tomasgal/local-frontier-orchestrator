@@ -14,7 +14,7 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          $targets=@('src\LfoL4Runtime.ps1','src\QwenChat.ps1','src\QwenMemory.ps1','launch\Start-LFO.ps1','tests\Test-LfoL4RuntimeDetector.ps1','tests\Test-LfoL4RuntimeIntegration.ps1')
+          $targets=@('src\LfoL4Runtime.ps1','src\QwenChat.ps1','src\QwenMemory.ps1','launch\Start-LFO.ps1','tests\Test-LfoL4QwenConnector.ps1','tests\Test-LfoL4RuntimeDetector.ps1','tests\Test-LfoL4RuntimeIntegration.ps1')
           foreach($target in $targets){$tokens=$null;$errors=$null;[void][Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $target),[ref]$tokens,[ref]$errors);if($errors.Count){$errors|ForEach-Object{Write-Host $_};throw "PARSE FAIL: $target"};Write-Host "PARSE PASS: $target"}
       - name: SurrealDB
         shell: powershell
