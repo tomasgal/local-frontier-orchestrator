@@ -1,0 +1,33 @@
+-- R1 immutable annotations, not factual evidence. Run only during explicit bootstrap.
+DEFINE TABLE IF NOT EXISTS observations SCHEMAFULL PERMISSIONS NONE;
+DEFINE FIELD IF NOT EXISTS observation_id ON observations TYPE string ASSERT string::matches($value, '^[a-f0-9]{32}$');
+DEFINE FIELD IF NOT EXISTS schema_version ON observations TYPE int ASSERT $value = 1;
+DEFINE FIELD IF NOT EXISTS taxonomy_version ON observations TYPE int ASSERT $value = 1;
+DEFINE FIELD IF NOT EXISTS observed_at ON observations TYPE datetime;
+DEFINE FIELD IF NOT EXISTS recorded_at ON observations TYPE datetime;
+DEFINE FIELD IF NOT EXISTS source ON observations TYPE object;
+DEFINE FIELD IF NOT EXISTS source.store_id ON observations TYPE string ASSERT string::matches($value, '^[a-f0-9]{32}$');
+DEFINE FIELD IF NOT EXISTS source.file ON observations TYPE string ASSERT string::matches($value, '^conversation-[0-9]{4}-[0-9]{2}\\.jsonl$');
+DEFINE FIELD IF NOT EXISTS source.epoch ON observations TYPE int ASSERT $value > 0;
+DEFINE FIELD IF NOT EXISTS source.turn_id ON observations TYPE int ASSERT $value > 0;
+DEFINE FIELD IF NOT EXISTS source.stage_id ON observations TYPE string ASSERT string::matches($value, '^s[1-9][0-9]*$');
+DEFINE FIELD IF NOT EXISTS source.content_sha256 ON observations TYPE string ASSERT string::matches($value, '^[a-f0-9]{64}$');
+DEFINE FIELD IF NOT EXISTS actor ON observations TYPE string ASSERT $value IN ['USER','LOCAL','FRONTIER','FINAL'];
+DEFINE FIELD IF NOT EXISTS stage ON observations TYPE string ASSERT ($this.actor = 'USER' AND $value = 'INPUT') OR ($this.actor = 'LOCAL' AND $value = 'LOCAL_RESPONSE') OR ($this.actor = 'FRONTIER' AND $value = 'FRONTIER_RESPONSE') OR ($this.actor = 'FINAL' AND $value = 'FINAL_RESPONSE');
+DEFINE FIELD IF NOT EXISTS producer ON observations TYPE string ASSERT $value IN ['USER','LOCAL','FRONTIER','WRAPPER'];
+DEFINE FIELD IF NOT EXISTS phase ON observations TYPE string ASSERT string::len($value) > 0 AND string::len($value) <= 80;
+DEFINE FIELD IF NOT EXISTS source_status ON observations TYPE string ASSERT $value IN ['received','returned','failed','delivered'];
+DEFINE FIELD IF NOT EXISTS model ON observations TYPE option<string | null> ASSERT $value = NONE OR $value = NULL OR string::len($value) <= 160;
+DEFINE FIELD IF NOT EXISTS observation_type ON observations TYPE string ASSERT $value IN ['FRAMING','PRESUPPOSITION','ASYMMETRIC_EVIDENCE_REQUEST','BIAS_CANDIDATE','OVERCONFIDENCE','UNCERTAINTY_SUPPRESSION','SYCOPHANTIC_REINFORCEMENT','COUNTEREVIDENCE_IGNORED','COUNTEREVIDENCE_INTRODUCED','BIAS_REINFORCED','BIAS_CHALLENGED','EPISTEMIC_RISK_SIGNAL'];
+DEFINE FIELD IF NOT EXISTS confidence ON observations TYPE number | null ASSERT $value = NULL OR ($value >= 0 AND $value <= 1);
+DEFINE FIELD IF NOT EXISTS detector ON observations TYPE string ASSERT string::matches($value, '^[a-zA-Z0-9._-]{1,80}$');
+DEFINE FIELD IF NOT EXISTS detector_version ON observations TYPE string ASSERT string::matches($value, '^[a-zA-Z0-9._-]{1,40}$');
+DEFINE FIELD IF NOT EXISTS status ON observations TYPE string ASSERT $value = 'REPORTED';
+DEFINE FIELD IF NOT EXISTS excerpt ON observations TYPE string ASSERT string::len($value) <= 512;
+DEFINE FIELD IF NOT EXISTS interaction ON observations TYPE string ASSERT $value IN ['','INTRODUCED','REINFORCED','IGNORED','CHALLENGED','CORRECTED'];
+DEFINE FIELD IF NOT EXISTS related_observation_id ON observations TYPE string ASSERT string::matches($value, '^([a-f0-9]{32})?$');
+DEFINE FIELD IF NOT EXISTS payload_sha256 ON observations TYPE string ASSERT string::matches($value, '^[a-f0-9]{64}$');
+DEFINE INDEX IF NOT EXISTS observation_key ON observations FIELDS observation_id UNIQUE;
+DEFINE INDEX IF NOT EXISTS source_page ON observations FIELDS source.store_id, source.epoch, observation_id;
+-- Protect accidental update/delete even for a database editor. Administrators can alter schema.
+DEFINE EVENT IF NOT EXISTS immutable_observation ON TABLE observations WHEN $event IN ['UPDATE','DELETE'] THEN { THROW 'R1 observations are append-only'; };

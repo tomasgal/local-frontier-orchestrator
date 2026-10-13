@@ -1,8 +1,8 @@
 # L4 design — Epistemic Observatory & Balancer
 
-Status: **design/scoping accepted; L0 source-capture prerequisite implemented on a separate development branch; SurrealDB R1 not started**
+Status: **design/scoping accepted; L0 source-capture prerequisite implemented on a separate development branch; SurrealDB R1 implementation candidate; Linux and Windows store acceptance passed**
 
-Date: 2026-10-12
+Date: 2026-10-13
 
 L4 is the next active LFO milestone after the frozen L2 and L3 contracts. It must
 build above those layers without reopening their accepted semantics.
@@ -269,7 +269,9 @@ responsibilities within L4.
 
 Prerequisite patch: [L0 stage source capture](L0_STAGE_SOURCE_CAPTURE.md) adds
 default-OFF conversation-stage provenance without changing L2/L3 semantics.
-Its isolated synthetic tests pass on PowerShell 7; Windows acceptance is pending.
+Its isolated synthetic tests pass on PowerShell 7 and Windows PowerShell 5.1 (user acceptance).
+
+R1 implementation contract: [L4_R1_STORE_CONTRACT.md](L4_R1_STORE_CONTRACT.md).
 
 **L4-R1: Epistemic Observation Store**
 
