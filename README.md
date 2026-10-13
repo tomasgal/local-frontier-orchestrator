@@ -1,6 +1,6 @@
 # Local Frontier Orchestrator
 
-**Current integrated baseline (2026-10-13): L0–L3 remain FIXED/CLOSED for their accepted scope, and the bounded L4 research stack through P2 is CLOSED/FROZEN for its stated scopes. LFO remains functional without L4. Automatic L4 runtime intervention remains OFF pending broader replication and an integrated end-to-end walkthrough.**
+**Current integrated baseline (2026-10-13): L0–L3 remain FIXED/CLOSED for their accepted scope, the bounded L4 research stack through P2 is CLOSED/FROZEN for its stated scopes, and L4-I1 end-to-end integration evidence is ACCEPTED. LFO remains functional without L4. Automatic L4 runtime intervention remains OFF by default; the next engineering gate is a clean Windows bootstrap/build acceptance.**
 
 **Integrated `main`:** the accepted L0–L3 implementation history and the frozen L4 research milestones are now integrated into the default branch. The latest bounded L4 checkpoint is [`v9.6-l4-p2-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6-l4-p2-frozen); frozen milestone tags remain immutable and authoritative for their exact evidence boundaries.
 
@@ -12,9 +12,9 @@
 | **L1 - FIXED** | Single-pass semantic micro-memory and pressure-triggered compaction; accepted existing behavior retained. |
 | **L2 - CLOSED/FROZEN** | Typed current/historical factual state and accepted selective read/write safeguards; immutable tag [`v9.4-l2-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.4-l2-frozen). |
 | **L3 - CLOSED/FROZEN** | Reconstructible faceted retrieval/index over L0/L2, bounded context, baseline fallback and verified L0 byte locators; immutable tag [`v9.5-l3-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.5-l3-frozen). Accepted milestone complete (100%). |
-| **L4 - CLOSED/FROZEN THROUGH P2 (research scope)** | R1 store, R2 annotation pilot, A1/A2 analytics, D1 detector experiment, P1 policy capsule and P2 bounded intervention experiment are frozen for their stated scopes. P2 produced CONTROL 4/8 vs INTERVENTION 8/8 with 4 improvements and 0 regressions in a bounded synthetic paired test; this is not authorization for automatic runtime deployment. |
+| **L4 - P2 FROZEN; I1 INTEGRATION ACCEPTED** | R1 store, R2 annotation pilot, A1/A2 analytics, D1 detector experiment, P1 policy capsule and P2 bounded intervention experiment are frozen for their stated scopes. I1 additionally proved the integrated L0 provenance -> SurrealDB -> analytics -> policy -> intervention -> real local-model path with full reverse provenance. Runtime intervention remains default-OFF. |
 
-**L4 P2 closure:** see [P2 frozen baseline](docs/L4_P2_FROZEN_BASELINE.md), [experiment design](docs/L4_P2_INTERVENTION_EXPERIMENT.md), and [evaluation results](docs/L4_P2_EVALUATION_RESULTS.md). The frozen decision is `PROMISING_BOUNDED_EFFECT`; broader/cross-host replication and an integrated walkthrough remain prerequisites before runtime integration.
+**L4 integration state:** see [P2 frozen baseline](docs/L4_P2_FROZEN_BASELINE.md), [experiment design](docs/L4_P2_INTERVENTION_EXPERIMENT.md), [evaluation results](docs/L4_P2_EVALUATION_RESULTS.md), and [accepted I1 integration evidence](docs/L4_I1_INTEGRATION_EVIDENCE.md). P2's frozen decision remains `PROMISING_BOUNDED_EFFECT`. I1 closes the end-to-end integration evidence gap; clean bootstrap/build acceptance is the next engineering gate, while broader/cross-host replication remains a separate research/deployment evidence class.
 
 **P2 packaging repair:** current development code includes [integrity compatibility v1](docs/L4_P2_INTEGRITY_COMPATIBILITY.md), which verifies the original accepted map across Git line-ending representations. Frozen tags, policy rules, intervention text and historical evidence remain unchanged.
 
