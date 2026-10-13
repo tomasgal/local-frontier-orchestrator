@@ -125,22 +125,6 @@ Runtime/model profiles own:
 
 This supports heterogeneous deployments: a modern GPU host, an older CPU-oriented host, or an edge/SBC accelerator can all present the same orchestration contract.
 
-
-### Hardware portability and optimization rule
-
-Performance work in the shared LFO architecture is **architecture-first, not host-first**.
-
-The primary expected gains should come from reducing or reorganizing work that exists on every supported host: fewer model passes, smaller and better-bounded prompts, deduplicated retrieval/context assembly, selective memory reads, better phase scheduling, and avoiding unnecessary serialization or blocking. v9.4-dev4 and v9.4-dev5 should be judged primarily on these general mechanisms.
-
-Host-specific tuning remains useful, but secondary:
-
-- thread counts, affinity, accelerator placement, context capacity, driver/runtime knobs, and similar settings belong in runtime/model profiles;
-- a host-specific knob may improve one deployment, but it must not become a dependency of the common orchestration architecture;
-- common optimizations should have a plausible hardware-independent mechanism and should be checked across materially different host classes when practical;
-- an optimization that wins only because it is narrowly fitted to one CPU/GPU/memory configuration should stay an optional host profile rather than a project-wide default.
-
-The project therefore prefers **portable reductions in total work and contention** over extracting the last few percent from one reference machine.
-
 ## 6. Policy and configuration boundary
 
 The Windows reference implementation keeps process-control logic separate from behavioural policy:
@@ -194,25 +178,37 @@ Host-specific capacity remains separate from memory semantics. A constrained 5k-
 
 Research traces preserve raw intermediate/final text, retrieval context, timing/token metadata, memory changes, and policy fingerprints for later Local Epistemic Balancer replay. Bias labels are not automatically written into working memory.
 
+The longer-term memory/research boundary is:
+
+```text
+L0  raw evidence/history
+L1  semantic working memory
+L2  structured factual state
+L3  retrieval & resolution fabric
+L4  research / epistemic analysis output
+```
+
+L3 may retrieve from L0/L2 and optional external knowledge adapters. L4 is a derived analytical output layer for observations, hypotheses, interventions and outcomes. L4 records must preserve provenance and uncertainty and must not silently become L2 facts or hidden user attributes. The current v9.4 implementation milestone remains L2.
+
+
 Durable factual/project memory should not be conflated with opaque model weights.
 
-### v9.4-dev4 observability / turn-context boundary (stage 1)
+### Generic epistemic mediator research boundary
 
-The `v9.4-dev4-observability` branch introduces an explicit pre-turn read-only L0/L1/recent-messages snapshot, keyed to the current prompt and reused by LOCAL generation, answer-only recovery, FRONTIER handoff and synthesis. This prevents repeated equivalent L0 scans within a turn while retaining the post-persistence memory snapshot as a separate read, because L1/L0 state can change after the write. The cache is reset at the start of each new turn.
+The planned bias-aware research mode has a narrower **generic, non-personalized mediator** workstream documented in [GENERIC_EPISTEMIC_MEDIATOR.md](GENERIC_EPISTEMIC_MEDIATOR.md).
 
-The new `LfoTurnTelemetry.ps1` module records one in-memory, bounded-by-actual-phases entry per model/frontier/retrieval/write phase. Each Ollama request retains its original body and remains a single HTTP call. When the Ollama response exposes counts and durations, research traces record `prompt_eval_count`, `eval_count`, `prompt_eval_seconds`, `decode_seconds` and a wall-minus-model-duration residual alongside `wall_seconds`; missing counters remain null. Turn context stats record L0 retrieved item/character counts, bounded L1 context, recent message count/characters and assembly time. No raw private text is added to these new telemetry fields. Stage 1 observability and L0/L1 assembly passed offline and an isolated two-turn LOCAL integration on the constrained Windows CPU-only host. The test preserved the five-row/four-current-state SQLite ORION supersession contract and captured prefill/decode and context timing. Single-run timing observations do not establish the sign or magnitude of permanent instrumentation overhead.
+Its first design target is not a universal bias classifier. It should:
 
-### v9.4-dev4 selective L2 read-side (stage 2; functional reference-host PASS, opt-in)
+- inspect observable properties of the current interaction;
+- keep direct evidence separate from derived interpretation;
+- compare behaviour against an explicit ground-truth, neutral, balanced, or counterbalanced reference condition;
+- express **bias magnitude / effect strength** as a phenomenon-specific deviation from that reference rather than as a generic risk score;
+- support auditable pre-response and post-response interventions;
+- preserve event, method, evidence, intervention and outcome provenance for later L4 analysis.
 
-`src/LfoStructuredRetrieval.ps1` opens existing SQLite state in read-only mode and queries `current_facts` by exact normalized entity-name matches derived from literal words or short phrases in the user's current question. All entity identity and relational queries stay inside the wrapper; Qwen never receives SQL. Reads are restricted to the active `conversation:<epoch>` and retain fact `source_turn` provenance; ambiguous aliases are skipped rather than guessed, and no database is created when the file is missing.
+The first candidate phenomena are user-side framing / confirmation-seeking signals, model-side sycophancy / agreement bias, and automation bias / appropriate reliance primarily as an outcome variable.
 
-`Memory.StructuredReadEnabled` is **false by default**. When explicitly enabled, at most 6 facts / 800 extra prompt characters are injected under `CURRENT STRUCTURED FACTS (L2)` into the single per-turn context snapshot. Values are tagged as recorded state, not independently verified. Current explicit user evidence takes precedence; explicit corrections and declarative state updates bypass L2 read-side injection to prevent old facts from influencing a new write. The model's `memory_ops[]` may not be inferred merely from stored L2 results. The trace records L2 candidates, emitted facts, injected character cost, retrieval duration and failures; failures fall back to L0/L1 rather than blocking the conversation. No schema change, no backend server and no model-initiated database access.
-
-**Stage 2 functional validation PASS on the constrained Windows CPU-only reference host (2026-10-09).** All four offline regression suites passed. The first live experiment exposed a read/write evidence leak: despite the policy, Qwen re-extracted four stored L2 facts as four new `memory_ops`. The corrected design enforces `Protect-LfoPersistenceFromReadSide` at the deterministic persistence boundary: LOCAL turns that actually received L2 facts suppress all model-emitted valid/rejected L2 operations and the L1 micro-note; original model-output counts, suppression counts, and reason remain in trace. Pure declarative/correction turns skip L2 reads and retain normal write semantics; FRONTIER synthesis from independent evidence follows its own path. The repair was verified offline for four operations, one valid operation and one rejected operation (Windows PowerShell 5.1 typed-array normalization).
-
-In the final isolated LOCAL live fixture, Qwen returned the four current ORION facts (Debian 13, 64 GB RAM, PostgreSQL 16, nightly backups) from L2 alone. Trace confirmed 4 retrieved items, 336 added chars, 4 model-proposed L2 operations all suppressed, 0 persisted operations, and no L1 micro-note. The independent SQLite checker confirmed all seven synthetic rows unchanged, including supersession and decoy scope; a separate accidentally submitted FRONTIER turn had no side effects. Retrieval measured 0.7748 s and total context assembly 0.8566 s; model request measured 189.9054 s. These timings demonstrate observability, not a statistically established performance gain or cross-host transfer.
-
-**Known design tradeoff:** a LOCAL question assisted by L2 cannot, in this version, simultaneously store legitimate implicit new assertions from the same turn. This is a deliberate fail-closed read-only boundary until trustworthy per-claim provenance is implemented. Default `Memory.StructuredReadEnabled` remains `$false` (opt-in) even after the reference-host PASS; do not confuse a passed isolated regression with general deployment approval. Dev5 may evaluate overhead and architecture-level optimizations without hardware-specializing common logic.
+This research contract should remain technology-neutral until the L3 retrieval/resolution and L4 research-analysis interfaces are stable enough to justify implementation coupling.
 
 ## 8. Synthesis policy
 

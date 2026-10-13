@@ -1,10 +1,5 @@
 # Memory strategy
 
-> **Superseding closure — 2026-10-12:** L2 is complete and frozen at `v9.4-l2-frozen`. Read [L2_FROZEN_BASELINE.md](L2_FROZEN_BASELINE.md) for the accepted profile, R1/R3/R4/R5 evidence and limitations. Earlier candidate, PENDING, PAUSED and next-test instructions below are historical. Do not restart L2 tuning automatically; next work is L3 design, then L4. The full 2414-character write policy is restored; A+B is accepted selectively, grouped extraction and C are not adopted.
-
-
-> **2026-10-11 policy checkpoint:** the current experimental branch implements the user-requested **2040-character L2 extraction policy candidate**, preserving all five examples. The full-policy validation recorded below belongs to the earlier 2414-character template and does not validate this revision. Current Windows offline/model extraction acceptance is PENDING. See [the refactoring goal and handoff](DEV5_DELPHI_REFACTOR_HANDOFF.md) for the counting convention, prior-policy pin and staged acceptance roadmap.
-
 This document explains the **design rationale and evolution strategy** for conversational memory in Local Frontier Orchestrator (LFO).
 
 For implementation details, storage layout, trace fields, and validated timings, see [MEMORY_AND_LOGGING.md](MEMORY_AND_LOGGING.md).
@@ -213,9 +208,11 @@ A future high-density-turn design should therefore consider:
 
 This is a separate problem from compaction scheduling.
 
-## Memory layers: L0–L3
+## Memory layers: L0–L4
 
-LFO memory should evolve as **complementary layers with different semantics**, not as repeated replacements of one storage format by another.
+LFO should evolve as **complementary layers with different semantics**, not as repeated replacements of one storage format by another.
+
+The current implementation milestone is still **L2**. L3 and L4 are architectural boundaries for later work, not claims about already implemented features.
 
 ### L0 — authoritative raw history
 
@@ -229,7 +226,7 @@ Properties:
 - source for exact historical retrieval and provenance;
 - potentially large, but not injected wholesale into the model context.
 
-L0 answers the question: **"What exactly happened?"**
+L0 answers: **"What exactly happened?"**
 
 ### L1 — semantic conversational working memory
 
@@ -251,7 +248,7 @@ L1 answers: **"What should the conversation keep actively in mind?"**
 
 L2 represents durable facts and relations that benefit from deterministic update/query semantics. The logical model is a small typed fact store rather than a nested JSON dictionary tied to one schema.
 
-Logical fact forms are conceptually:
+Canonical forms are conceptually:
 
 ```text
 (subject, predicate, object-entity)
@@ -268,35 +265,92 @@ Core     ram_gb     32
 ORION    os         Ubuntu 24.04
 ```
 
-The goal is to stabilize the **logical contract** early so the physical backend can change later without rewriting LFO memory semantics.
+L2 owns deterministic current-state semantics, provenance and supersession.
 
 L2 answers: **"What structured state is currently known, and how is it related?"**
 
-### L3 — optional associative/semantic retrieval layer
+### L3 — retrieval & resolution fabric
 
-L3 is **not a committed v9.4 feature** and is not another authoritative store.
+L3 is **not another authoritative store** and is not committed as a v9.4 feature.
 
-If real use demonstrates that lexical retrieval and explicit entity/predicate matching are insufficient, L3 may later add:
+Its role is candidate finding and identity resolution across operational memory and optional external knowledge adapters.
 
-- embeddings for semantic candidate retrieval;
-- entity linking and alias matching;
+Possible mechanisms include:
+
+- exact lexical retrieval from L0;
+- selective L2 entity/predicate lookup;
+- alias matching;
+- fuzzy entity resolution;
+- entity linking;
 - reranking;
-- similarity-based discovery across L0/L1/L2.
+- similarity/embedding retrieval if real failures justify it;
+- bounded read-only adapters to external sources such as DokuWiki, documents, Git repositories or web retrieval.
 
 L3 must not decide exact replacement semantics. For example, semantic similarity must not determine whether `Debian 12` was superseded by `Ubuntu 24.04`; that remains an L2 state/provenance operation.
 
-L3 answers: **"What potentially relevant memory should be considered?"**
+External corpora remain external. A DokuWiki search adapter can participate in L3 retrieval without the wiki becoming L3 storage.
 
-The intended authority ordering is therefore:
+L3 answers: **"What evidence or context should be considered?"**
+
+### L4 — research / epistemic analysis output
+
+L4 is a planned **derived analytical layer** for the Human–AI Bias Balancer research.
+
+It is primarily an output of analysis over retrieved evidence and context, not another input memory store.
+
+Conceptually:
 
 ```text
-L0 raw history        authoritative evidence/provenance
-L1 working memory     lossy conversational orientation
-L2 structured state   deterministic current factual state
-L3 semantic index     optional candidate-finding layer
+L0 evidence -----------+
+L2 state --------------+--> L3 retrieval/resolution --> selected evidence
+external knowledge ----+                              |
+                                                       v
+                                             L4 research analysis
 ```
 
-L3 may be added only if measured retrieval failures justify its extra complexity.
+Candidate L4 objects include:
+
+- InteractionEvent;
+- Actor;
+- BiasObservation;
+- BiasType;
+- Intervention;
+- Outcome;
+- LongitudinalHypothesis.
+
+Bias should be represented as a reified, event-scoped observation with provenance and confidence rather than a permanent actor property. Prefer an observation equivalent to:
+
+```text
+event=turn:918
+actor=human
+candidate_bias=confirmation_bias
+confidence=0.64
+status=hypothesis
+```
+
+over a durable factual assertion such as:
+
+```text
+user has_bias confirmation_bias
+```
+
+L4 output must remain defeasible and must not silently promote itself into L2 factual state or ordinary L1 conversational memory.
+
+L4 answers: **"What analytical interpretation is being proposed from the evidence?"**
+
+The intended authority/role ordering is therefore:
+
+```text
+L0 raw history          authoritative evidence/provenance
+L1 working memory       lossy conversational orientation
+L2 structured state     deterministic current factual state
+L3 retrieval/resolution non-authoritative candidate/context finding
+L4 research analysis    derived observations/hypotheses/interventions/outcomes
+```
+
+The DokuWiki search subsystem is relevant here as an **optional L3 external-knowledge adapter**. It can supply canonical conceptual or methodological context to L4 analysis, but the wiki itself is neither L3 storage nor L4 output.
+
+See [L4_RESEARCH_ANALYSIS.md](L4_RESEARCH_ANALYSIS.md) and [DOKUWIKI_SEARCH_SUBSYSTEM.md](DOKUWIKI_SEARCH_SUBSYSTEM.md).
 
 ## v9.4 milestone — L2 structured memory
 
@@ -358,13 +412,12 @@ v9.4 should:
 The preferred v9.4 backend is a local SQLite database such as:
 
 ```text
-%LOCALAPPDATA%\LocalFrontierOrchestrator\state\l2-memory.db
+%LOCALAPPDATA%\LocalFrontierOrchestrator\state\memory.db
 ```
 
 The logical schema should be capable of representing:
 
-- opaque entity identities independent of any supposedly canonical name;
-- one or more observed surface names / aliases for an entity;
+- entities;
 - predicates;
 - entity-to-entity relations;
 - typed scalar values;
@@ -408,47 +461,15 @@ For an **explicit memory request**, LFO should not claim successful persistence 
 
 For ordinary implicit memory, implementation may minimize visible post-answer latency while preserving ordering and durability invariants.
 
-### Why SQLite belongs specifically in L2
+### Development status — 2026-10-05
 
-SQLite is not being introduced as a replacement for conversational memory or as the authoritative record of the conversation. Each layer has a different job:
+The active `v9.4-l2-structured-memory` branch has reached a validated structured **write-side** checkpoint (`v9.4-dev3`) on two materially different Windows host classes. Schema 3, typed scalar values, entity relations, atomic fail-closed turn writes, duplicate suppression, restart persistence, scope isolation, provenance, and scalar supersession have all been reproduced outside a single development machine. The constrained CPU-only 8 GB notebook also reproduced the same structured extraction contract and live correction/supersession behavior.
 
-- **L0 JSONL** preserves the raw evidence/provenance of what the user, local model, and frontier path actually produced;
-- **L1** keeps a small lossy semantic orientation state for conversational continuity;
-- **L2 SQLite** holds facts whose semantics benefit from typed values, relations, deterministic replacement, joins, indexes, atomic transactions, and reconstructible history;
-- **L3**, if later justified, may help resolve aliases, ambiguity, fuzzy mentions, or semantic candidates, but it must not silently redefine L2 state.
+Current measurements show that SQLite is not the latency bottleneck: live L2 writes range from roughly hundredths of a second to about one second, while local-model turns on the constrained host take tens to hundreds of seconds.
 
-The local model therefore never needs to know SQL and does not need to decide that a particular spelling is a "canonical name". It emits a semantic operation over surface mentions. The wrapper resolves those mentions to opaque entity IDs and applies accepted operations through the MemoryStore boundary. Post-FRONTIER synthesis follows the same rule: frontier output is an external information input to Qwen synthesis, and only the synthesis pass emits the L2 operations for that turn.
+A post-dev3 optimization candidate is already implemented on the development branch but is **not yet a validated checkpoint**. It lowers LOCAL temperature from `0.20` to `0.10`, compresses the L2 extraction policy from 2,414 to 917 characters, removes an additional 871-character duplicated LOCAL structured-output rule block, and introduces a conservative deterministic acknowledgement path so a pure declarative update with a valid L2 set does not trigger a second full local inference merely to say that the update was noted.
 
-This division is why an embedded relational engine is useful even at small scale: the value is not dataset size but deterministic state semantics, relational queries, provenance, and transactions without adding a database server or exposing storage machinery to the model.
-
-### v9.4-dev3 implementation checkpoint — updated 2026-10-05
-
-The structured **write** boundary is now validated across two materially different Windows host classes:
-
-- schema 3: `entities(id, entity_type, ...)` plus `entity_names(entity_id, name, normalized_name, source_turn, ...)`;
-- entity names are mentions/surface forms, not identity keys;
-- trivial normalization handles formatting variants; unresolved ambiguity is not guessed;
-- typed scalar and entity-relation writes use one atomic transaction per user turn;
-- source turn and conversation scope are persisted;
-- scalar replacement closes the previous current fact through `valid_to_turn` and inserts the new current value;
-- a mixed valid/rejected operation set is fail-closed for L2 rather than partially written;
-- LOCAL and synthesis structured outputs share one `memory_ops[]` contract;
-- the desktop reference host validated live atomic persistence and scalar supersession;
-- a constrained CPU-only 8 GB notebook independently passed the complete store regression and reproduced the L2 extraction battery with no rejected operations, then live-wrote four facts and correctly superseded one scalar value on a LOCAL correction;
-- the notebook also reproduced the narrow Qwen integer serialization quirk (`"{32}"`) already seen on the desktop host, and the deterministic brace-wrapped-integer normalization handled it as designed;
-- measured SQLite write time remains negligible compared with local-model inference, so current optimization work targets prompt/model overhead rather than storage.
-
-**Post-dev3 optimization checkpoint — isolated CPU-only end-to-end PASS (2026-10-09):**
-
-- LOCAL generation temperature is reduced from `0.20` to `0.10`;
-- the originally validated full L2 extraction policy is retained: compact policy variants failed the unchanged extraction battery, including typed validation and semantic fidelity;
-- an additional 871-character duplicated LOCAL structured-output instruction block is removed;
-- a conservative wrapper detector permits a deterministic acknowledgement instead of a second full local inference only when a pure declarative state update already produced a non-empty, fully valid L2 operation set;
-- the offline regression checks syntax, restored full-policy contract anchors, temperature, and positive/negative declarative-fallback fixtures; it passed on the reference host.
-
-**Validation evidence (2026-10-09):** both shorter L2-policy candidates failed the unchanged extraction battery, so the original full policy was restored with exact Git blob identity to the validated baseline. Offline regression PASS; extraction counts PASS for multi-attribute 4/0, relation 3/0, correction 1/0, no-L2 0/0, and post-FRONTIER 3/0 (valid/rejected). The post-FRONTIER CPU-model predicate ambiguity remains an observed semantic limitation of the baseline rather than a new regression. An isolated CPU-only 5120-context two-turn live test stayed LOCAL, wrote 4 typed facts followed by 1 corrected OS value, and verified the SQLite state: 5 total historical rows, 4 current rows, original OS closed at turn 2, and the other 3 facts preserved. On the first turn the model returned an invalid answer; `local-declarative-ack` supplied `OK.` without launching a second answer-only inference. The first turn measured 169.006 s, 1488 prompt tokens, 269 generated tokens and 1.471 s L2 write versus prior 185.81 s, 1674 prompt tokens, and 1.189 s L2 write. The correction measured 25.845 s and 0.028 s L2 write versus prior 34.14 s and 0.031 s. Production memory was not used. These are single-run end-to-end observations, not statistically reliable throughput/speedup estimates; cross-host performance transfer remains untested. That was the dev3 boundary; L2 reads into prompt construction and phase-level observability were subsequently implemented and functionally validated as dev4 stage 1+2 on the constrained reference host (2026-10-09). L2 read-side remains disabled by default. The deterministic LOCAL read/write guard suppresses echoed model-derived L2 operations and L1 notes on turns enriched from stored L2 facts, preserving the original facts and read-only semantics at the cost of not storing new implicit assertions in mixed read/claim turns. Dev5 performance and cross-host validation remain separate.
-
-
+That candidate must still pass its offline regression, the unchanged extraction battery, and a same-fixture live benchmark on the next available host. L2 reads are still not injected into Qwen prompt construction; bounded/selective L2 retrieval remains the next major architectural integration boundary after this tuning pass.
 ### Non-goals for v9.4
 
 v9.4 is **not** intended to:
@@ -570,11 +591,9 @@ LFO is not the first system to explore persistent or same-call memory. The relev
 
 | System | Public memory pattern | LFO relationship |
 | --- | --- | --- |
-| **[Memori](https://memorilabs.ai/docs/memori-byodb/concepts/architecture/)** | SQL-native BYODB memory over SQLite/PostgreSQL/MySQL and other databases. It captures raw interactions, asynchronously extracts facts and semantic triples, builds a knowledge graph, generates local embeddings, and injects recalled memories on later calls. | This is the closest public analogue to LFO's SQL direction. Memori is a general memory middleware with semantic/vector recall and asynchronous augmentation; LFO is intentionally narrower for a small local model: same-pass bounded extraction, typed current-state operations, explicit supersession/provenance, and no embeddings by default. |
-| **[LangGraph SQLite Store / Checkpointer](https://github.com/langchain-ai/langgraph/tree/main/libs/checkpoint-sqlite)** | SQLite can persist graph checkpoints and application-defined key/value JSON; the store can optionally add vector search. It is deliberately generic rather than prescribing semantic fact extraction. | LFO shares the embedded/local persistence philosophy but places a stronger domain contract above SQLite: entities, typed facts, relations, current validity, provenance and fail-closed turn transactions. |
-| **[Open WebUI Memory](https://docs.openwebui.com/features/chat-conversations/memory/)** | Local per-user memory snippets are managed through add/update/replace/delete/search tools and can be injected into system context under explicit character budgets. Its documentation warns that very small local models may struggle with autonomous memory selection. | LFO avoids relying on autonomous memory tools for the 4B reference model. The wrapper owns persistence and bounded extraction, while the model emits a narrow schema-constrained side channel. |
-| **[Letta](https://docs.letta.com/v1-sdk/memory/memory-blocks)** | Persistent memory blocks are pinned into the context window and can be edited or shared across agents; older messages remain retrievable outside the active context. | LFO's L1 is analogous to a much smaller working-memory block, while L0 raw history and the emerging L2 fact store are kept explicitly separate to conserve constrained context. |
-| **Mem0** | Uses extracted memories plus retrieval and entity-oriented memory management. | LFO currently uses a smaller local pipeline and treats semantic retrieval as optional L3 rather than a prerequisite for exact current-state replacement. |
+| **LangMem / LangGraph** | Supports memory formation in the hot path or in background reflection. Its documentation explicitly notes the latency trade-off of hot-path formation. | LFO keeps immediate memory formation but avoids a second hot-path inference by piggybacking the micro-note on the answer/synthesis generation. |
+| **Mem0** | Uses extracted memories plus retrieval; its 2026 memory pipeline describes single-pass ADD-only extraction, entity linking, and multi-signal retrieval. | LFO currently uses a much smaller local pipeline: single-pass answer-side extraction, tiny rolling state, and lexical exact-history retrieval. Entity/key structure is a plausible future convergence point. |
+| **Letta** | Uses persistent memory blocks that remain in context, plus archival/vector-backed memory. | LFO uses a much smaller always-present rolling state because constrained local context is a primary design target; detailed history is retrieved only when needed. |
 | **Sonzai** | Documents a dual-output pattern where the same LLM call emits a reply plus a hidden `[MEMORY: ...]` line; deeper extraction can run asynchronously. | LFO uses the same broad no-second-roundtrip idea, but moved the hidden channel to schema-constrained JSON after text-marker reliability proved insufficient on the tested small local model. |
 
 These systems solve overlapping but not identical problems. LFO intentionally favors a minimal, inspectable architecture that can run locally and can be measured on weak hardware.

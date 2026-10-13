@@ -1,12 +1,28 @@
 # Local Frontier Orchestrator
 
-**L2 complete and frozen (2026-10-12): `v9.4-l2-frozen`.** Typed SQLite memory, scope/provenance, corrections and integrity guards form the fixed foundation for L3/L4. The accepted variant combines DEV3/post-DEV3 improvements with selective DEV5 A+B read optimization. The separate v9.3 runtime on `main` remains unchanged; this milestone is published on `v9.4-dev5-compact-read` and pinned by the immutable tag.
+**Current operational baseline (2026-10-12): L0, L1, L2 and L3 are FIXED for their accepted scope and form the production baseline. LFO is functional without L4.** L4 is the next research/development milestone and is not required for normal LOCAL/FRONTIER operation or persistent memory.
 
-**Measured CPU read-path improvement:** in four correctness-gated FULL / A+B / A+B / FULL observations, input fell **1756 to 1210 tokens (-31%)**, mean output **173 to 24 (-86%)**, and mean complete-turn time **159.629 to 24.791 seconds**. All responses were correct and L1/L2 memory unchanged. Load/cache asymmetry limits exact latency attribution; this is an accepted eligible-read optimization, not a general whole-workload DEV3–DEV5 speedup claim.
+**Use the complete published baseline:** [`v9.6-l4-l0-provenance`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6-l4-l0-provenance), accepted commit [`2d80f1d`](https://github.com/tomasgal/local-frontier-orchestrator/tree/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd). This checkpoint includes the accepted L2/L3 implementations and the tested L0 stage-source patch. The branch name anticipates L4 work; the checkpoint does not contain the SurrealDB L4 store or Balancer.
 
-**Start here:** [Frozen L2 contract, decisions and evidence](docs/L2_FROZEN_BASELINE.md) · [Frozen file manifest](docs/L2_FROZEN_MANIFEST.json) · [Next: L3, then L4](docs/ROADMAP.md). Existing default switches remain OFF. The explicit [accepted L2 profile](config/QwenChat-L2Frozen.config.psd1) selects A+B and the bounded mixed-current-user path; C and grouped extraction are not adopted. No repeated L2 tuning or model runs are a prerequisite for beginning L3 design.
+**Branch distinction:** `main` still contains the earlier **v9.3 runtime**. This README documents the project's current baseline and links to its implementation; this documentation update does not merge or deploy runtime changes onto `main`. For the complete L0-L3 baseline, use the branch or exact commit linked above.
 
-**L3 complete and frozen for the accepted scope (2026-10-12): `v9.5-l3-frozen`.** The reconstructible schema-v4 faceted SQLite retrieval layer passed the final **8/8 offline suite**, five-shape LIVE2 validation, focused no-match fallback retest, and focused live L0-locator smoke with production memory untouched. Predicate-aware eligible reads reduced prompt tokens by **10.72–12.67%** at matched correctness in the broader live corpus. The final verified L0 byte locator preserved exact evidence while reducing median synthetic 20k-turn source resolution from **9879.59 ms to 28.52 ms**; this is a source-resolution microbenchmark, not a whole-turn speedup claim. See [L3 frozen baseline](docs/L3_FROZEN_BASELINE.md) and [historical candidate checkpoint](docs/L3_CANDIDATE_CHECKPOINT.md). **L4-R1 Epistemic Observation Store is now CLOSED/FROZEN for its store/API scope.** The next bounded step is an explicit human/offline annotation pilot before L4-A analytics or L4-P intervention policy.
+| Layer | Accepted role and status |
+| --- | --- |
+| **L0 - FIXED** | Authoritative conversation JSONL and source provenance. The accepted patch adds optional USER/LOCAL/FRONTIER/FINAL stage-source capture, including synthesis, answer recovery and actual final-answer producer. |
+| **L1 - FIXED** | Single-pass semantic micro-memory and pressure-triggered compaction; accepted existing behavior retained. |
+| **L2 - CLOSED/FROZEN** | Typed current/historical factual state and accepted selective read/write safeguards; immutable tag [`v9.4-l2-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.4-l2-frozen). |
+| **L3 - CLOSED/FROZEN** | Reconstructible faceted retrieval/index over L0/L2, bounded context, baseline fallback and verified L0 byte locators; immutable tag [`v9.5-l3-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.5-l3-frozen). Accepted milestone complete (100%). |
+| **L4 - IN DEVELOPMENT** | Epistemic Observatory & Balancer. Design accepted; next implementation milestone is **L4-R1: Epistemic Observation Store** in SurrealDB. |
+
+**Fix policy:** keep L0-L3 stable while L4 is developed. The L0 provenance patch is accepted and the resulting baseline is fixed again. Reopen an accepted layer only for a demonstrated material defect or an explicitly versioned new research scope; never move frozen tags. L0/L1 are fixed by this accepted checkpoint and scope decision; no separate L0/L1 frozen tags are claimed. Production use is an operational acceptance decision, not a claim of universal reliability or measured performance on every host.
+
+**L0 patch validation:** 10 synthetic scenarios / 20 OFF-ON variants passed on Linux PowerShell 7 and Windows PowerShell, with **0 real model calls** and **production memory untouched**. The tests cover initial responses, synthesis, recovery, frontier fallback/failure, final-producer attribution, fresh-process reads, and L3 locator/scan evidence parity without stage-data leakage. Stage capture works independently of research logging and adds no model call. `Memory.L0StageSourcesEnabled` remains **false by default**; publishing the patch does not enable it in an existing deployment. Existing L2/L3 opt-in defaults are also preserved.
+
+**Start here:** [L0 patch contract](https://github.com/tomasgal/local-frontier-orchestrator/blob/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd/docs/L0_STAGE_SOURCE_CAPTURE.md) | [L2 frozen contract](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_BASELINE.md) | [L3 frozen contract](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.5-l3-frozen/docs/L3_FROZEN_BASELINE.md) | [L4 design and R1 scope](https://github.com/tomasgal/local-frontier-orchestrator/blob/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd/docs/L4_EPISTEMIC_OBSERVATORY_DESIGN.md) | [Current development roadmap](https://github.com/tomasgal/local-frontier-orchestrator/blob/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd/docs/ROADMAP.md).
+
+DEV5's architecture-first optimization direction was materially informed by Daniel Correa Villa's *Pushing Four Raspberry Pis to the Memory Wall* (DOI `10.5281/zenodo.20357376`). LFO transfers the general principle of eliminating unnecessary work and context/data movement before hardware-specific tuning; it does not claim a reproduction of the paper or transfer of its Raspberry Pi measurements. The exact accepted mapping is documented in [docs/DEV5_IMPLEMENTATION_SUMMARY.md](docs/DEV5_IMPLEMENTATION_SUMMARY.md).
+
+**DEV5 technical note:** the bounded transferability results are now published as *Reducing Context and Generation Traffic in a Local-First LLM Orchestrator: A Transferability Case Study* on Zenodo, DOI [10.5281/zenodo.23318551](https://doi.org/10.5281/zenodo.23318551). The note reports the accepted A+B mechanism and R5 observations with the same evidence boundaries as the frozen baseline; it is not presented as a replication of the motivating Raspberry Pi study or as a universal speedup claim.
 
 Local Frontier Orchestrator is a local-first conversational orchestration layer for combining a small local language model with a stronger remote frontier model.
 
@@ -16,21 +32,13 @@ The current reference implementation uses **Qwen via Ollama** as the local conve
 
 For v9.2 memory validation, the project uses a **conservative 90% engineering acceptance floor** for qualitative semantic behavior. This is not a claim that measured reliability is 90% or below 99%: the development smoke suite performed materially better than the acceptance floor, but its size and construction do not support a statistically defensible 99%-class reliability estimate.
 
-The project remains a research prototype. L2 and the accepted L3 retrieval layer are now frozen; L4 epistemic mediation proceeds above those fixed contracts.
+The project combines a fixed operational L0-L3 baseline with ongoing L4 research. Known limitations and the boundaries of the accepted tests remain documented; further research does not automatically reopen the fixed layers.
 
 For the rationale behind the conversational-memory architecture, trade-offs against other memory systems, and the planned path from single-pass micro-memory to pressure-triggered and eventually keyed/deterministic memory updates, see [docs/MEMORY_STRATEGY.md](docs/MEMORY_STRATEGY.md).
 
+For an optional external-knowledge integration pattern using a human-curated DokuWiki, deterministic graph/section structure, and a compact lexical rescue index, see [docs/DOKUWIKI_SEARCH_SUBSYSTEM.md](docs/DOKUWIKI_SEARCH_SUBSYSTEM.md). This is intentionally separate from LFO's internal L0-L4 architecture and may later be exposed through the L3 retrieval/resolution layer.
+
 As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validation scope on the constrained reference hardware. It preserves v9.2 single-pass micro-memory as the normal path, adds pressure-triggered compaction at `>=4` pending notes or `>=108` pending-note characters, and uses at most one focused memory-only recovery when the user explicitly asks the system to remember something but the single-pass note is empty. Invalid final-answer sentinels are also recovered without regenerating memory, and correction-prefix normalization is hardened across `CORR`, `CORR:` and `CORR :` variants. Isolated end-to-end tests passed both count-pressure and char-pressure compaction, while ordinary implicit memory remains single-pass. Raw JSONL history remains authoritative; rolling memory remains a lossy orientation layer.
-
-## v9.4 L2 closure — DEV3 foundation, selective DEV5 optimization
-
-- **R1:** 12/12 Windows offline regression suites PASS for the accepted authorization repairs.
-- **R3:** six targeted Windows offline suites PASS after restoring the full 2414-character write policy.
-- **R4:** four isolated LOCAL turns PASS: declaration, correction, protected read, and exact-source mixed update. Four model calls; saved first turn rechecked after correcting an overly narrow predicate-name assertion, followed by three resumed turns.
-- **R5:** four protected read trials PASS; A+B eliminates redundant write output/instructions on eligible reads. FULL still proposed two memory operations per trial, safely suppressed by the existing guard. No production memory touched.
-- **R6:** accept the conservative write contract, integrity guards and selective A+B; retain bounded mixed writes and observability; defer grouped extraction and C; reject the 2040-character policy as the frozen default.
-
-L2 is closed for this scope. Historical results, failed candidates, source pins and remaining limitations are preserved in [the freeze record](docs/L2_FROZEN_BASELINE.md) and [historical experiments](docs/DEV5_PERFORMANCE_EXPERIMENTS.md). L3 retrieval is also closed for its accepted scope; the next active design milestone is L4 epistemic mediation. Human–AI bias-checker quality has not been established by these memory tests.
 
 ## Core architecture
 
@@ -76,60 +84,6 @@ The local model is therefore more than a router. It remains part of the conversa
 - **Policy/config separation:** routing/system policy, synthesis policy, frontier-subagent instructions, hard gates, and generation defaults are externalized from the transport/orchestration script so they can be reviewed and changed without editing process-control code.
 - **Traceable experimentation:** longer-term failures and corrections are more informative than tuning the system around one or two prompts.
 
-## Hardware-independent scaling strategy
-
-LFO is designed as an **orchestration/control plane**, not as the inference engine itself. The memory, routing, policy and context layers should therefore remain stable while the local inference substrate scales independently.
-
-```text
-LFO control plane
-  |- routing / policy
-  |- L0 / L1 / L2 / L3 memory
-  |- context assembly
-  |- LOCAL / FRONTIER decision
-  |- telemetry
-  |
-  v
-local inference endpoint
-  |- CPU-only runtime
-  |- single small GPU
-  |- single large GPU
-  |- multi-GPU model parallelism
-  |- multiple local replicas / specialists
-  `- future accelerator or internal inference service
-```
-
-The architectural contract is deliberately endpoint-oriented: LFO asks a local model service to perform inference; it does not need to own GPU placement, tensor parallelism, model sharding or replica scheduling. Those concerns belong to the inference runtime/profile.
-
-This means that hardware growth should primarily change **capacity and the LOCAL/FRONTIER capability boundary**, not the LFO memory semantics or orchestration design.
-
-Examples:
-
-| Deployment | Intended scaling behaviour |
-| --- | --- |
-| CPU-only / constrained notebook | Smaller quantized LOCAL model; more tasks may escalate to FRONTIER. |
-| 6-32 GB single GPU | Same LFO stack; change model, quantization, context and runtime placement through the host profile. |
-| 48-96 GB single GPU | Run a larger LOCAL model, larger context or more concurrent sessions without changing L0-L3 contracts. |
-| 2-4 GPU workstation/server | The inference backend may shard one larger model across GPUs, expose several model replicas, or host specialist models behind the same orchestration boundary. |
-| Example: 3 x 32 GB GPU server | LFO can still see one logical LOCAL endpoint while the backend uses the three GPUs for model/tensor parallelism; alternatively the GPUs can host independent replicas or specialists. The routing and memory layers do not require refactoring. |
-| Multi-user / small server cluster | Add an inference gateway/scheduler behind LFO; the control-plane contract remains the same. |
-| Larger multi-node cluster | Distribution, batching, KV-cache placement and HA move into the serving layer. LFO may need deployment adapters, but not a redesign of its memory architecture. |
-
-The preferred scaling rule is:
-
-> **Scale the inference substrate first; change LFO semantics only when a demonstrated orchestration or memory requirement demands it.**
-
-In practical terms, moving from a 4B LOCAL model on modest hardware to a 70B-class or other larger model on a multi-GPU host should not require rewriting L0/L1/L2/L3. The stronger LOCAL tier should simply satisfy more requests locally and reduce the frequency of FRONTIER escalation.
-
-A multi-GPU host can be used in three broad ways without changing the core LFO architecture:
-
-1. **one larger sharded LOCAL model** exposed as one endpoint;
-2. **multiple replicas of the same LOCAL model** for throughput/concurrency;
-3. **multiple local specialists** with a thin model-selection layer above the same frozen memory/context contracts.
-
-The current reference implementation is not yet fully platform-neutral: it is PowerShell/Windows-oriented, uses the Windows SQLite substrate in the validated path, Ollama as the reference local serving endpoint and Codex CLI for the frontier path. Therefore LFO is currently **portable by architecture, not yet portable by implementation**. A Linux or alternate-runtime port should replace host/runtime adapters while preserving the higher-level orchestration and frozen L2/L3 semantics.
-
-The design target is therefore **automatic or configuration-driven scaling without semantic refactoring**: hardware-specific model placement, quantization, context sizing and multi-GPU scheduling belong in runtime profiles or the inference backend, while routing, memory provenance, retrieval and fallback contracts remain stable.
-
 ## Why not simply run the frontier model for everything?
 
 The project explores a heterogeneous architecture in which different computational tiers have different roles.
@@ -142,7 +96,7 @@ Potential reasons to keep a local first-line model include:
 - local preprocessing and future retrieval over private sources;
 - local policy enforcement and redaction before a cloud call;
 - explicit control over routing and intervention policy;
-- a stable place to implement metacognitive and Human–AI bias-balancing experiments;
+- a stable place to implement metacognitive and Humanâ€“AI bias-balancing experiments;
 - the ability to use different local hardware tiers without changing the user-facing interaction model.
 
 ## Scalability of single-pass memory
@@ -155,9 +109,9 @@ Practical scaling expectations:
 
 | Hardware tier | Expected effect of v9.2 |
 | --- | --- |
-| CPU-only / constrained host | Largest absolute latency gain. On the validated notebook, ordinary post-answer memory work fell from roughly 18–21 s to commonly 0.01–0.05 s. |
+| CPU-only / constrained host | Largest absolute latency gain. On the validated notebook, ordinary post-answer memory work fell from roughly 18â€“21 s to commonly 0.01â€“0.05 s. |
 | ~6 GB VRAM | The removed second inference is already much faster than on CPU, but still consumes prompt evaluation, decode, scheduler, and runtime overhead. Single-pass therefore remains useful for latency and efficiency. |
-| ~16–17 GB VRAM | More VRAM can be spent on a larger model, higher-quality quantization, or more context without changing the single-pass memory architecture. A stronger local model may also improve semantic extraction quality. |
+| ~16â€“17 GB VRAM | More VRAM can be spent on a larger model, higher-quality quantization, or more context without changing the single-pass memory architecture. A stronger local model may also improve semantic extraction quality. |
 | 24 GB+ / server-class GPU | The absolute latency saving per turn may become small, but removing one model request per conversational turn still improves throughput, concurrency, and energy efficiency. |
 | Multi-user service | The benefit compounds with request volume: v9.2 avoids one separate memory-note inference for each completed turn; only periodic compaction remains an additional model call. |
 
@@ -165,7 +119,7 @@ This should be read as an **architectural scaling argument, not a completed benc
 
 The main scaling boundary is therefore not VRAM but **side-task complexity**. A small schema such as `route + answer + memory_note` is well suited to single-pass generation. If future versions add many independent classifiers, confidence signals, user-model updates, retrieval queries, or tool plans into the same response, those side tasks may eventually compete with answer quality and should then be split into dedicated or background components.
 
-Periodic compaction is intentionally still separate in v9.2. It occurs every five completed memory steps by default and remains the next obvious optimization target if deployment scale makes that cost material.
+Historically, v9.2 used separate compaction every five completed memory steps. The accepted L1 baseline uses the later v9.3 pressure thresholds described below; routine L1 tuning is closed while L4 is developed.
 
 ## Hardware scope
 
@@ -205,11 +159,11 @@ A related experimental fork is maintained at [tomasgal/codex-router](https://git
 - **Qwen-first:** local conversational model calls Codex only when needed;
 - **Codex-first:** Codex provides the interface and routes execution to a local model.
 
-## Human–AI bias balancing research
+## Humanâ€“AI bias balancing research
 
-A major research track for this architecture is **Human–AI bias balancing**.
+A major research track for this architecture is **Humanâ€“AI bias balancing**.
 
-The working hypothesis is that Human–LLM interaction can form a reciprocal feedback loop:
+The working hypothesis is that Humanâ€“LLM interaction can form a reciprocal feedback loop:
 
 - human confirmation/myside bias, automation bias, confidence miscalibration, and framing affect how AI advice is requested and interpreted;
 - LLM sycophancy, agreement bias, context sensitivity, and fluent overconfidence can reinforce the user's initial framing;
@@ -217,36 +171,46 @@ The working hypothesis is that Human–LLM interaction can form a reciprocal fee
 
 The local layer provides a natural experimental location for an auditable **Local Epistemic Balancer**. It can inspect the user request before frontier escalation and inspect the frontier result before presenting it to the user.
 
-The goal is not to create an “unbiased AI.” The goal is to study whether a local mediator can improve **appropriate reliance**: accepting useful AI guidance while resisting misleading guidance, without merely suppressing disagreement or maximizing user satisfaction.
+The goal is not to create an â€śunbiased AI.â€ť The goal is to study whether a local mediator can improve **appropriate reliance**: accepting useful AI guidance while resisting misleading guidance, without merely suppressing disagreement or maximizing user satisfaction.
 
 See [`docs/HUMAN_AI_BIAS_BALANCER.md`](docs/HUMAN_AI_BIAS_BALANCER.md).
+
+A narrower **generic, non-personalized mediation** workstream is documented in [`docs/GENERIC_EPISTEMIC_MEDIATOR.md`](docs/GENERIC_EPISTEMIC_MEDIATOR.md). It focuses on operationalizing observable interaction-level phenomena, measuring **bias magnitude relative to explicit reference/control conditions** rather than assigning a generic risk score, defining auditable pre/post-response interventions, and evaluating direct versus mediated interaction on reproducible benchmarks. Candidate implementation ideas that are not yet frozen are collected in [`docs/CANDIDATE_SOLUTION_DESIGNS.md`](docs/CANDIDATE_SOLUTION_DESIGNS.md).
+
+The active L4 milestone is **Epistemic Observatory & Balancer**, with `EpistemicObservation` as its core object. Bias is one observation class; framing or presupposition are not automatically biases. L4 will use SurrealDB (`lfo / epistemic / observations`) as its canonical observation store, while full conversation sources remain in L0. Its default design is **write-mostly, read-rarely**. Observations are separate from L2 factual evidence; implicit future use may supply only a bounded policy capsule after a rare trigger.
+
+**L4-R1 scope:** runtime/store contract, observation schema, source provenance, create/read APIs and isolated persistence/restart tests. Automatic interventions, answer rewrites, persistent user profiling, graph/vector features and continuous prompt injection are outside R1. The [current L4 design](https://github.com/tomasgal/local-frontier-orchestrator/blob/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd/docs/L4_EPISTEMIC_OBSERVATORY_DESIGN.md) governs this milestone; [earlier research notes](docs/L4_RESEARCH_ANALYSIS.md) remain background. **SurrealDB and L4 are not dependencies of the working L0-L3 baseline.**
 
 ## Repository layout
 
 ```text
 .
-├── README.md
-├── .gitignore
-├── config/
-│   ├── host.example.psd1
-│   └── QwenChat.config.psd1
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── CODEX_ROUTER_NOTES.md
-│   ├── HUMAN_AI_BIAS_BALANCER.md
-│   ├── NOTEBOOK_SETUP.md
-│   └── ROADMAP.md
-├── policy/
-│   ├── orchestrator-system.txt
-│   ├── synthesis-system.txt
-│   └── frontier-subagent.txt
-├── launch/
-│   ├── QwenChat.bat
-│   ├── Start-Ollama.bat
-│   └── Start-Ollama.ps1
-└── src/
-    ├── QwenChat.ps1
-    └── QwenMemory.ps1
+â”śâ”€â”€ README.md
+â”śâ”€â”€ .gitignore
+â”śâ”€â”€ config/
+â”‚   â”śâ”€â”€ host.example.psd1
+â”‚   â””â”€â”€ QwenChat.config.psd1
+â”śâ”€â”€ docs/
+â”‚   â”śâ”€â”€ ARCHITECTURE.md
+â”‚   â”śâ”€â”€ CODEX_ROUTER_NOTES.md
+â”‚   â”śâ”€â”€ HUMAN_AI_BIAS_BALANCER.md
+â”‚   â”śâ”€â”€ GENERIC_EPISTEMIC_MEDIATOR.md
+â”‚   â”śâ”€â”€ CANDIDATE_SOLUTION_DESIGNS.md
+â”‚   â”śâ”€â”€ DOKUWIKI_SEARCH_SUBSYSTEM.md
+â”‚   â”śâ”€â”€ L4_RESEARCH_ANALYSIS.md
+â”‚   â”śâ”€â”€ NOTEBOOK_SETUP.md
+â”‚   â””â”€â”€ ROADMAP.md
+â”śâ”€â”€ policy/
+â”‚   â”śâ”€â”€ orchestrator-system.txt
+â”‚   â”śâ”€â”€ synthesis-system.txt
+â”‚   â””â”€â”€ frontier-subagent.txt
+â”śâ”€â”€ launch/
+â”‚   â”śâ”€â”€ QwenChat.bat
+â”‚   â”śâ”€â”€ Start-Ollama.bat
+â”‚   â””â”€â”€ Start-Ollama.ps1
+â””â”€â”€ src/
+    â”śâ”€â”€ QwenChat.ps1
+    â””â”€â”€ QwenMemory.ps1
 ```
 
 ## Hardware and storage requirements
@@ -283,6 +247,8 @@ The scripts avoid hard-coded personal paths. Runtime paths can be supplied throu
 
 ## Quick start
 
+For the complete accepted L0-L3 version, first use the [published baseline checkpoint](https://github.com/tomasgal/local-frontier-orchestrator/tree/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd). A default checkout of `main` still runs the older v9.3 code. Existing host-specific settings and opt-in switches must be selected explicitly; the commands below do not migrate or enable them.
+
 Start Ollama:
 
 ```powershell
@@ -309,7 +275,7 @@ launch\QwenChat.bat -Model "your-local-model:tag"
 
 The local model profile should carry hardware/runtime placement settings appropriate for that machine. The chat client intentionally avoids overriding GPU/CPU placement, context length, or thread count per request.
 
-QwenChat v9.3 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. Ordinary memory remains **single-pass**: the LOCAL answer or post-frontier synthesis may emit a bounded 0–40 character user-delta micro-note without a separate per-turn memory inference. Pending notes are compacted into a 0–160 character rolling state when semantic pressure reaches **4 notes or 108 pending-note characters**. If the user explicitly asks the system to remember something and the single-pass note is empty, the wrapper permits at most one focused memory-only recovery call. Exact historical data is not compressed away: full conversation JSONL remains authoritative and bounded relevant raw snippets can be retrieved when needed.
+QwenChat v9.3 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. Ordinary memory remains **single-pass**: the LOCAL answer or post-frontier synthesis may emit a bounded 0â€“40 character user-delta micro-note without a separate per-turn memory inference. Pending notes are compacted into a 0â€“160 character rolling state when semantic pressure reaches **4 notes or 108 pending-note characters**. If the user explicitly asks the system to remember something and the single-pass note is empty, the wrapper permits at most one focused memory-only recovery call. Exact historical data is not compressed away: full conversation JSONL remains authoritative and bounded relevant raw snippets can be retrieved when needed.
 
 For a clean Windows host bootstrap, see [`docs/NOTEBOOK_SETUP.md`](docs/NOTEBOOK_SETUP.md). Do not copy a tuned context/GPU profile from another machine before measuring the new host.
 
@@ -333,14 +299,9 @@ The transport path is working:
 local model -> ask_codex -> native Codex frontier -> local model
 ```
 
-L2 is complete and frozen at `v9.4-l2-frozen`. Its accepted profile combines the
-DEV3 foundation, repaired authorization and selective DEV5 A+B optimization.
-See [the closure record](docs/L2_FROZEN_BASELINE.md) for evidence and boundaries.
+**L0-L3 are fixed and accepted for current production use.** LOCAL/FRONTIER routing, synthesis and persistent memory operate without L4. The latest accepted combined checkpoint is `2d80f1d` on `v9.6-l4-l0-provenance`; the L0 patch and its Windows acceptance are complete. L2 and L3 retain their immutable frozen tags.
 
-Next work is L3 interface/retrieval design, followed by L4 epistemic mediation.
-The v9.3 runtime on `main`, historical DEV3 and production memory remain unchanged.
-Future L2 defect fixes require a separately versioned change; the frozen reference
-must not be moved or silently retuned.
+Development now proceeds to **L4-R1: Epistemic Observation Store**. L4 implementation remains separate from the accepted lower-layer semantics. The fixed baseline is not reopened for routine tuning while L4 is under development. This README-only update leaves the v9.3 runtime on `main` unchanged.
 
 ## License
 
