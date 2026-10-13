@@ -1,0 +1,13 @@
+{
+  "schema": "lfo-l4-p2-integrity-compatibility-v1",
+  "version": "1.0.0",
+  "intervention_version": "1.0.1",
+  "frozen_tag": "v9.6-l4-p2-frozen",
+  "frozen_commit": "e648bba1201db639244b120b5f5db74e0c6f4059",
+  "frozen_map_git_blob": "aa380c1dbd0e294512dd2c7968ad2c0e34fe339c",
+  "canonical_map_sha256": "15611e74cc1c038fd1ae827b51504dd948345b7b2fdb58fd6ec9e1c9e44b9c8e",
+  "historical_map_sha256": "312f05eb128d59c83bc61558610df7e9320184e0a64b5476845ae123cc56c456",
+  "canonicalization": "utf8-optional-bom-crlf-to-lf-v1",
+  "historical_serialization": "crlf-internal-final-lf-v1",
+  "scope": "Representation compatibility only; frozen map, lock, rules, cases and evidence remain unchanged."
+}
