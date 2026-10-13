@@ -100,8 +100,8 @@ Step 'Windows / PowerShell preflight'
 Assert-Lfo ($env:OS -eq 'Windows_NT') 'LFO Windows bootstrap requires Windows.'
 Assert-Lfo ([Environment]::Is64BitOperatingSystem) 'LFO Windows bootstrap currently requires 64-bit Windows.'
 Assert-Lfo ($PSVersionTable.PSVersion -ge [version]'5.1') 'Windows PowerShell 5.1 or newer is required.'
-Assert-Lfo (Get-Command Invoke-WebRequest -ErrorAction SilentlyContinue) 'Invoke-WebRequest is unavailable.'
-Assert-Lfo (Get-Command Expand-Archive -ErrorAction SilentlyContinue) 'Expand-Archive is unavailable.'
+Assert-Lfo ($null -ne (Get-Command Invoke-WebRequest -ErrorAction SilentlyContinue)) 'Invoke-WebRequest is unavailable.'
+Assert-Lfo ($null -ne (Get-Command Expand-Archive -ErrorAction SilentlyContinue)) 'Expand-Archive is unavailable.'
 Info ("PowerShell {0}; Windows {1}; 64-bit={2}" -f $PSVersionTable.PSVersion,[Environment]::OSVersion.Version,[Environment]::Is64BitOperatingSystem)
 try {
     $drive=[IO.DriveInfo]::new([IO.Path]::GetPathRoot([IO.Path]::GetFullPath($InstallRoot)))
