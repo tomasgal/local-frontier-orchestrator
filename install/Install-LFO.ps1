@@ -135,6 +135,20 @@ function Resolve-CommandPath([string]$Name) {
     if ($c) { if ($c.Source) { return [string]$c.Source }; return [string]$c.Path }
     return $null
 }
+function Resolve-CodexPath {
+    foreach($name in @('codex.cmd','codex.exe','codex')) {
+        $p=Resolve-CommandPath $name
+        if($p){return [IO.Path]::GetFullPath($p)}
+    }
+    foreach($p in @(
+        (Join-Path $env:LOCALAPPDATA 'Programs\OpenAI\Codex\bin\codex.exe'),
+        (Join-Path $env:USERPROFILE '.codex\packages\standalone\current\bin\codex.exe'),
+        (Join-Path $env:USERPROFILE '.local\bin\codex.exe')
+    )) {
+        if(Test-Path -LiteralPath $p -PathType Leaf){return [IO.Path]::GetFullPath($p)}
+    }
+    return $null
+}
 function Open-EncodedWindow([string]$Title,[string]$Code) {
     $full = '$Host.UI.RawUI.WindowTitle='''+(Quote-PsSingle $Title)+''';'+$Code
     $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
@@ -165,31 +179,53 @@ try {
 } catch {}
 
 Step 'Frontier adapter detection'
-$codexPath=$null
-foreach($name in @('codex.cmd','codex.exe','codex')) {
-    $candidate=Resolve-CommandPath $name
-    if($candidate){$codexPath=$candidate;break}
-}
-$codexVersion=$null
-if($codexPath){
-    try {
-        $old=$ErrorActionPreference;$ErrorActionPreference='Continue'
-        $codexVersion=(& $codexPath --version 2>&1 | Out-String).Trim()
-        $exit=$LASTEXITCODE
-        $ErrorActionPreference=$old
-        if($exit -ne 0 -or [string]::IsNullOrWhiteSpace($codexVersion)){$codexVersion='version unavailable'}
-    } catch {
-        $codexVersion='version unavailable'
-    }
-    Info "Codex CLI: FOUND"
-    Info "Executable: $codexPath"
-    Info "Version: $codexVersion"
-    Info "Frontier adapter availability: CODEX_AVAILABLE"
-} else {
+$codexPath=Resolve-CodexPath
+if(-not $codexPath){
     Warn 'Codex CLI: NOT FOUND'
-    Info 'Frontier adapter availability: NONE'
-    Info 'This bootstrap does not install or configure a frontier adapter yet; LFO installation will continue.'
+    Write-Host ''
+    Write-Host 'Codex CLI is required for the LFO frontier path.' -ForegroundColor Yellow
+    Write-Host '  [1] Install OpenAI Codex CLI'
+    Write-Host '  [2] Exit installation'
+    Write-Host ''
+    do {
+        $choice=(Read-Host 'Select 1 or 2').Trim()
+    } while($choice -notin @('1','2'))
+
+    if($choice -eq '2'){
+        Write-Host 'LFO installation cancelled: Codex CLI is required.' -ForegroundColor Yellow
+        exit 2
+    }
+
+    Step 'Install OpenAI Codex CLI'
+    $codexInstaller=Join-Path $env:TEMP ('codex-install-'+[guid]::NewGuid().ToString('N')+'.ps1')
+    try {
+        Info 'Downloading the official OpenAI Codex Windows installer...'
+        Invoke-WebRequest -UseBasicParsing 'https://chatgpt.com/codex/install.ps1' -OutFile $codexInstaller
+        Assert-Lfo (Test-Path -LiteralPath $codexInstaller -PathType Leaf) 'Codex installer download failed.'
+        $installProc=Start-Process powershell.exe -Wait -PassThru -NoNewWindow -ArgumentList @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',$codexInstaller)
+        Assert-Lfo ($installProc.ExitCode -eq 0) "OpenAI Codex installer exited with code $($installProc.ExitCode)."
+    } finally {
+        Remove-Item -LiteralPath $codexInstaller -Force -ErrorAction SilentlyContinue
+    }
+
+    $codexPath=Resolve-CodexPath
+    Assert-Lfo $codexPath 'Codex installation completed but codex.exe could not be located. Open a new terminal and rerun the LFO bootstrap.'
 }
+
+$codexVersion=$null
+try {
+    $old=$ErrorActionPreference;$ErrorActionPreference='Continue'
+    $codexVersion=(& $codexPath --version 2>&1 | Out-String).Trim()
+    $exit=$LASTEXITCODE
+    $ErrorActionPreference=$old
+    Assert-Lfo ($exit -eq 0 -and -not [string]::IsNullOrWhiteSpace($codexVersion)) 'Codex CLI was found but codex --version failed.'
+} catch {
+    throw "Codex CLI readiness check failed: $($_.Exception.Message)"
+}
+Info 'Codex CLI: FOUND'
+Info "Executable: $codexPath"
+Info "Version: $codexVersion"
+Info 'Frontier adapter availability: CODEX_AVAILABLE'
 
 $AppRoot=Join-Path $InstallRoot 'app'
 $RuntimeRoot=Join-Path $InstallRoot 'runtime'
@@ -530,11 +566,7 @@ Write-Host ('Source:        '+$SourceCommit) -ForegroundColor Green
 Write-Host ('SQLite:       PASS '+$sqliteVersion) -ForegroundColor Green
 Write-Host ('Ollama:       '+$ollamaApiVersion+' @ '+$ollamaBase) -ForegroundColor Green
 Write-Host ('SurrealDB:    '+$SurrealVersion+' @ '+$surrealBase) -ForegroundColor Green
-if($codexPath){
-    Write-Host ('Codex:        FOUND ('+$codexVersion+')') -ForegroundColor Green
-} else {
-    Write-Host 'Codex:        NOT FOUND (frontier onboarding pending)' -ForegroundColor Yellow
-}
+Write-Host ('Codex:        FOUND ('+$codexVersion+')') -ForegroundColor Green
 $installedLaunchDir=Join-Path $InstallRoot 'launch'
 Write-Host ('Launch dir:    '+$installedLaunchDir) -ForegroundColor Green
 Write-Host ''
