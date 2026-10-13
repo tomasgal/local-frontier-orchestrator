@@ -1,10 +1,10 @@
 # Local Frontier Orchestrator
 
-**Current operational baseline (2026-10-12): L0, L1, L2 and L3 are FIXED for their accepted scope and form the production baseline. LFO is functional without L4.** L4 is the next research/development milestone and is not required for normal LOCAL/FRONTIER operation or persistent memory.
+**Current integrated baseline (2026-10-13): L0–L3 remain FIXED/CLOSED for their accepted scope, and the bounded L4 research stack through P2 is CLOSED/FROZEN for its stated scopes. LFO remains functional without L4. Automatic L4 runtime intervention remains OFF pending broader replication and an integrated end-to-end walkthrough.**
 
-**Use the complete published baseline:** [`v9.6-l4-l0-provenance`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6-l4-l0-provenance), accepted commit [`2d80f1d`](https://github.com/tomasgal/local-frontier-orchestrator/tree/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd). This checkpoint includes the accepted L2/L3 implementations and the tested L0 stage-source patch. The branch name anticipates L4 work; the checkpoint does not contain the SurrealDB L4 store or Balancer.
+**Integrated `main`:** the accepted L0–L3 implementation history and the frozen L4 research milestones are now integrated into the default branch. The latest bounded L4 checkpoint is [`v9.6-l4-p2-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6-l4-p2-frozen); frozen milestone tags remain immutable and authoritative for their exact evidence boundaries.
 
-**Branch distinction:** `main` still contains the earlier **v9.3 runtime**. This README documents the project's current baseline and links to its implementation; this documentation update does not merge or deploy runtime changes onto `main`. For the complete L0-L3 baseline, use the branch or exact commit linked above.
+**Branch integration:** the former L4 development line is now integrated into `main`. This does not enable L4 intervention in production: research closure, runtime deployment and cross-host replication remain separate decisions.
 
 | Layer | Accepted role and status |
 | --- | --- |
@@ -12,7 +12,9 @@
 | **L1 - FIXED** | Single-pass semantic micro-memory and pressure-triggered compaction; accepted existing behavior retained. |
 | **L2 - CLOSED/FROZEN** | Typed current/historical factual state and accepted selective read/write safeguards; immutable tag [`v9.4-l2-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.4-l2-frozen). |
 | **L3 - CLOSED/FROZEN** | Reconstructible faceted retrieval/index over L0/L2, bounded context, baseline fallback and verified L0 byte locators; immutable tag [`v9.5-l3-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.5-l3-frozen). Accepted milestone complete (100%). |
-| **L4 - IN DEVELOPMENT** | Epistemic Observatory & Balancer. Design accepted; next implementation milestone is **L4-R1: Epistemic Observation Store** in SurrealDB. |
+| **L4 - CLOSED/FROZEN THROUGH P2 (research scope)** | R1 store, R2 annotation pilot, A1/A2 analytics, D1 detector experiment, P1 policy capsule and P2 bounded intervention experiment are frozen for their stated scopes. P2 produced CONTROL 4/8 vs INTERVENTION 8/8 with 4 improvements and 0 regressions in a bounded synthetic paired test; this is not authorization for automatic runtime deployment. |
+
+**L4 P2 closure:** see [P2 frozen baseline](docs/L4_P2_FROZEN_BASELINE.md), [experiment design](docs/L4_P2_INTERVENTION_EXPERIMENT.md), and [evaluation results](docs/L4_P2_EVALUATION_RESULTS.md). The frozen decision is `PROMISING_BOUNDED_EFFECT`; broader/cross-host replication and an integrated walkthrough remain prerequisites before runtime integration.
 
 **Fix policy:** keep L0-L3 stable while L4 is developed. The L0 provenance patch is accepted and the resulting baseline is fixed again. Reopen an accepted layer only for a demonstrated material defect or an explicitly versioned new research scope; never move frozen tags. L0/L1 are fixed by this accepted checkpoint and scope decision; no separate L0/L1 frozen tags are claimed. Production use is an operational acceptance decision, not a claim of universal reliability or measured performance on every host.
 
