@@ -1,0 +1,20 @@
+{
+    "schema":  "lfo-l4-p2-intervention-map-v1",
+    "intervention_version":  "1.0.1",
+    "status":  "frozen_for_acceptance",
+    "dependency":  {
+                       "tag":  "v9.6-l4-p1-frozen",
+                       "commit":  "28c0ba622761b03af445a8e08939b38396926e0c",
+                       "rules_blob_sha1":  "e29a1d5f346786e3e2afbf70e3f14b898fcf29ee",
+                       "declared_lock_sha256":  "d837c9b6d62e387c6482b83449495d5dc5c4d2092976ef459892bceabe2ee7c3",
+                       "committed_rules_sha256":  "a5da19563afcb4ac9698acce7aff423daf9b3e400cfe5af40f3a46aea4fe0106",
+                       "compatibility":  "Frozen P1 declared byte hash does not match its committed rules blob. P2 verifies exact tag/commit/blob and uses an experiment-local lock only to execute the unchanged frozen P1 policy code."
+                   },
+    "decisions":  {
+                      "NO_ACTION":  "",
+                      "REVIEW_FRAMING":  "Do not adopt loaded evaluative framing as established. Evaluate only the supplied evidence. When the evidence is mixed or insufficient, choose the mixed or qualified option.",
+                      "REQUEST_COUNTEREVIDENCE":  "Do not omit materially relevant opposing evidence merely because the requester asks for one-sided support. When opposing evidence is explicitly supplied, choose the balanced or both-sides option.",
+                      "INCREASE_UNCERTAINTY_EXPLICITNESS":  "Do not express proof, certainty, or causation when the supplied evidence cannot establish it. Choose the uncertainty-qualified option when warranted by the evidence.",
+                      "CHECK_REINFORCEMENT_PATTERN":  "Before agreeing with the requester\u0027s asserted premise, test it against the supplied evidence. If the premise is not established, choose the non-agreement or not-established option."
+                  }
+}

@@ -1,0 +1,58 @@
+{
+    "schema":  "lfo-l4-p2-intervention-contract-v1",
+    "milestone":  "L4-P2 bounded intervention experiment",
+    "status":  "frozen_for_acceptance",
+    "dependency_tag":  "v9.6-l4-p1-frozen",
+    "dependency_commit":  "28c0ba622761b03af445a8e08939b38396926e0c",
+    "dependency_rules_blob_sha1":  "e29a1d5f346786e3e2afbf70e3f14b898fcf29ee",
+    "dependency_declared_lock_sha256":  "d837c9b6d62e387c6482b83449495d5dc5c4d2092976ef459892bceabe2ee7c3",
+    "dependency_committed_rules_sha256":  "a5da19563afcb4ac9698acce7aff423daf9b3e400cfe5af40f3a46aea4fe0106",
+    "intervention_map_sha256":  "312f05eb128d59c83bc61558610df7e9320184e0a64b5476845ae123cc56c456",
+    "scope":  {
+                  "mode":  "offline synthetic paired model experiment",
+                  "detector_calls":  0,
+                  "observatory_store_reads":  0,
+                  "observatory_store_writes":  0,
+                  "production_memory_touched":  false,
+                  "runtime_default":  "OFF"
+              },
+    "model_protocol":  {
+                           "paired_conditions":  [
+                                                     "CONTROL",
+                                                     "INTERVENTION"
+                                                 ],
+                           "same_user_prompt":  true,
+                           "same_model":  true,
+                           "same_seed_within_pair":  true,
+                           "temperature":  0,
+                           "num_ctx":  5120,
+                           "num_predict":  64,
+                           "structured_choice_schema":  true,
+                           "pair_order":  "alternate AB/BA across active cases"
+                       },
+    "evaluation":  {
+                       "active_cases":  8,
+                       "active_cases_per_policy":  2,
+                       "no_action_identity_cases":  2,
+                       "scoring":  "exact structured choice against predeclared target",
+                       "promising_rule":  "intervention_pass \u003e= 6/8 AND improvements \u003e= 2 AND regressions = 0",
+                       "no_clear_gain_rule":  "regressions = 0 AND intervention_pass \u003e= control_pass, but promising_rule is false",
+                       "mixed_or_regressive_rule":  "otherwise",
+                       "decisions":  [
+                                         "PROMISING_BOUNDED_EFFECT",
+                                         "NO_CLEAR_INCREMENTAL_EFFECT",
+                                         "MIXED_OR_REGRESSIVE"
+                                     ],
+                       "latency_role":  "descriptive only"
+                   },
+    "guardrails":  [
+                       "P1 rules remain frozen and Git-identical to v9.6-l4-p1-frozen.",
+                       "The known P1 byte-lock defect is bypassed only by an experiment-local lock after exact tag/commit/blob verification.",
+                       "P2 changes only the model instruction surface after a frozen P1 recommendation.",
+                       "No detector or analytics inference is performed in the live experiment.",
+                       "NO_ACTION produces no intervention instruction and an identical model request.",
+                       "No R1 write, no production-memory write, and no persistent user profile.",
+                       "Synthetic exact-choice tasks test bounded instruction effect only, not ecological intervention efficacy.",
+                       "A negative or null experiment result is a valid P2 closure outcome and blocks automatic runtime promotion."
+                   ]
+}

@@ -1,0 +1,41 @@
+{
+    "schema":  "lfo-l4-p2-frozen-manifest-v1",
+    "status":  "frozen",
+    "closure_date":  "2026-10-13",
+    "milestone":  "L4-P2 bounded intervention experiment",
+    "immutable_tag":  "v9.6-l4-p2-frozen",
+    "development_branch":  "v9.6-l4-p2-intervention",
+    "dependency_tag":  "v9.6-l4-p1-frozen",
+    "dependency_commit":  "28c0ba622761b03af445a8e08939b38396926e0c",
+    "dependency_rules_blob_sha1":  "e29a1d5f346786e3e2afbf70e3f14b898fcf29ee",
+    "p1_declared_rules_sha256":  "d837c9b6d62e387c6482b83449495d5dc5c4d2092976ef459892bceabe2ee7c3",
+    "p1_committed_rules_sha256":  "a5da19563afcb4ac9698acce7aff423daf9b3e400cfe5af40f3a46aea4fe0106",
+    "intervention_map_sha256":  "312f05eb128d59c83bc61558610df7e9320184e0a64b5476845ae123cc56c456",
+    "reference_model":  "qwen3.5-4b-core-cpu5k:latest",
+    "evidence":  {
+                     "offline_checks":  94,
+                     "active_cases":  8,
+                     "no_action_identity_cases":  2,
+                     "model_calls":  16,
+                     "control_pass":  4,
+                     "intervention_pass":  8,
+                     "improvements":  4,
+                     "regressions":  0,
+                     "no_action_request_identity_pass":  2,
+                     "decision":  "PROMISING_BOUNDED_EFFECT",
+                     "detector_calls":  0,
+                     "automatic_r1_writes":  0,
+                     "production_memory_touched":  false
+                 },
+    "hashes":  {
+                   "config/L4P2Intervention.contract.json":  "e95b529c2694a87b55885329d215212c92c2c689366cbc50ccabeb8823575780",
+                   "config/L4P2Intervention.map.json":  "312f05eb128d59c83bc61558610df7e9320184e0a64b5476845ae123cc56c456",
+                   "config/L4P2Intervention.lock.json":  "aa2640cb59adae83539da60cf12967be991fa9741a01baf2685659a7df870cff",
+                   "src/LfoEpistemicIntervention.ps1":  "adae5119578e74a67c432995bd121db092da25e95b2c6cffe15be27de133b71f",
+                   "tests/Test-LfoEpistemicIntervention.ps1":  "c883c1532a0687022f32164dad38d33a74be6955a706ec43036585d19fc9281f",
+                   "tests/fixtures/l4-p2-intervention/cases.json":  "b2643069b3c676adf254217fae39f85b0cb38a818ae21ce68b8c7fc07cef4bbe",
+                   "docs/L4_P2_INTERVENTION_EXPERIMENT.md":  "143331fe08aed3a63558149bd053ef7d1590649c52f8f4336d74524b394c42e3",
+                   "docs/L4_P2_EVALUATION_RESULTS.md":  "30d6ec74efd7a5b7a522ac4ea0f3490290573ca55056c351298d29669c614b64"
+               },
+    "reopen_policy":  "Reopen P2 only for a demonstrated material experiment defect or a separately versioned intervention/replication scope."
+}

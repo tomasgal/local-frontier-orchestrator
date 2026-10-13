@@ -96,11 +96,24 @@ model call, R1 write, prompt injection or answer rewrite, and creates no
 persistent user state. A deterministic synthetic acceptance corpus and a
 private read-only curated A2 sanity replay passed.
 
-### Next: L4-P2 bounded intervention experiment
+### L4-P2 closure - bounded intervention experiment
 
-Design any actual intervention as a separately versioned, default-OFF experiment
-with an explicit effectiveness and safety evaluation. P1 itself remains a
-recommendation surface only.
+**L4-P2 is CLOSED/FROZEN for the bounded synthetic intervention scope.**
+See [L4_P2_FROZEN_BASELINE.md](L4_P2_FROZEN_BASELINE.md),
+[L4_P2_INTERVENTION_EXPERIMENT.md](L4_P2_INTERVENTION_EXPERIMENT.md), and
+[L4_P2_EVALUATION_RESULTS.md](L4_P2_EVALUATION_RESULTS.md).
+
+The exact frozen P1 Git dependency remained unchanged. P2 used a separately
+hash-locked intervention map and paired local-model experiment: CONTROL
+**4/8**, INTERVENTION **8/8**, improvements
+**4**, regressions **0**, NO_ACTION request identity
+**2/2**. Decision: **PROMISING_BOUNDED_EFFECT**.
+
+A P1 portability defect was documented: its declared rules byte hash differs
+from the committed frozen rules bytes. The P1 tag was not changed; P2 bound the
+dependency by immutable tag, commit and Git blob identity.
+
+Next: separately versioned broader/cross-host intervention replication before any runtime integration.
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED

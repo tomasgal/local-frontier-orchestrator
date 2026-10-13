@@ -1,0 +1,7 @@
+{
+    "schema":  "lfo-l4-p2-intervention-lock-v1",
+    "intervention_version":  "1.0.1",
+    "map_sha256":  "312f05eb128d59c83bc61558610df7e9320184e0a64b5476845ae123cc56c456",
+    "locked_before_acceptance":  true,
+    "dependency_tag":  "v9.6-l4-p1-frozen"
+}
