@@ -29,7 +29,7 @@ $CpuModel = 'lfo-qwen3.5-4b-cpu5k:latest'
 function Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
 function Info([string]$Text) { Write-Host "    $Text" }
 function Warn([string]$Text) { Write-Host "WARNING: $Text" -ForegroundColor Yellow }
-function Assert-Lfo([bool]$Value,[string]$Message) { if (-not $Value) { throw $Message } }
+function Assert-Lfo($Value,[string]$Message) { if (-not [bool]$Value) { throw $Message } }
 function Get-Sha256([string]$Path) { return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
 function Quote-PsSingle([string]$Text) { return $Text.Replace("'","''") }
 function Wait-Ready([scriptblock]$Probe,[string]$Name,[int]$Seconds=60) {
