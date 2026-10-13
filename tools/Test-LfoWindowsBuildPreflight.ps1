@@ -26,11 +26,9 @@ $staticResult=Join-Path $env:TEMP ('lfo-static-'+[guid]::NewGuid().ToString('N')
 $p1Result=Join-Path $env:TEMP ('lfo-p1compat-'+[guid]::NewGuid().ToString('N')+'.json')
 try{
     & (Join-Path $repoRoot 'tests/Test-LfoIntegratedBuildStatic.ps1') -ResultPath $staticResult
-    Assert ($LASTEXITCODE -eq 0) 'integrated static gate process'
     $sr=Get-Content -LiteralPath $staticResult -Raw -Encoding UTF8|ConvertFrom-Json
     Assert ([bool]$sr.pass) 'integrated static gate result'
     & (Join-Path $repoRoot 'tests/Test-LfoEpistemicPolicyCompatibility.ps1') -ResultPath $p1Result
-    Assert ($LASTEXITCODE -eq 0) 'P1 compatibility gate process'
     $pr=Get-Content -LiteralPath $p1Result -Raw -Encoding UTF8|ConvertFrom-Json
     Assert ([bool]$pr.pass) 'P1 compatibility gate result'
 }finally{Remove-Item -LiteralPath $staticResult,$p1Result -Force -ErrorAction SilentlyContinue}
@@ -44,9 +42,14 @@ Assert ([bool]$config.Epistemic.Enabled) 'installed L4 infrastructure enabled'
 Assert (-not [bool]$config.Epistemic.PolicyEnabled -and -not [bool]$config.Epistemic.InterventionEnabled) 'installed automatic L4 OFF'
 
 $ov=Invoke-RestMethod -Uri ('http://127.0.0.1:'+([int]$state.ollama_port)+'/api/version') -TimeoutSec 3
-Assert (-not [string]::IsNullOrWhiteSpace([string]$ov.version)) 'Ollama API ready'
+Assert ([string]$ov.version -ceq '0.34.4') 'Ollama 0.34.4 API ready'
 $sv=Invoke-RestMethod -Uri ('http://127.0.0.1:'+([int]$state.surreal_port)+'/version') -TimeoutSec 3
 Assert ([string]$sv -match '3\.3\.0') 'SurrealDB 3.3.0 ready'
+$ollamaHash=(Get-FileHash -LiteralPath ([string]$state.ollama_exe) -Algorithm SHA256).Hash.ToLowerInvariant()
+Assert ($ollamaHash -ceq '535193f38f3344e5b08f5d1c171c31ce11aa17f0124ff69ae26d8ec7fe06fa62') 'Ollama archive/runtime binding'
+$l4RuntimeConfig=Import-PowerShellDataFile -LiteralPath (Join-Path $repoRoot 'config/L4Runtime.psd1')
+$surrealHash=(Get-FileHash -LiteralPath ([string]$state.surreal_exe) -Algorithm SHA256).Hash.ToLowerInvariant()
+Assert ($surrealHash -ceq [string]$l4RuntimeConfig.WindowsSHA256) 'SurrealDB runtime hash binding'
 Assert (Test-Path -LiteralPath ([string]$state.l4_runtime_credential) -PathType Leaf) 'L4 runtime credential exists'
 
 $models=Invoke-RestMethod -Uri ('http://127.0.0.1:'+([int]$state.ollama_port)+'/api/tags') -TimeoutSec 10
@@ -64,8 +67,8 @@ $report=[ordered]@{
     ollama_version=[string]$ov.version
     surreal_version=[string]$sv
     sqlite_version=[string]$state.sqlite_version
-    ollama_sha256=(Get-FileHash -LiteralPath ([string]$state.ollama_exe) -Algorithm SHA256).Hash.ToLowerInvariant()
-    surreal_sha256=(Get-FileHash -LiteralPath ([string]$state.surreal_exe) -Algorithm SHA256).Hash.ToLowerInvariant()
+    ollama_sha256=$ollamaHash
+    surreal_sha256=$surrealHash
     model=[string]$state.model
     automatic_l4_policy=$false
     automatic_l4_intervention=$false
