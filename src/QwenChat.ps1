@@ -169,7 +169,7 @@ function Write-LfoEpistemicStatus {
         return
     }
     $status=Get-LfoEpistemicRuntimeStatus $script:L4Runtime
-    Write-Host ("[l4: configured={0}; available={1}; auto-policy=OFF; auto-intervention=OFF; explicit-review={2}; explicit-one-shot={3}; armed={4}]" -f 
+    Write-Host ("[l4: configured={0}; available={1}; auto-policy=OFF; auto-intervention=OFF; explicit-review={2}; explicit-one-shot={3}; armed={4}]" -f `
         $status.Configured,$status.Available,$status.AllowExplicitReview,$status.AllowExplicitOneShotIntervention,($null -ne $script:L4ArmedReview)) -ForegroundColor DarkGray
     if($status.Error){Write-Host ('[l4 error: '+$status.Error+']') -ForegroundColor Yellow}
 }
@@ -184,7 +184,7 @@ function Invoke-LfoEpistemicReviewCommand([switch]$ArmNext) {
     if($script:Config.Epistemic.ContainsKey('WindowTurns')){$window=[int]$script:Config.Epistemic.WindowTurns}
     $review=Get-LfoEpistemicRuntimeReview -Runtime $script:L4Runtime -Epoch ([int]$script:RuntimeState.epoch) -LastTurn $lastTurn -WindowTurns $window -EnableIntervention:$ArmNext
     $supportCount=@($review.Support).Count
-    Write-Host ("[l4 review: status={0}; decision={1}; reason={2}; support={3}; intervention={4}]" -f 
+    Write-Host ("[l4 review: status={0}; decision={1}; reason={2}; support={3}; intervention={4}]" -f `
         $review.Status,$review.Decision,$review.ReasonCode,$supportCount,$review.InterventionActive) -ForegroundColor DarkCyan
     if($review.Error){Write-Host ('[l4 review error: '+$review.Error+']') -ForegroundColor Yellow}
     if($ArmNext){
@@ -1134,101 +1134,7 @@ while ($true) {
         '^/exit$' {
             exit 0
         }
-        '^/clear
-        '^/paste$' {
-            $clip = Get-Clipboard -Raw
-            if ([string]::IsNullOrWhiteSpace($clip)) {
-                Write-Host "Clipboard is empty." -ForegroundColor Yellow
-                continue
-            }
-            Write-Host ("[Sending clipboard: {0} characters]" -f $clip.Length) -ForegroundColor DarkGray
-            Invoke-Qwen $clip
-            continue
-        }
-        '^/think\s+on$' {
-            $ThinkEnabled = $true
-            Write-Host "Thinking enabled."
-            continue
-        }
-        '^/think\s+off
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
-            $ThinkEnabled = $false
-            Write-Host "Thinking disabled."
-            continue
-        }
-        '^/l4\s+status
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
-            Write-LfoEpistemicStatus
-            continue
-        }
-        '^/l4\s+review
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
-            Invoke-LfoEpistemicReviewCommand
-            continue
-        }
-        '^/l4\s+next
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
-            Invoke-LfoEpistemicReviewCommand -ArmNext
-            continue
-        }
-        '^/l4\s+cancel
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
-            $script:L4ArmedReview=$null
-            Write-Host '[l4: one-shot intervention cancelled]' -ForegroundColor DarkGray
-            continue
-        }
-        '^\s*
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
+        '^/clear$' {
             Clear-PersistentConversationMemory
             $script:L4ArmedReview=$null
             Write-Host "Working memory and active conversation context cleared. Historical logs retained. Any armed L4 one-shot was cancelled."
@@ -1249,77 +1155,29 @@ while ($true) {
             Write-Host "Thinking enabled."
             continue
         }
-        '^/think\s+off
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
+        '^/think\s+off$' {
             $ThinkEnabled = $false
             Write-Host "Thinking disabled."
             continue
         }
-        '^/l4\s+status
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
+        '^/l4\s+status$' {
             Write-LfoEpistemicStatus
             continue
         }
-        '^/l4\s+review
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
+        '^/l4\s+review$' {
             Invoke-LfoEpistemicReviewCommand
             continue
         }
-        '^/l4\s+next
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
+        '^/l4\s+next$' {
             Invoke-LfoEpistemicReviewCommand -ArmNext
             continue
         }
-        '^/l4\s+cancel
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
+        '^/l4\s+cancel$' {
             $script:L4ArmedReview=$null
             Write-Host '[l4: one-shot intervention cancelled]' -ForegroundColor DarkGray
             continue
         }
-        '^\s*
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
+        '^\s*$' {
             continue
         }
         default {
