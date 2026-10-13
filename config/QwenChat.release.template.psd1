@@ -1,6 +1,6 @@
 @{
     # Generated-install template. Installer replaces __LFO_*__ placeholders.
-    Model = 'qwen3.5:4b-q4_K_M'
+    Model = '__LFO_MODEL__'
     BaseUri = '__LFO_OLLAMA_BASEURI__'
     CodexTimeoutSec = 300
     HistoryMaxMessages = 12
