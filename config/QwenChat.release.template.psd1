@@ -57,6 +57,8 @@
         RecordRuntimeStatus = $true
         PolicyEnabled = $false
         InterventionEnabled = $false
+        AllowExplicitReview = $true
+        AllowExplicitOneShotIntervention = $true
         WindowTurns = 8
     }
 
