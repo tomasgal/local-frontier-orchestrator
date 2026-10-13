@@ -23,6 +23,35 @@ Default installation root:
 The installed tree separates application source, runtimes, models, mutable data,
 local/private configuration and launchers.
 
+## Frontier runtime requirement
+
+The current Windows build uses **OpenAI Codex CLI** as the supported frontier
+runtime. The bootstrap detects an existing Codex CLI before continuing. If
+Codex is not present, the installer offers only two choices:
+
+1. install OpenAI Codex CLI using the official Windows installer;
+2. exit the LFO installation.
+
+A LOCAL-only installation is not treated as a complete LFO installation in
+this bootstrap path.
+
+Codex is the current default frontier runtime because OpenAI makes Codex
+available across ChatGPT plans, including **Free** and **Go**, with usage limits
+that vary by plan. This allows the reference LFO frontier path to rely on one
+official client and its user authentication instead of implementing a separate
+OpenAI account, credential, or TUI layer inside LFO.
+
+The current bootstrap stage detects/provisions the Codex executable and records
+its availability. Authentication/readiness validation is a separate bootstrap
+gate still to be completed before this candidate can be called a finished
+installer.
+
+The current LFO runtime invokes Codex as an isolated frontier pipe and keeps the
+user's Codex configuration out of the request path via the existing
+`--ignore-user-config` contract. This keeps the accepted reference path
+predictable while using Codex-managed user credentials.
+
+
 ## Reuse before provisioning
 
 The installer does not blindly install duplicate dependencies.
