@@ -27,11 +27,15 @@ function Test-LfoTcpPort([int]$Port){
     $c=New-Object Net.Sockets.TcpClient
     try{$c.Connect('127.0.0.1',$Port);return $true}catch{return $false}finally{$c.Dispose()}
 }
-function Quote-LfoLiteral([string]$Value){return "'"+$Value.Replace("'","''")+"'"}
+function Escape-LfoSingleQuoted([string]$Value){return $Value.Replace("'","''")}
 
 $ollamaBase='http://127.0.0.1:'+$ollamaPort
 $ollamaRunning=$false
-try{$v=Invoke-RestMethod -Uri ($ollamaBase+'/api/version') -TimeoutSec 1;$ollamaRunning=$true;Write-Host ("Ollama already responding at {0} (v{1}); existing process retained." -f $ollamaBase,$v.version)}catch{}
+try{
+    $v=Invoke-RestMethod -Uri ($ollamaBase+'/api/version') -TimeoutSec 1
+    $ollamaRunning=$true
+    Write-Host ("Ollama already responding at {0} (v{1}); existing process retained." -f $ollamaBase,$v.version)
+}catch{}
 if(-not $ollamaRunning){
     if(Test-LfoTcpPort $ollamaPort){throw "Ollama port $ollamaPort is occupied by a non-Ollama endpoint. Existing process was not stopped."}
     $context=if($Profile -eq 'CPU'){5120}else{8192}
@@ -47,29 +51,43 @@ $env:GGML_VK_VISIBLE_DEVICES='-1'
 Remove-Item Env:CUDA_VISIBLE_DEVICES,Env:ROCR_VISIBLE_DEVICES,Env:OLLAMA_VULKAN,Env:GGML_VK_VISIBLE_DEVICES -ErrorAction SilentlyContinue
 '@
     }
-    $code=@"
-\$ErrorActionPreference='Stop'
-\$Host.UI.RawUI.WindowTitle='LFO | Ollama $Profile'
-\$env:OLLAMA_HOST='127.0.0.1:$ollamaPort'
-\$env:OLLAMA_MODELS=$(Quote-LfoLiteral $modelsDir)
-\$env:OLLAMA_CONTEXT_LENGTH='$context'
-\$env:OLLAMA_NUM_PARALLEL='1'
-\$env:OLLAMA_MAX_LOADED_MODELS='1'
-\$env:OLLAMA_NO_CLOUD='1'
-\$env:OLLAMA_DEBUG='1'
-$modeBlock
-Write-Host 'LFO Ollama $Profile server: live foreground log. Ctrl+C stops this server.'
-& $(Quote-LfoLiteral $ollamaExe) serve
-"@
+    $code=@'
+$ErrorActionPreference='Stop'
+$Host.UI.RawUI.WindowTitle='LFO | Ollama __PROFILE__'
+$env:OLLAMA_HOST='127.0.0.1:__PORT__'
+$env:OLLAMA_MODELS='__MODELS__'
+$env:OLLAMA_CONTEXT_LENGTH='__CONTEXT__'
+$env:OLLAMA_NUM_PARALLEL='1'
+$env:OLLAMA_MAX_LOADED_MODELS='1'
+$env:OLLAMA_NO_CLOUD='1'
+$env:OLLAMA_DEBUG='1'
+__MODEBLOCK__
+Write-Host 'LFO Ollama __PROFILE__ server: live foreground log. Ctrl+C stops this server.'
+& '__OLLAMA__' serve
+'@
+    $code=$code.Replace('__PROFILE__',(Escape-LfoSingleQuoted $Profile)).
+        Replace('__PORT__',[string]$ollamaPort).
+        Replace('__MODELS__',(Escape-LfoSingleQuoted $modelsDir)).
+        Replace('__CONTEXT__',[string]$context).
+        Replace('__MODEBLOCK__',$modeBlock).
+        Replace('__OLLAMA__',(Escape-LfoSingleQuoted $ollamaExe))
     $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
-    $null=Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList @('-NoLogo','-NoProfile','-NoExit','-ExecutionPolicy','Bypass','-EncodedCommand',$encoded)
-    for($i=0;$i -lt 120;$i++){try{$null=Invoke-RestMethod -Uri ($ollamaBase+'/api/version') -TimeoutSec 1;$ollamaRunning=$true;break}catch{Start-Sleep -Milliseconds 250}}
+    $windowsPowerShell=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $null=Start-Process -FilePath $windowsPowerShell -ArgumentList @('-NoLogo','-NoProfile','-NoExit','-ExecutionPolicy','Bypass','-EncodedCommand',$encoded)
+    for($i=0;$i -lt 120;$i++){
+        try{$null=Invoke-RestMethod -Uri ($ollamaBase+'/api/version') -TimeoutSec 1;$ollamaRunning=$true;break}
+        catch{Start-Sleep -Milliseconds 250}
+    }
     if(-not $ollamaRunning){throw 'Ollama did not become ready. Inspect the visible Ollama console.'}
 }
 
 $surrealBase='http://127.0.0.1:'+$surrealPort
 $surrealRunning=$false
-try{$null=Invoke-RestMethod -Uri ($surrealBase+'/ready') -TimeoutSec 1;$surrealRunning=$true;Write-Host ("SurrealDB already responding at {0}; existing process retained." -f $surrealBase)}catch{}
+try{
+    $null=Invoke-RestMethod -Uri ($surrealBase+'/ready') -TimeoutSec 1
+    $surrealRunning=$true
+    Write-Host ("SurrealDB already responding at {0}; existing process retained." -f $surrealBase)
+}catch{}
 if(-not $surrealRunning){
     if(Test-LfoTcpPort $surrealPort){throw "SurrealDB port $surrealPort is occupied by another endpoint. Existing process was not stopped."}
     & (Join-Path $PSScriptRoot '..\tools\Open-LfoSurrealConsole.ps1') -Binary $surrealExe -Workspace $l4Workspace -Port $surrealPort -LogLevel debug
@@ -77,4 +95,5 @@ if(-not $surrealRunning){
 
 if($NoChat){Write-Host ("LFO services ready. Profile={0}; model={1}" -f $Profile,$model);return}
 Write-Host ("Starting QwenChat with complete-build profile: {0}" -f $Profile)
-& (Join-Path $PSScriptRoot '..\src\QwenChat.ps1') -ConfigPath $configPath -ContextLengthHint $(if($Profile -eq 'CPU'){5120}else{8192})
+$contextHint=if($Profile -eq 'CPU'){5120}else{8192}
+& (Join-Path $PSScriptRoot '..\src\QwenChat.ps1') -ConfigPath $configPath -ContextLengthHint $contextHint
