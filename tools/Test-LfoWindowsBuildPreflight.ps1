@@ -14,7 +14,8 @@ $script:checks=0
 function Assert([bool]$Condition,[string]$Message){$script:checks++;if(-not $Condition){throw $Message}}
 
 Assert (Test-Path -LiteralPath $repoRoot -PathType Container) 'repo root exists'
-$git=(Get-Command git.exe -ErrorAction Stop).Source
+$git=[string]$state.git_exe
+if([string]::IsNullOrWhiteSpace($git) -or -not(Test-Path -LiteralPath $git -PathType Leaf)){throw 'Installed Git executable is unavailable.'}
 $head=(& $git -C $repoRoot rev-parse HEAD).Trim()
 Assert ($LASTEXITCODE -eq 0) 'git rev-parse'
 Assert ($head -ceq [string]$state.commit) 'installed commit equals install state'
@@ -63,6 +64,8 @@ $report=[ordered]@{
     ollama_version=[string]$ov.version
     surreal_version=[string]$sv
     sqlite_version=[string]$state.sqlite_version
+    ollama_sha256=(Get-FileHash -LiteralPath ([string]$state.ollama_exe) -Algorithm SHA256).Hash.ToLowerInvariant()
+    surreal_sha256=(Get-FileHash -LiteralPath ([string]$state.surreal_exe) -Algorithm SHA256).Hash.ToLowerInvariant()
     model=[string]$state.model
     automatic_l4_policy=$false
     automatic_l4_intervention=$false
