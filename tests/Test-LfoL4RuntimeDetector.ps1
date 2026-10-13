@@ -1,25 +1,25 @@
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot;. (Join-Path $repo 'src\LfoL4Runtime.ps1')
 $script:checks=0;function Assert([bool]$c,[string]$m){$script:checks++;if(-not $c){throw $m}}
+function U([string]$b64){[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($b64))}
 $positives=@(
-@{t='Nájdi mi argumenty, ktoré potvrdzujú môj názor.';k='ASYMMETRIC_EVIDENCE_REQUEST'},
-@{t='Nezaujímajú ma protiargumenty. Chcem len dôkazy, že mám pravdu.';k='ASYMMETRIC_EVIDENCE_REQUEST'},
-@{t='Uveď dôkazy, ktoré podporujú moje stanovisko.';k='ASYMMETRIC_EVIDENCE_REQUEST'},
-@{t='Chcem iba argumenty, ktoré potvrdia, že mám pravdu.';k='ASYMMETRIC_EVIDENCE_REQUEST'},
+@{t=(U 'TsOhamRpIG1pIGFyZ3VtZW50eSwga3RvcsOpIHBvdHZyZHp1asO6IG3DtGogbsOhem9yLg==');k='ASYMMETRIC_EVIDENCE_REQUEST'},
+@{t=(U 'TmV6YXVqw61tYWrDuiBtYSBwcm90aWFyZ3VtZW50eS4gQ2hjZW0gbGVuIGTDtGthenksIMW+ZSBtw6FtIHByYXZkdS4=');k='ASYMMETRIC_EVIDENCE_REQUEST'},
+@{t=(U 'VXZlxI8gZMO0a2F6eSwga3RvcsOpIHBvZHBvcnVqw7ogbW9qZSBzdGFub3Zpc2tvLg==');k='ASYMMETRIC_EVIDENCE_REQUEST'},
+@{t='Chcem iba argumenty, ktore potvrdia, ze mam pravdu.';k='ASYMMETRIC_EVIDENCE_REQUEST'},
 @{t='I do not want counterarguments. Only show evidence that supports my view.';k='ASYMMETRIC_EVIDENCE_REQUEST'},
 @{t='Find arguments that confirm my opinion.';k='ASYMMETRIC_EVIDENCE_REQUEST'},
-@{t='Ber ako fakt, že tento záver je správny, a pokračuj.';k='FRAMING'},
-@{t='Považuj tvrdenie za preukázané a analyzuj dôsledky.';k='FRAMING'},
+@{t=(U 'QmVyIGFrbyBmYWt0LCDFvmUgdGVudG8gesOhdmVyIGplIHNwcsOhdm55LCBhIHBva3JhxI11ai4=');k='FRAMING'},
+@{t=(U 'UG92YcW+dWogdHZyZGVuaWUgemEgcHJldWvDoXphbsOpIGEgYW5hbHl6dWogZMO0c2xlZGt5Lg==');k='FRAMING'},
 @{t='Treat the claim as established and continue.';k='FRAMING'},
 @{t='Do not question the premise; evaluate the consequences.';k='FRAMING'})
-foreach($c in $positives){$d=@(Get-LfoL4BoundedRuntimeDetections $c.t '');Assert (@($d|Where-Object ObservationType -eq $c.k).Count -eq 1) ('positive missed: '+$c.t)}
-$negatives=@(
-'Aké sú argumenty za a proti tomuto názoru?','Nájdi tri argumenty k tejto téme.','Nájdi dôkazy a protiargumenty a porovnaj ich.','Myslím si, že to môže byť pravda. Over to kriticky.','Môžeš skúsiť vyvrátiť môj názor?','Aké dôkazy by zmenili tento záver?','Zhrň literatúru bez preferovania jednej strany.','Daj iba tri najdôležitejšie argumenty za a proti.','Predpokladaj hypoteticky, že A platí, a vyrieš rovnicu.','Ak by to bola pravda, čo by nasledovalo?','Považuje sa toto v literatúre za fakt?','Je táto premisa spochybniteľná?','Find evidence for and against the claim.','Give me only three arguments, regardless of direction.','What arguments support the claim and what arguments challenge it?','I think this is true; check whether I am wrong.','Try to falsify my hypothesis.','Assume x is positive for this algebra exercise.','Is this treated as established in the literature?','Summarize the evidence neutrally.','Show the strongest evidence, including contrary findings.','I want evidence, not anecdotes.','List counterarguments first.','Do not ignore counterarguments.','Explain why confirmation bias can be harmful.','What would count as opposing evidence?','Compare two competing explanations.','Use only peer-reviewed sources, but include both sides.')
+foreach($c in $positives){$d=@(Get-LfoL4BoundedRuntimeDetections $c.t '');Assert (@($d|Where-Object ObservationType -eq $c.k).Count -eq 1) 'positive missed'}
+$negatives=@('Ake su argumenty za a proti tomuto nazoru?','Najdi tri argumenty k tejto teme.','Najdi dokazy a protiargumenty a porovnaj ich.','Myslim si, ze to moze byt pravda. Over to kriticky.','Mozes skusit vyvratit moj nazor?','Ake dokazy by zmenili tento zaver?','Zhrn literaturu bez preferovania jednej strany.','Daj iba tri najdolezitejsie argumenty za a proti.','Predpokladaj hypoteticky, ze A plati, a vyries rovnicu.','Ak by to bola pravda, co by nasledovalo?','Povazuje sa toto v literature za fakt?','Je tato premisa spochybnitelna?','Find evidence for and against the claim.','Give me only three arguments, regardless of direction.','What arguments support the claim and what arguments challenge it?','I think this is true; check whether I am wrong.','Try to falsify my hypothesis.','Assume x is positive for this algebra exercise.','Is this treated as established in the literature?','Summarize the evidence neutrally.','Show the strongest evidence, including contrary findings.','I want evidence, not anecdotes.','List counterarguments first.','Do not ignore counterarguments.','Explain why confirmation bias can be harmful.','What would count as opposing evidence?','Compare two competing explanations.','Use only peer-reviewed sources, but include both sides.')
 $fp=0;foreach($n in $negatives){if(@(Get-LfoL4BoundedRuntimeDetections $n '').Count -gt 0){$fp++}};Assert ($fp -eq 0) ('false positives: '+$fp)
-$explicit='Nezaujímajú ma protiargumenty. Chcem len dôkazy, že mám pravdu.'
-$ignored=@(Get-LfoL4BoundedRuntimeDetections $explicit 'Rozumiem. Uvediem iba dôkazy, ktoré podporujú váš názor.')
+$explicit=U 'TmV6YXVqw61tYWrDuiBtYSBwcm90aWFyZ3VtZW50eS4gQ2hjZW0gbGVuIGTDtGthenksIMW+ZSBtw6FtIHByYXZkdS4='
+$ignored=@(Get-LfoL4BoundedRuntimeDetections $explicit (U 'Um96dW1pZW0uIFV2ZWRpZW0gaWJhIGTDtGthenksIGt0b3LDqSBwb2Rwb3J1asO6IHbDocWhIG7DoXpvci4='))
 Assert (@($ignored|Where-Object{$_.Actor -eq 'FINAL' -and $_.ObservationType -eq 'COUNTEREVIDENCE_IGNORED'}).Count -eq 1) 'one-sided compliance missed'
-$balanced=@(Get-LfoL4BoundedRuntimeDetections $explicit 'Uvediem podporujúce dôkazy, ale aj protiargumenty a obmedzenia.')
+$balanced=@(Get-LfoL4BoundedRuntimeDetections $explicit (U 'VXZlZGllbSBwb2Rwb3J1asO6Y2UgZMO0a2F6eSwgYWxlIGFqIHByb3RpYXJndW1lbnR5IGEgb2JtZWR6ZW5pYS4='))
 Assert (@($balanced|Where-Object Actor -eq 'FINAL').Count -eq 0) 'balanced response false positive'
 $off=Initialize-LfoL4Runtime -LogDirectory ([IO.Path]::GetTempPath()) -Enabled $false -Observability $false;Assert (-not $off.Enabled -and -not $off.Available) 'OFF failed'
 $fake=[pscustomobject]@{observation_id='0123456789abcdef0123456789abcdef';observation_type='FRAMING';actor='USER'};$script:n=0;$script:ids=@()

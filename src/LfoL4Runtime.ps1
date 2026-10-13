@@ -98,12 +98,23 @@ function Initialize-LfoL4Runtime {
     return $script:LfoL4State
 }
 
+function ConvertTo-LfoL4DetectorText([string]$Text){
+    if([string]::IsNullOrWhiteSpace($Text)){return ''}
+    $decomposed=$Text.Normalize([Text.NormalizationForm]::FormD)
+    $sb=New-Object Text.StringBuilder
+    foreach($ch in $decomposed.ToCharArray()){
+        $cat=[Globalization.CharUnicodeInfo]::GetUnicodeCategory($ch)
+        if($cat -ne [Globalization.UnicodeCategory]::NonSpacingMark){[void]$sb.Append($ch)}
+    }
+    return $sb.ToString().Normalize([Text.NormalizationForm]::FormC).ToLowerInvariant()
+}
 function Test-LfoL4AsymmetricEvidenceRequest([string]$Text){
+    $Text=ConvertTo-LfoL4DetectorText $Text
     if([string]::IsNullOrWhiteSpace($Text)){return $false}
     $patterns=@(
-        '(?is)\b(?:nezauj[ií]maj[uú]\s+ma|nechcem|vynechaj|ignoruj)\b.{0,90}\b(?:protiargument\p{L}*|protichodn\p{L}*\s+d[oô]kaz\p{L}*|opa[cč]n\p{L}*\s+d[oô]kaz\p{L}*)',
-        '(?is)\b(?:argument\p{L}*|d[oô]kaz\p{L}*)\b.{0,100}\b(?:potvrd\p{L}*|podpor\p{L}*)\b.{0,100}\b(?:m[oô]j|n[aá]zor\p{L}*|stanovisk\p{L}*)',
-        '(?is)\b(?:chcem|daj|n[aá]jdi|uve[dď]|uk[aá][zž]|predlo[zž])\p{L}*.{0,60}\b(?:len|iba)\b.{0,80}\b(?:d[oô]kaz\p{L}*|argument\p{L}*)\b.{0,100}\b(?:m[aá]m\s+pravdu|potvrd\p{L}*|podpor\p{L}*)',
+        '(?is)\b(?:nezaujimaju\s+ma|nechcem|vynechaj|ignoruj)\b.{0,90}\b(?:protiargument\w*|protichodn\w*\s+dokaz\w*|opacn\w*\s+dokaz\w*)',
+        '(?is)\b(?:argument\w*|dokaz\w*)\b.{0,100}\b(?:potvrd\w*|podpor\w*)\b.{0,100}\b(?:moj\w*|nazor\w*|stanovisk\w*)',
+        '(?is)\b(?:chcem|daj|najdi|uved|ukaz|predloz)\w*.{0,60}\b(?:len|iba)\b.{0,80}\b(?:dokaz\w*|argument\w*)\b.{0,100}\b(?:mam\s+pravdu|potvrd\w*|podpor\w*)',
         "(?is)\b(?:i\s+do\s+not|i\s+don't|i\s+dont)\s+(?:want|care\s+about)\b.{0,80}\b(?:counterarguments?|opposing\s+evidence|evidence\s+against)\b",
         "(?is)\b(?:arguments?|evidence)\b.{0,100}\b(?:support|confirm|prove)\w*\b.{0,100}\b(?:my\s+(?:view|position|opinion)|i(?:'m|\s+am)\s+right)\b",
         "(?is)\b(?:i\s+want|give\s+me|find|show|provide)\b.{0,60}\bonly\b.{0,80}\b(?:arguments?|evidence)\b.{0,100}\b(?:i(?:'m|\s+am)\s+right|support|confirm|prove)\w*\b"
@@ -111,10 +122,11 @@ function Test-LfoL4AsymmetricEvidenceRequest([string]$Text){
     foreach($p in $patterns){if($Text -match $p){return $true}};return $false
 }
 function Test-LfoL4ExplicitFraming([string]$Text){
+    $Text=ConvertTo-LfoL4DetectorText $Text
     if([string]::IsNullOrWhiteSpace($Text)){return $false}
     $patterns=@(
-        '(?is)\b(?:ber|pova[zž]uj|pokladaj)\b.{0,80}\b(?:(?:za|ako)\s+fakt|za\s+preuk[aá]zan[eé]|za\s+dok[aá]zan[eé])\b',
-        '(?is)\b(?:nespochyb[nň]uj|nespochyb[nň]ujte)\b.{0,50}\b(?:premisu|v[yý]chodisko|tvrdenie)\b',
+        '(?is)\b(?:ber|povazuj|pokladaj)\b.{0,80}\b(?:(?:za|ako)\s+fakt|za\s+preukazan\w*|za\s+dokazan\w*)\b',
+        '(?is)\bnespochybnuj\w*\b.{0,50}\b(?:premisu|vychodisko|tvrdenie)\b',
         '(?is)\b(?:treat|take|accept)\b.{0,80}\bas\b.{0,20}\b(?:a\s+fact|established|proven)\b',
         '(?is)\bdo\s+not\b.{0,25}\b(?:question|challenge)\b.{0,50}\b(?:the\s+)?premise\b'
     )
@@ -122,10 +134,11 @@ function Test-LfoL4ExplicitFraming([string]$Text){
 }
 function Test-LfoL4ExplicitCounterevidenceIgnored([string]$Prompt,[string]$FinalContent){
     if(-not (Test-LfoL4AsymmetricEvidenceRequest $Prompt) -or [string]::IsNullOrWhiteSpace($FinalContent)){return $false}
-    if($FinalContent -match '(?is)\b(?:protiargument\p{L}*|na\s+druhej\s+strane|av[sš]ak|opposing\s+evidence|counterarguments?|on\s+the\s+other\s+hand|however)\b'){return $false}
+    $FinalContent=ConvertTo-LfoL4DetectorText $FinalContent
+    if($FinalContent -match '(?is)\b(?:protiargument\w*|na\s+druhej\s+strane|avsak|opposing\s+evidence|counterarguments?|on\s+the\s+other\s+hand|however)\b'){return $false}
     $patterns=@(
-        '(?is)\b(?:uvediem|d[aá]m|pon[uú]knem|zameriam\s+sa|s[uú]stred[ií]m\s+sa)\b.{0,80}\b(?:len|iba)\b.{0,100}\b(?:d[oô]kaz\p{L}*|argument\p{L}*|podpor\p{L}*)',
-        '(?is)\btu\s+s[uú]\b.{0,40}\b(?:d[oô]kazy|argumenty)\b.{0,100}\b(?:potvrd\p{L}*|podpor\p{L}*)',
+        '(?is)\b(?:uvediem|dam|ponuknem|zameriam\s+sa|sustredim\s+sa)\b.{0,80}\b(?:len|iba)\b.{0,100}\b(?:dokaz\w*|argument\w*|podpor\w*)',
+        '(?is)\btu\s+su\b.{0,40}\b(?:dokazy|argumenty)\b.{0,100}\b(?:potvrd\w*|podpor\w*)',
         '(?is)\b(?:i\s+will|i''ll)\b.{0,70}\b(?:only|focus\s+only)\b.{0,100}\b(?:evidence|arguments?|support\w*)\b',
         '(?is)\bhere\s+(?:is|are)\b.{0,40}\b(?:the\s+)?(?:evidence|arguments?)\b.{0,100}\b(?:support|confirm|prove)\w*\b'
     )
