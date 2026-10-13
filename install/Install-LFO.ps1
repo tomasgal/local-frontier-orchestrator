@@ -77,13 +77,55 @@ function Download-Verified([string]$Uri,[string]$Destination,[string]$Sha256) {
     $parent=Split-Path -Parent $Destination
     New-Item -ItemType Directory -Path $parent -Force | Out-Null
     $tmp=$Destination+'.download-'+[guid]::NewGuid().ToString('N')
+    $response=$null;$input=$null;$output=$null
     try {
+        $name=[IO.Path]::GetFileName(([uri]$Uri).AbsolutePath)
+        if ([string]::IsNullOrWhiteSpace($name)) { $name='artifact' }
         Info "Downloading $Uri"
-        Invoke-WebRequest -UseBasicParsing -Uri $Uri -OutFile $tmp -TimeoutSec 1800
+        $request=[Net.HttpWebRequest]::Create($Uri)
+        $request.UserAgent='LFO-Windows-Bootstrap/1.0'
+        $request.AllowAutoRedirect=$true
+        $request.Timeout=60000
+        $request.ReadWriteTimeout=60000
+        $response=$request.GetResponse()
+        $total=[int64]$response.ContentLength
+        $input=$response.GetResponseStream()
+        $output=[IO.File]::Open($tmp,[IO.FileMode]::Create,[IO.FileAccess]::Write,[IO.FileShare]::None)
+        $buffer=New-Object byte[] (1024*1024)
+        [int64]$done=0
+        $sw=[Diagnostics.Stopwatch]::StartNew()
+        $lastProgressMs=-1000
+        while(($read=$input.Read($buffer,0,$buffer.Length)) -gt 0) {
+            $output.Write($buffer,0,$read)
+            $done += $read
+            if(($sw.ElapsedMilliseconds-$lastProgressMs) -ge 250) {
+                $doneMiB=[math]::Round($done/1MB,1)
+                $rate=if($sw.Elapsed.TotalSeconds -gt 0){[math]::Round(($done/1MB)/$sw.Elapsed.TotalSeconds,1)}else{0}
+                if($total -gt 0) {
+                    $totalMiB=[math]::Round($total/1MB,1)
+                    $pct=[math]::Min(100,[math]::Floor(($done*100.0)/$total))
+                    Write-Progress -Activity ("Downloading "+$name) -Status ("{0} / {1} MiB  ({2} MiB/s)" -f $doneMiB,$totalMiB,$rate) -PercentComplete $pct
+                } else {
+                    Write-Progress -Activity ("Downloading "+$name) -Status ("{0} MiB downloaded  ({1} MiB/s)" -f $doneMiB,$rate)
+                }
+                $lastProgressMs=$sw.ElapsedMilliseconds
+            }
+        }
+        $output.Flush($true)
+        $sw.Stop()
+        Write-Progress -Activity ("Downloading "+$name) -Completed
+        Info ("Downloaded {0:N1} MiB; verifying SHA-256..." -f ($done/1MB))
         $actual=Get-Sha256 $tmp
         if ($actual -cne $Sha256.ToLowerInvariant()) { throw "SHA256 mismatch for $Uri. Expected $Sha256, got $actual." }
+        Info 'SHA-256 PASS'
         Move-Item -LiteralPath $tmp -Destination $Destination -Force
-    } finally { if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue } }
+    } finally {
+        if($output){$output.Dispose()}
+        if($input){$input.Dispose()}
+        if($response){$response.Dispose()}
+        Write-Progress -Activity 'Downloading' -Completed -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+    }
 }
 function Resolve-CommandPath([string]$Name) {
     $c=Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
