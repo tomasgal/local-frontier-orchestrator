@@ -22,6 +22,9 @@ Assert (@($ignored|Where-Object{$_.Actor -eq 'FINAL' -and $_.ObservationType -eq
 $balanced=@(Get-LfoL4BoundedRuntimeDetections $explicit (U 'VXZlZGllbSBwb2Rwb3J1asO6Y2UgZMO0a2F6eSwgYWxlIGFqIHByb3RpYXJndW1lbnR5IGEgb2JtZWR6ZW5pYS4='))
 Assert (@($balanced|Where-Object Actor -eq 'FINAL').Count -eq 0) 'balanced response false positive'
 $off=Initialize-LfoL4Runtime -LogDirectory ([IO.Path]::GetTempPath()) -Enabled $false -Observability $false;Assert (-not $off.Enabled -and -not $off.Available) 'OFF failed'
+$badCred=New-Object Management.Automation.PSCredential('fixture',(ConvertTo-SecureString 'fixture' -AsPlainText -Force))
+$unavailable=Initialize-LfoL4Runtime -LogDirectory ([IO.Path]::GetTempPath()) -Enabled $true -PolicyEnabled $true -Observability $false -Endpoint 'http://127.0.0.1:1' -Credential $badCred
+Assert ($unavailable.Enabled -and -not $unavailable.Available -and $unavailable.Reason -ceq 'store-unavailable') 'unavailable store did not fail open'
 $fake=[pscustomobject]@{observation_id='0123456789abcdef0123456789abcdef';observation_type='FRAMING';actor='USER'};$script:n=0;$script:ids=@()
 $writer={param($c,$d,$o)$script:n++;$script:ids+=,[string]$o.observation_id;if($script:n -eq 1){[pscustomobject]@{outcome='UNKNOWN'}}else{[pscustomobject]@{outcome='ALREADY_EXISTS'}}}
 $retry=Invoke-LfoL4ObservationWrite ([pscustomobject]@{}) ([IO.Path]::GetTempPath()) $fake $writer

@@ -21,6 +21,9 @@ jobs:
         run: |
           $p=Join-Path $env:RUNNER_TEMP 'surreal.exe';Invoke-WebRequest -UseBasicParsing 'https://github.com/surrealdb/surrealdb/releases/download/v3.3.0/surreal-v3.3.0.windows-amd64.exe' -OutFile $p
           $h=(Get-FileHash -Algorithm SHA256 -LiteralPath $p).Hash.ToLowerInvariant();if($h -cne '3e5e9d363a352be81f5a983d53f0bc0cd77a90e305f01e2fed929987cf79735c'){throw "hash $h"}
+      - name: Ordinary Qwen connector
+        shell: powershell
+        run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File tests\Test-LfoL4QwenConnector.ps1
       - name: T1
         shell: powershell
         run: powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File tests\Test-LfoL4RuntimeDetector.ps1
