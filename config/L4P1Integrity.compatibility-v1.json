@@ -1,0 +1,11 @@
+{
+  "schema": "lfo-l4-p1-integrity-compatibility-v1",
+  "version": "1.0.0",
+  "canonicalization": "utf8-optional-bom-crlf-to-lf-v1",
+  "frozen_tag": "v9.6-l4-p1-frozen",
+  "frozen_commit": "28c0ba622761b03af445a8e08939b38396926e0c",
+  "frozen_rules_git_blob": "e29a1d5f346786e3e2afbf70e3f14b898fcf29ee",
+  "historical_declared_rules_sha256": "d837c9b6d62e387c6482b83449495d5dc5c4d2092976ef459892bceabe2ee7c3",
+  "canonical_rules_sha256": "a5da19563afcb4ac9698acce7aff423daf9b3e400cfe5af40f3a46aea4fe0106",
+  "note": "Versioned runtime compatibility binding for the immutable P1 packaging defect. It does not rewrite the frozen tag or historical lock."
+}
