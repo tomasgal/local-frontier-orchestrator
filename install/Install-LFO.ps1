@@ -138,6 +138,15 @@ function Open-EncodedWindow([string]$Title,[string]$Code) {
     Start-Process powershell.exe -WindowStyle Normal -ArgumentList @('-NoLogo','-NoProfile','-NoExit','-ExecutionPolicy','Bypass','-EncodedCommand',$encoded) | Out-Null
 }
 
+Write-Host ''
+Write-Host 'Local Frontier Orchestrator (LFO) - Windows bootstrap' -ForegroundColor Cyan
+Write-Host 'Local-first AI orchestration with structured memory, provenance and bounded L4 epistemic tooling.'
+Write-Host 'Project: https://github.com/tomasgal/local-frontier-orchestrator'
+Write-Host 'Created by Tomas Gal; bootstrap and integration tooling developed with OpenAI ChatGPT/Codex assistance.'
+Write-Host 'This installer will verify Windows/PowerShell/SQLite, reuse or provision Ollama and SurrealDB,'
+Write-Host 'obtain the selected LFO source, prepare local runtime/data/configuration, and create CPU/GPU launchers.'
+Write-Host 'Existing compatible components are reused where safe; unrelated data stores and running services are not overwritten.'
+Write-Host ''
 Step 'Windows / PowerShell preflight'
 Assert-Lfo ($env:OS -eq 'Windows_NT') 'LFO Windows bootstrap requires Windows.'
 Assert-Lfo ([Environment]::Is64BitOperatingSystem) 'LFO Windows bootstrap currently requires 64-bit Windows.'
