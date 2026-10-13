@@ -101,6 +101,23 @@ foreach ($l3ModuleName in @('LfoL3Store.ps1','LfoL3Planner.ps1','LfoL3Runtime.ps
     . $l3Module
 }
 
+$script:L4Runtime = $null
+$script:L4ArmedReview = $null
+if ($script:Config.ContainsKey('Epistemic')) {
+    foreach ($l4ModuleName in @(
+        'LfoEpistemicStore.ps1',
+        'LfoEpistemicObservatory.ps1',
+        'LfoEpistemicInteractionAnalytics.ps1',
+        'LfoEpistemicPolicyCapsule.ps1',
+        'LfoEpistemicIntervention.ps1',
+        'LfoEpistemicRuntime.ps1'
+    )) {
+        $l4Module = Join-Path $PSScriptRoot $l4ModuleName
+        if (-not (Test-Path -LiteralPath $l4Module)) { throw "L4 module not found: $l4Module" }
+        . $l4Module
+    }
+}
+
 $ThinkEnabled = [bool]$Think
 Initialize-QwenMemoryConfiguration `
     $ContextLengthHint `
@@ -143,6 +160,41 @@ function Test-Ollama {
         Write-Host "Ollama is not responding at $BaseUri." -ForegroundColor Red
         Write-Host "Start Ollama in another console first (for example: .\launch\Start-Ollama.ps1)."
         exit 1
+    }
+}
+
+function Write-LfoEpistemicStatus {
+    if ($null -eq $script:L4Runtime) {
+        Write-Host '[l4: not configured]' -ForegroundColor DarkGray
+        return
+    }
+    $status=Get-LfoEpistemicRuntimeStatus $script:L4Runtime
+    Write-Host ("[l4: configured={0}; available={1}; auto-policy=OFF; auto-intervention=OFF; explicit-review={2}; explicit-one-shot={3}; armed={4}]" -f `
+        $status.Configured,$status.Available,$status.AllowExplicitReview,$status.AllowExplicitOneShotIntervention,($null -ne $script:L4ArmedReview)) -ForegroundColor DarkGray
+    if($status.Error){Write-Host ('[l4 error: '+$status.Error+']') -ForegroundColor Yellow}
+}
+
+function Invoke-LfoEpistemicReviewCommand([switch]$ArmNext) {
+    if ($null -eq $script:L4Runtime) {
+        Write-Host '[l4: not configured]' -ForegroundColor Yellow
+        return
+    }
+    $lastTurn=[Math]::Max(0,([int]$script:RuntimeState.next_turn_id-1))
+    $window=8
+    if($script:Config.Epistemic.ContainsKey('WindowTurns')){$window=[int]$script:Config.Epistemic.WindowTurns}
+    $review=Get-LfoEpistemicRuntimeReview -Runtime $script:L4Runtime -Epoch ([int]$script:RuntimeState.epoch) -LastTurn $lastTurn -WindowTurns $window -EnableIntervention:$ArmNext
+    $supportCount=@($review.Support).Count
+    Write-Host ("[l4 review: status={0}; decision={1}; reason={2}; support={3}; intervention={4}]" -f `
+        $review.Status,$review.Decision,$review.ReasonCode,$supportCount,$review.InterventionActive) -ForegroundColor DarkCyan
+    if($review.Error){Write-Host ('[l4 review error: '+$review.Error+']') -ForegroundColor Yellow}
+    if($ArmNext){
+        if([string]$review.Status -ceq 'ok' -and [bool]$review.InterventionActive){
+            $script:L4ArmedReview=$review
+            Write-Host '[l4: one-shot intervention armed for the next local first-pass model request]' -ForegroundColor DarkCyan
+        }else{
+            $script:L4ArmedReview=$null
+            Write-Host '[l4: no active one-shot intervention was armed]' -ForegroundColor DarkGray
+        }
     }
 }
 
@@ -534,12 +586,20 @@ function Invoke-LfoChatApi([string]$Phase, [string]$Body) {
 }
 
 function Invoke-QwenLocalApi {
+    param([string]$EpistemicInstruction='')
     # Distinguish PowerShell prompt/schema construction from the HTTP model
     # request. Both FULL and COMPACT share identical instrumentation.
     $prepareSw = [Diagnostics.Stopwatch]::StartNew()
+    $requestMessages=@(Get-QwenConversationMessages)
+    if(-not [string]::IsNullOrWhiteSpace($EpistemicInstruction)){
+        if($requestMessages.Count -lt 1 -or [string]$requestMessages[0].role -cne 'system'){throw 'L4 one-shot requires a system message boundary.'}
+        $system=[string]$requestMessages[0].content
+        $system += [Environment]::NewLine+[Environment]::NewLine+'EXPLICIT ONE-SHOT EPISTEMIC INTERVENTION:'+[Environment]::NewLine+$EpistemicInstruction
+        $requestMessages[0]=@{role='system';content=$system}
+    }
     $bodyObj = @{
         model      = $Model
-        messages   = @(Get-QwenConversationMessages)
+        messages   = $requestMessages
         think      = $script:ThinkEnabled
         stream     = $false
         keep_alive = '5m'
@@ -747,6 +807,8 @@ function Invoke-Qwen([string]$Prompt) {
     $memoryRecoveryReason = $null
     $memoryRecoverySuccess = $null
     $memoryNoteSource = 'single-pass'
+    $l4ArmedAtStart = $script:L4ArmedReview
+    $l4Attempted = $false
     $stageSources = New-Object 'System.Collections.Generic.List[object]'
     $finalProducer = 'WRAPPER'
     $finalPhase = 'wrapper'
@@ -758,7 +820,16 @@ function Invoke-Qwen([string]$Prompt) {
     } else {
         # Qwen routes and answers in one schema-constrained generation. On
         # LOCAL the same generation also carries the bounded memory micro-note.
-        $r = Invoke-QwenLocalApi
+        $l4Instruction=''
+        if($null -ne $l4ArmedAtStart -and [bool]$l4ArmedAtStart.InterventionActive){$l4Instruction=[string]$l4ArmedAtStart.Instruction}
+        try{
+            $r = Invoke-QwenLocalApi -EpistemicInstruction $l4Instruction
+        }finally{
+            if(-not [string]::IsNullOrWhiteSpace($l4Instruction)){
+                $l4Attempted=$true
+                $script:L4ArmedReview=$null
+            }
+        }
         $localPostSw = [Diagnostics.Stopwatch]::StartNew()
         Show-QwenThinking $r
         $candidate = Get-CleanQwenContent $r
@@ -1004,6 +1075,8 @@ $recentContext
 
     if (-not [string]::IsNullOrWhiteSpace($finalContent)) {
         Add-LfoL0StageSource $stageSources 'FINAL' 'FINAL_RESPONSE' $finalPhase $finalProducer $finalContent 'delivered' 'assistant'
+        $l4Trace=$null
+        if($null -ne $script:L4Runtime){$l4Trace=New-LfoEpistemicRuntimeTurnTrace -Runtime $script:L4Runtime -ArmedReview $l4ArmedAtStart -Attempted:$l4Attempted}
         Persist-TurnAndMemory `
             -StageSources $stageSources.ToArray() `
             -Prompt $Prompt `
@@ -1023,17 +1096,24 @@ $recentContext
             -MemoryRecoveryUsed $memoryRecoveryUsed `
             -MemoryRecoveryReason $memoryRecoveryReason `
             -MemoryRecoverySuccess $memoryRecoverySuccess `
-            -MemoryNoteSource $memoryNoteSource
+            -MemoryNoteSource $memoryNoteSource `
+            -EpistemicTrace $l4Trace
     }
 }
 
 
 Initialize-PersistentMemory
+if($script:Config.ContainsKey('Epistemic')){
+    $script:L4Runtime=Initialize-LfoEpistemicRuntime -Config $script:Config -LogDirectory $script:LogDir
+    if($script:L4Runtime.Configured -and -not $script:L4Runtime.Available){
+        Write-Host ('[l4 unavailable: '+$script:L4Runtime.Error+']') -ForegroundColor Yellow
+    }
+}
 $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.4-dev4 (observable context assembly; optional L2 retrieval). Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "Qwen local chat integrated build candidate. Commands: /exit, /clear, /paste, /think on, /think off, /l4 status, /l4 review, /l4 next, /l4 cancel"
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
@@ -1056,7 +1136,8 @@ while ($true) {
         }
         '^/clear$' {
             Clear-PersistentConversationMemory
-            Write-Host "Working memory and active conversation context cleared. Historical logs retained."
+            $script:L4ArmedReview=$null
+            Write-Host "Working memory and active conversation context cleared. Historical logs retained. Any armed L4 one-shot was cancelled."
             continue
         }
         '^/paste$' {
@@ -1077,6 +1158,23 @@ while ($true) {
         '^/think\s+off$' {
             $ThinkEnabled = $false
             Write-Host "Thinking disabled."
+            continue
+        }
+        '^/l4\s+status$' {
+            Write-LfoEpistemicStatus
+            continue
+        }
+        '^/l4\s+review$' {
+            Invoke-LfoEpistemicReviewCommand
+            continue
+        }
+        '^/l4\s+next$' {
+            Invoke-LfoEpistemicReviewCommand -ArmNext
+            continue
+        }
+        '^/l4\s+cancel$' {
+            $script:L4ArmedReview=$null
+            Write-Host '[l4: one-shot intervention cancelled]' -ForegroundColor DarkGray
             continue
         }
         '^\s*$' {

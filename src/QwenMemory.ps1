@@ -1404,7 +1404,8 @@ function Persist-TurnAndMemory(
     [string]$MemoryRecoveryReason,
     $MemoryRecoverySuccess,
     [string]$MemoryNoteSource,
-    [object[]]$StageSources = @()
+    [object[]]$StageSources = @(),
+    $EpistemicTrace = $null
 ) {
     if (-not $script:MemoryEnabled -and
         -not [bool]$script:Config.ResearchLogging.Enabled) {
@@ -1751,6 +1752,10 @@ function Persist-TurnAndMemory(
             dev5_l2_evidence_role = $(if (Test-LfoDev5LowerTrustL2EvidenceEligible) { 'user-data' } else { 'system-context' })
             retrieved_old_data = $retrievedBefore
             bias_signals = @()
+        }
+
+        if ($null -ne $EpistemicTrace) {
+            $trace['epistemic'] = $EpistemicTrace
         }
 
         $trace['memory_note_source'] = $(if ([string]::IsNullOrWhiteSpace($MemoryNoteSource)) {
