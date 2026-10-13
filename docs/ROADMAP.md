@@ -49,12 +49,18 @@ synthetic 17-observation linked corpus with 17/17 L0 provenance resolution,
 and bounded deterministic pilot analytics. It adds no automatic detector,
 ordinary prompt injection, response intervention or mandatory model call.
 
-### Next: L4-A1 Observatory analytics
+### L4-A1 active — Observatory analytics
 
-Use the frozen R2 workflow as the evidence-producing layer and define the
-smallest useful longitudinal/interaction analytic surface. Automatic detector
-work should follow only after the analytic targets are explicit enough to
-evaluate; Balancer policy/intervention remains deferred.
+A1-A defines the bounded Observatory contract in
+[L4_A1_OBSERVATORY_CONTRACT.md](L4_A1_OBSERVATORY_CONTRACT.md) and
+`config/L4A1Observatory.contract.json`: explicit source-turn windows,
+antecedent→response linked transitions, recurrence across distinct turns,
+descriptive non-overlapping window comparison and bounded provenance
+drill-back.
+
+Next within A1: implement Q1-Q5 read-only and validate them on deterministic
+fixtures. No automatic detector, prompt injection, Balancer intervention or
+mandatory model call is part of A1.
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED
