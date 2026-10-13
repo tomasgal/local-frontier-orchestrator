@@ -26,4 +26,7 @@ $fake=[pscustomobject]@{observation_id='0123456789abcdef0123456789abcdef';observ
 $writer={param($c,$d,$o)$script:n++;$script:ids+=,[string]$o.observation_id;if($script:n -eq 1){[pscustomobject]@{outcome='UNKNOWN'}}else{[pscustomobject]@{outcome='ALREADY_EXISTS'}}}
 $retry=Invoke-LfoL4ObservationWrite ([pscustomobject]@{}) ([IO.Path]::GetTempPath()) $fake $writer
 Assert ($retry.Retried -and $retry.NewSignal -and $retry.Outcome -eq 'ALREADY_EXISTS') 'retry did not converge';Assert ($script:ids[0] -ceq $script:ids[1]) 'retry changed id'
+$script:LfoL4State.SignalTurns=3;$script:LfoL4State.LastAnalyticsTurn=9;$script:LfoL4State.PendingIntervention=[pscustomobject]@{Decision='REVIEW_FRAMING';Instruction='x';SourceTurn=9}
+Reset-LfoL4RuntimeSession
+Assert ($script:LfoL4State.SignalTurns -eq 0 -and $script:LfoL4State.LastAnalyticsTurn -eq 0 -and $null -eq $script:LfoL4State.PendingIntervention) 'session reset retained cross-epoch trigger/intervention state'
 Write-Host ("L4_RUNTIME_DETECTOR_PASS: checks={0}; positives={1}; negatives={2}; false_positives={3}; ModelCalls=0; D1Calls=0" -f $script:checks,$positives.Count,$negatives.Count,$fp)

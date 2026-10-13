@@ -236,3 +236,14 @@ function Add-LfoL4InterventionToSystemText([string]$SystemText){
     return $SystemText+[Environment]::NewLine+[Environment]::NewLine+'L4 BOUNDED RESPONSE REVIEW (current response only; not user history):'+[Environment]::NewLine+$instruction
 }
 function Complete-LfoL4RuntimeTurn {if($null -ne $script:LfoL4State){$script:LfoL4State.CurrentIntervention=$null}}
+
+function Reset-LfoL4RuntimeSession {
+    if($null -eq $script:LfoL4State){return}
+    $script:LfoL4State.SignalTurns=0
+    $script:LfoL4State.LastSignalTurn=0
+    $script:LfoL4State.LastAnalyticsTurn=0
+    $script:LfoL4State.CurrentIntervention=$null
+    $script:LfoL4State.PendingIntervention=$null
+    $script:LfoL4State.LastResult=$null
+    Write-LfoL4RuntimeStatus 'session -> RESET; historical R1 retained'
+}
