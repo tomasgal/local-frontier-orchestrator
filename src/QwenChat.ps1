@@ -85,7 +85,7 @@ if (-not (Test-Path -LiteralPath $l2ReadModule)) {
 . $l2ReadModule
 
 $telemetryModule = Join-Path $PSScriptRoot 'LfoTurnTelemetry.ps1'
-if (-not (Test-Path -LiteralPath $telemetryModule)) { throw "Dev4 telemetry module not found: $telemetryModule" }
+if (-not (Test-Path -LiteralPath $telemetryModule)) { throw "LFO telemetry module not found: $telemetryModule" }
 . $telemetryModule
 
 $memoryModule = Join-Path $PSScriptRoot 'QwenMemory.ps1'
@@ -1033,16 +1033,20 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.4-dev4 (observable context assembly; optional L2 retrieval). Commands: /exit, /clear, /paste, /think on, /think off"
-Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
-Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
-Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
+Write-Host "Local Frontier Orchestrator - local chat | v9.6 integrated baseline" -ForegroundColor Cyan
+Write-Host "Local model: Qwen via Ollama; ordinary turns stay local when routing allows."
+Write-Host "Frontier escalation: ask_codex is read-only and limited to at most one call per user turn."
+Write-Host "Routing: deterministic hard gates plus Qwen LOCAL/FRONTIER routing; the local model has no direct Ollama tool access."
+Write-Host ("Thinking: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
+Write-Host "Commands: /exit, /clear, /paste, /think on, /think off"
 if ($script:MemoryEnabled) {
-    Write-Host ("Persistent memory: ON; recent turns={0}; compact at pending>={1} notes or >={2} chars; note<={3} chars; state<={4} chars" -f `
+    Write-Host ("Memory: ON; recent turns={0}; compact at pending>={1} notes or >={2} chars; note<={3} chars; state<={4} chars" -f `
         $script:MemoryRecentTurns, $script:MemoryCompactionMaxPendingNotes, $script:MemoryCompactionMaxPendingChars, $script:MemoryNoteMaxChars, $script:MemoryStateMaxChars)
     Write-Host ("Exact-data retrieval: max {0} items / {1} chars" -f `
         $script:MemoryRetrievalMaxItems, $script:MemoryRetrievalMaxChars)
-    Write-Host ("Memory/log path: {0}" -f $script:DataRoot)
+    Write-Host ("Local memory/log path: {0}" -f $script:DataRoot)
+} else {
+    Write-Host "Memory: OFF"
 }
 Write-Host ""
 
