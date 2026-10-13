@@ -504,7 +504,10 @@ Write-Host ('SurrealDB:    '+$SurrealVersion+' @ '+$surrealBase) -ForegroundColo
 Write-Host ('Working dir:   '+$WorkingDirectory) -ForegroundColor Green
 Write-Host ''
 Write-Host 'Start LFO from the working directory with:' -ForegroundColor Cyan
+Write-Host ("  Set-Location '"+(Quote-PsSingle $WorkingDirectory)+"'")
 Write-Host '  .\Start-LFO-GPU.ps1'
 Write-Host '  .\Start-LFO-CPU.ps1'
 Write-Host ''
+Write-Host 'Opening the working directory in Windows Explorer...' -ForegroundColor Cyan
+try { Start-Process explorer.exe -ArgumentList ('"'+$WorkingDirectory+'"') | Out-Null } catch { Warn ("Unable to open Explorer: "+$_.Exception.Message) }
 Write-Host 'The first clean-build acceptance should be executed through these installed-tree launchers, not from a development checkout.'
