@@ -25,6 +25,17 @@ if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) { throw "LFO instal
 $state = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json
 $monitor = Join-Path $state.AppRoot 'launch\Watch-LFOService.ps1'
 
+Write-Host ''
+Write-Host 'Local Frontier Orchestrator (LFO) - Windows runtime' -ForegroundColor Cyan
+Write-Host 'Integrated baseline: v9.6 | Windows bootstrap/build candidate'
+Write-Host 'Local-first path: Qwen via Ollama handles ordinary conversation and routing.'
+Write-Host 'Frontier path: authenticated Codex CLI is called only when routing/policy requires stronger or fresh external reasoning.'
+Write-Host 'Memory path: local L0/L1/L2/L3 state preserves conversation evidence, working memory and structured retrieval.'
+Write-Host 'L4 datastore: SurrealDB endpoint is prepared for epistemic observability; automatic intervention is not enabled by this launcher.'
+Write-Host 'Service policy: reuse compatible running services where safe; do not stop unrelated services.'
+Write-Host ("Selected profile: {0}" -f $Profile)
+Write-Host ''
+
 # Ollama: reuse a compatible existing listener. If absent, start the configured executable visibly.
 $ollamaUri = [string]$state.Ollama.BaseUri
 $ollamaReady = $false
@@ -66,10 +77,12 @@ $env:LFO_L4_RUNTIME_CREDENTIAL = [string]$state.SurrealDB.RuntimeCredentialPath
 $env:LFO_L4_OBSERVABILITY = '1'
 $chat = Join-Path $state.AppRoot 'src\QwenChat.ps1'
 $config = [string]$state.LFO.ConfigPath
-Write-Host "Starting LFO profile=$Profile model=$model" -ForegroundColor Cyan
-Write-Host "Ollama:   $ollamaUri"
+Write-Host "Runtime ready." -ForegroundColor Green
+Write-Host "Profile:   $Profile"
+Write-Host "Model:     $model"
+Write-Host "Ollama:    $ollamaUri"
 Write-Host "SurrealDB: $surrealUri"
-Write-Host "Config:   $config"
+Write-Host "Config:    $config"
 Write-Host ''
 & $chat -Model $model -ConfigPath $config -ContextLengthHint $ctx
 exit $LASTEXITCODE
