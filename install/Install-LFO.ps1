@@ -112,6 +112,9 @@ function Download-Verified([string]$Uri,[string]$Destination,[string]$Sha256) {
             }
         }
         $output.Flush($true)
+        $output.Dispose(); $output=$null
+        $input.Dispose(); $input=$null
+        $response.Dispose(); $response=$null
         $sw.Stop()
         Write-Progress -Activity ("Downloading "+$name) -Completed
         Info ("Downloaded {0:N1} MiB; verifying SHA-256..." -f ($done/1MB))
@@ -377,8 +380,17 @@ if(-not $SkipModelPull){
 Step 'Resolve SurrealDB runtime: reuse compatible 3.3.0 binary, otherwise provision pinned binary'
 $surrealCandidates=New-Object Collections.Generic.List[string]
 if($env:LFO_SURREAL_EXE){$surrealCandidates.Add($env:LFO_SURREAL_EXE)}
+if($oldState -and $oldState.SurrealDB -and $oldState.SurrealDB.Executable){$surrealCandidates.Add([string]$oldState.SurrealDB.Executable)}
 foreach($n in @('surreal.exe','surreal')){$p=Resolve-CommandPath $n;if($p){$surrealCandidates.Add($p)}}
 $managedSurreal=Join-Path $RuntimeRoot ('surrealdb-'+$SurrealVersion+'\surreal.exe');$surrealCandidates.Add($managedSurreal)
+# Generic bounded discovery for portable SurrealDB runtimes under LocalAppData.
+foreach($pattern in @('*\surreal.exe','*\*\surreal.exe','*\*\*\surreal.exe','*\*\*\*\surreal.exe')) {
+    try {
+        foreach($item in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -File -ErrorAction SilentlyContinue)) {
+            if($item.FullName){$surrealCandidates.Add($item.FullName)}
+        }
+    } catch {}
+}
 try { foreach($p in @(Get-Process surreal -ErrorAction SilentlyContinue|ForEach-Object{$_.Path})){if($p){$surrealCandidates.Insert(0,$p)}} } catch {}
 $surrealExe=$null
 foreach($candidate in @($surrealCandidates|Select-Object -Unique)){if((Get-SurrealExeVersion $candidate) -eq [version]$SurrealVersion){$surrealExe=[IO.Path]::GetFullPath($candidate);break}}
