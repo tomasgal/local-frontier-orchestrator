@@ -143,6 +143,25 @@ explicit L4 activation without unintended state mutation.
 Broader/cross-host replication remains valuable follow-up research/deployment
 evidence, but it is not a prerequisite for constructing or accepting this
 implementation-cycle build.
+
+### Planned v10.0 — flexible frontier client layer
+
+The current reference implementation intentionally standardizes the frontier
+path on OpenAI Codex CLI. The Windows bootstrap detects Codex and, when it is
+absent, offers to install the official Codex client or exit installation.
+Codex is suitable as the reference dependency because it is available across
+ChatGPT plans including Free and Go, subject to plan-specific usage limits.
+
+For **v10.0**, plan a provider-flexible frontier client/adapter layer so that
+the LFO orchestration contract is no longer tied to one concrete frontier CLI
+or TUI. The architectural target is one LFO build with swappable frontier
+adapters behind a stable text/request boundary.
+
+No specific alternative client is committed for v10.0 until it has been
+implemented and validated against the LFO safety, isolation, routing,
+synthesis, and provenance contracts. The current Codex path remains the only
+supported reference frontier backend for this implementation cycle.
+
 ### Historical roadmap and evidence
 
 The dated material below records development history. Earlier NEXT/PENDING/PAUSED
