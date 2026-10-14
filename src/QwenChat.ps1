@@ -1080,7 +1080,7 @@ while ($true) {
             } else { Write-Host '[L4 analysis unavailable.]' }
             continue
         }
-        '^/exit
+        '^/exit$' {
             exit 0
         }
         '^/clear$' {
