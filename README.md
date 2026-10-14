@@ -244,35 +244,35 @@ The L4 substrate is now documented through frozen R1/R2/A1/D1/A2/P1/P2 baselines
 
 ```text
 .
-â”śâ”€â”€ README.md
-â”śâ”€â”€ .gitignore
-â”śâ”€â”€ config/
-â”‚   â”śâ”€â”€ host.example.psd1
-â”‚   â””â”€â”€ QwenChat.config.psd1
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── ROADMAP.md
-│   ├── WINDOWS_BOOTSTRAP_BUILD.md
-│   ├── NOTEBOOK_SETUP.md
-│   ├── MEMORY_AND_LOGGING.md
-│   ├── MEMORY_STRATEGY.md
-│   ├── L2_FROZEN_BASELINE.md
-│   ├── L3_FROZEN_BASELINE.md
-│   ├── L4_RECORDING_MANUAL_ANALYSIS.md
-│   ├── HUMAN_AI_BIAS_BALANCER.md
-│   ├── GENERIC_EPISTEMIC_MEDIATOR.md
-│   └── archive/
-├── policy/
-â”‚   â”śâ”€â”€ orchestrator-system.txt
-â”‚   â”śâ”€â”€ synthesis-system.txt
-â”‚   â””â”€â”€ frontier-subagent.txt
-â”śâ”€â”€ launch/
-â”‚   â”śâ”€â”€ QwenChat.bat
-â”‚   â”śâ”€â”€ Start-Ollama.bat
-â”‚   â””â”€â”€ Start-Ollama.ps1
-â””â”€â”€ src/
-    â”śâ”€â”€ QwenChat.ps1
-    â””â”€â”€ QwenMemory.ps1
+|-- README.md
+|-- install/
+|   `-- Install-LFO.ps1
+|-- launch/
+|   |-- Start-LFO.ps1
+|   |-- Start-LFO-CPU.ps1
+|   |-- Start-LFO-GPU.ps1
+|   `-- View-LFOConversationLog.ps1
+|-- config/
+|   `-- QwenChat.config.psd1
+|-- policy/
+|-- schema/
+|   `-- L4Observations.surql
+|-- src/
+|   |-- QwenChat.ps1
+|   |-- QwenMemory.ps1
+|   `-- LfoL4Runtime.ps1
+|-- tests/
+`-- docs/
+    |-- ARCHITECTURE.md
+    |-- ROADMAP.md
+    |-- WINDOWS_BOOTSTRAP_BUILD.md
+    |-- NOTEBOOK_SETUP.md
+    |-- MEMORY_AND_LOGGING.md
+    |-- MEMORY_STRATEGY.md
+    |-- L4_RECORDING_MANUAL_ANALYSIS.md
+    |-- HUMAN_AI_BIAS_BALANCER.md
+    |-- GENERIC_EPISTEMIC_MEDIATOR.md
+    `-- archive/
 ```
 
 ## Hardware and storage requirements
@@ -298,14 +298,21 @@ The 8 GB RAM result is a **compatibility/portability baseline, not a performance
 
 ## Software requirements
 
-The current Windows reference implementation assumes:
+For the supported Windows bootstrap path:
 
-- Windows PowerShell 5.1 or compatible PowerShell;
-- Ollama available locally;
-- a local chat model installed in Ollama;
-- OpenAI Codex CLI installed and authenticated if frontier escalation is required.
+- Windows PowerShell 5.1 on a supported Windows 10/11 system;
+- the Windows `winsqlite3.dll` ABI used by the project;
+- network access for source/runtime/model acquisition when a compatible local
+  copy is not already available.
 
-The scripts avoid hard-coded personal paths. Runtime paths can be supplied through command-line parameters or environment variables.
+The bootstrap can use Git when present and otherwise falls back to a GitHub
+source archive. It reuses or provisions compatible Ollama and SurrealDB
+runtimes. If Codex CLI is missing, it offers to run the official Codex Windows
+installer; Codex authentication is still required before FRONTIER requests can
+succeed.
+
+Normal users do not need Node.js, npm, Codex Router, a separately cloned
+repository, or a manually created Ollama alias merely to install LFO.
 
 ## Quick start
 

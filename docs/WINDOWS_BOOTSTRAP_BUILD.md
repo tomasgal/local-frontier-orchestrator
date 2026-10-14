@@ -4,6 +4,10 @@ Status: **ACCEPTED WINDOWS BOOTSTRAP — CLEAN INSTALLED-TREE ACCEPTANCE PASSED 
 
 This document describes the Windows bootstrap packaging for the published **LFO v9.6.1 runtime contract**. The immutable `v9.6.1` tag remains the runtime release evidence boundary; `main` carries the accepted installer/service packaging.
 
+## Source selection
+
+The normal installer defaults to `SourceRef = 'main'`, which is the canonical accepted packaging/source line. `-SourceRef <commit-or-ref>` remains available for pinned acceptance or reconstruction work.
+
 ## Runtime contract
 
 The installed runtime provides Qwen 3.5 4B via Ollama, OpenAI Codex CLI as the current reference frontier adapter, SQLite through `winsqlite3.dll`, SurrealDB 3.3.0, v9.6.1 conservative post-L0 L4 recording, explicit `/analyze` bounded A1/A2 reads, and P1/P2 response intervention **OFF**. L4 remains fail-open with respect to ordinary chat.

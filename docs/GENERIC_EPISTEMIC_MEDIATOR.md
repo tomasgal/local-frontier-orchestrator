@@ -324,7 +324,7 @@ The evaluation should preserve stochastic variation. A fixed seed can be useful 
 
 ## 8. Candidate mediator contract
 
-Before the LFO implementation is frozen, a technology-neutral contract is preferable.
+The LFO storage/analytics substrate is now frozen enough to host experiments, but the **mediator research contract should remain independently versioned and technology-light** so measurement definitions do not become accidental consequences of one runtime implementation.
 
 Candidate inputs:
 
