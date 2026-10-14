@@ -28,6 +28,91 @@ on demand with a three-second timeout per request; errors leave chat operational
 Missing/invalid configuration reports UNAVAILABLE and requires configuration
 repair and a chat restart. A transient DB outage needs no restart.
 
+### Candidate detector tuning (not implemented in v9.6.1)
+
+The current v9.6.1 T1 detector has no user-facing sensitivity parameter. Its
+matching rules are intentionally conservative and are hard-coded in
+`Get-LfoL4TurnObservationType`. A future implementation could expose either a
+named profile:
+
+```powershell
+L4 = @{
+    Enabled = $true
+    DetectorProfile = 'conservative'   # conservative | expanded
+}
+```
+
+or a small ordinal sensitivity setting:
+
+```powershell
+DetectorSensitivity = 1   # 1=conservative, 2=expanded
+```
+
+These are **candidate interfaces, not active configuration keys**. They should
+not both become independent controls; implementation should choose one canonical
+interface and map it to an explicit, testable ruleset. The intended meaning is
+limited to breadth of detection: `conservative` preserves the current
+false-negative-preferring rules, while `expanded` may recognize a broader set
+of semantically equivalent formulations. It must not silently turn a deterministic
+signal detector into a personality classifier or a generic bias score.
+
+Current implementation points on `main` (2026-10-14; function names are
+authoritative if line numbers later move):
+
+- `config/QwenChat.config.psd1:10` — current `L4` configuration block. Add
+  `DetectorProfile` or `DetectorSensitivity` here when the interface is
+  implemented.
+- `src/QwenChat.ps1:1036-1039` — QwenChat reads `Config.L4` and passes the
+  complete hashtable to `Initialize-LfoL4Recording`; no separate transport path
+  is required for a new L4 key.
+- `src/LfoL4Runtime.ps1:48-71` — `Initialize-LfoL4Recording`. Validate the
+  profile/sensitivity here and preserve the resolved setting in
+  `$script:LfoL4Recording`.
+- `src/LfoL4Runtime.ps1:74-90` — `Get-LfoL4TurnObservationType`. This is the
+  actual deterministic T1 ruleset. Profile-dependent rule expansion belongs
+  here (or in helper functions called from here).
+- `src/LfoL4Runtime.ps1:93-108` — `Invoke-LfoL4RecordTurn` calls the detector
+  and creates the R1 observation. Pass the resolved profile/sensitivity into the
+  detector here and bump `DetectorVersion` if detector semantics change.
+- `tests/Test-LfoL4Recording.ps1:12-28` — current positive/negative T1 fixtures.
+  Add explicit conservative and expanded-profile cases here before promotion.
+  Conservative negatives must remain negatives unless the profile explicitly
+  changes their contract.
+
+### Bias magnitude is a separate measurement problem
+
+Detector sensitivity only changes **which candidate events are annotated**. It
+does not measure how strong a bias-related effect is. A future research output
+might look like:
+
+```text
+FRAMING magnitude = 0.32
+ASYMMETRY magnitude = 0.71
+SYCOPHANCY shift = 0.18
+```
+
+Such values require an explicit reference/control condition and a
+phenomenon-specific metric. They must not be produced by simply assigning a
+numeric weight to the current regex match. The existing R1 `confidence` field
+is detector confidence and must not be overloaded as bias magnitude.
+
+Relevant implementation points for a future magnitude design are:
+
+- `src/LfoEpistemicStore.ps1:69-106` — canonical R1 observation construction;
+  currently includes optional `confidence`, but no magnitude field.
+- `schema/L4Observations.surql:1-30` — SurrealDB R1 schema. A persisted
+  per-observation magnitude would require an explicit schema/version decision
+  here and matching canonical serialization in `Add-LfoEpistemicObservation`
+  (`src/LfoEpistemicStore.ps1:163-190`).
+- `src/LfoEpistemicObservatory.ps1:98-160` — A1 window aggregation; currently
+  counts annotations and provenance but computes no magnitude.
+- `src/LfoEpistemicInteractionAnalytics.ps1:105-215` — A2 interaction analytics;
+  this is a natural place for a **derived** magnitude from paired/control
+  observations if the metric is defined at interaction/window level rather than
+  stored in each R1 record.
+- `docs/GENERIC_EPISTEMIC_MEDIATOR.md`, section 4 — research definition of bias
+  magnitude as deviation from an explicit reference/control condition.
+
 ## Behavior and limits
 
 T1 handles short direct Slovak/English user instructions to request only

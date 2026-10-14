@@ -104,6 +104,30 @@ framed prompt   -> response distribution B
 bias magnitude = measured shift attributable to the framing manipulation
 ```
 
+A future implementation may expose phenomenon-specific measurements such as:
+
+```text
+FRAMING magnitude = 0.32
+ASYMMETRY magnitude = 0.71
+SYCOPHANCY shift = 0.18
+```
+
+These numbers are examples of an output shape only. They are not produced by
+v9.6.1 and must not be interpreted as calibrated probabilities. Each quantity
+needs its own explicit reference/control condition and metric.
+
+For implementation work, keep detector breadth separate from magnitude
+measurement. A simple candidate detector-tuning interface may be
+`L4.DetectorProfile = 'conservative' | 'expanded'` (or, alternatively, an
+ordinal `DetectorSensitivity = 1 | 2`). The exact current code touchpoints are
+documented in `docs/L4_RECORDING_MANUAL_ANALYSIS.md`: configuration at
+`config/QwenChat.config.psd1:10`, detector rules in
+`src/LfoL4Runtime.ps1:74-90`, detector invocation/recording in
+`src/LfoL4Runtime.ps1:93-108`, and deterministic fixtures in
+`tests/Test-LfoL4Recording.ps1:12-28`. Magnitude storage or derivation would
+instead touch the R1 schema/store and/or A1/A2 analytics; it must not reuse the
+existing R1 `confidence` field as a surrogate magnitude.
+
 Possible measures include:
 
 - change in agreement with a false prior;
