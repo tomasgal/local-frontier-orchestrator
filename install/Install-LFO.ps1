@@ -628,7 +628,7 @@ $statePath=Join-Path $ConfigRoot 'install-state.json'
 [IO.File]::WriteAllText($statePath,($state|ConvertTo-Json -Depth 12),$utf8)
 
 Step 'Publish easy launchers inside the install tree'
-foreach($name in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1')){
+foreach($name in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1','View-LFOConversationLog.ps1')){
     $src=Join-Path $AppRoot ('launch\'+$name);Assert-Lfo (Test-Path -LiteralPath $src -PathType Leaf) "Required launcher missing from source: $name"
     Copy-Item -LiteralPath $src -Destination (Join-Path $LaunchRoot $name) -Force
 }
@@ -659,6 +659,7 @@ Write-Host '  Start-LFO-CPU.bat   (double-click or Command Prompt)'
 Write-Host '  Start-LFO-GPU.bat   (double-click or Command Prompt)'
 Write-Host '  .\Start-LFO-CPU.ps1 (PowerShell)'
 Write-Host '  .\Start-LFO-GPU.ps1 (PowerShell)'
+Write-Host '  .\View-LFOConversationLog.ps1 (current-month turn log viewer)'
 Write-Host ''
 Write-Host 'No shortcuts are created outside the LFO install tree; create any Windows shortcuts where you prefer.'
 Write-Host 'Opening the LFO launch directory in Windows Explorer...' -ForegroundColor Cyan
