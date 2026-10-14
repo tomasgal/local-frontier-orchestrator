@@ -5,11 +5,15 @@
     CodexTimeoutSec = 300
     HistoryMaxMessages = 12
 
+    # Existing R1 service and current-user credential; no automatic DB bootstrap.
+    # Launchers may supply LFO_L4_ENDPOINT / LFO_L4_RUNTIME_CREDENTIAL instead.
+    L4 = @{ Enabled = $true; Endpoint = ''; CredentialPath = '' }
+
     Memory = @{
         Enabled = $true
-        # Optional L0 source-stage capture for future L4 observation provenance.
+        # L0 source-stage capture required for L4 observation provenance.
         # Independent of ResearchLogging; no extra model call or prompt data.
-        L0StageSourcesEnabled = $false
+        L0StageSourcesEnabled = $true
         DataDirectory = '%LOCALAPPDATA%\LocalFrontierOrchestrator'
 
         # Shared semantics; host launchers may override capacity parameters.

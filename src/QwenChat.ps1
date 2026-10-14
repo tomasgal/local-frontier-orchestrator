@@ -1005,6 +1005,7 @@ $recentContext
     if (-not [string]::IsNullOrWhiteSpace($finalContent)) {
         Add-LfoL0StageSource $stageSources 'FINAL' 'FINAL_RESPONSE' $finalPhase $finalProducer $finalContent 'delivered' 'assistant'
         Persist-TurnAndMemory `
+            -PostL0 $script:LfoL4PostL0 `
             -StageSources $stageSources.ToArray() `
             -Prompt $Prompt `
             -FinalContent $finalContent `
@@ -1029,11 +1030,28 @@ $recentContext
 
 
 Initialize-PersistentMemory
+$script:LfoL4PostL0=$null
+$script:LfoL4Loaded=$false
+try {
+    . (Join-Path $PSScriptRoot 'LfoL4Runtime.ps1')
+    $l4Settings=@{}
+    if($script:Config.ContainsKey('L4')){$l4Settings=$script:Config.L4}
+    $l4State=Initialize-LfoL4Recording -LogDirectory $script:LogDir -ProvenanceEnabled $script:L0StageSourcesEnabled -Settings $l4Settings
+    $script:LfoL4Loaded=$true
+    Write-Host ('[L4 recording: '+$l4State.Status+'; analysis: /analyze; P2 OFF]')
+    if($l4State.Status -ceq 'CONFIGURED'){
+        $script:LfoL4PostL0={
+            param($Row,$SourceFile)
+            $result=Invoke-LfoL4RecordTurn -Row $Row -SourceFile $SourceFile
+            Write-Host ("[L4 turn={0}: {1}]" -f $Row.turn_id,$result.Status) -ForegroundColor DarkGray
+        }
+    }
+} catch { Write-Host '[L4 unavailable; chat continues.]' -ForegroundColor Yellow }
 $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.4-dev4 (observable context assembly; optional L2 retrieval). Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "Qwen local chat v9.6.1. Commands: /exit, /clear, /paste, /think on, /think off, /analyze [1..100 turns]"
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
@@ -1051,6 +1069,12 @@ while ($true) {
     if ($null -eq $prompt) { continue }
 
     switch -Regex ($prompt.Trim()) {
+        '^/analyze(?:\s|$)' {
+            if($script:LfoL4Loaded){
+                Invoke-LfoL4AnalyzeCommand -Command $prompt -Epoch ([int]$script:RuntimeState.epoch) -LastTurn ([int]$script:RuntimeState.next_turn_id-1)
+            } else { Write-Host '[L4 analysis unavailable.]' }
+            continue
+        }
         '^/exit$' {
             exit 0
         }

@@ -1,28 +1,44 @@
 # Local Frontier Orchestrator
 
-**Current integrated baseline (2026-10-13): L0–L3 remain FIXED/CLOSED for their accepted scope, the bounded L4 research stack through P2 is CLOSED/FROZEN for its stated scopes, and L4-I1 end-to-end integration evidence is ACCEPTED. LFO remains functional without L4. Automatic L4 runtime intervention remains OFF by default; the next engineering gate is a clean Windows bootstrap/build acceptance.**
+**Current version: [v9.6.1](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.1) (2026-10-14).** Ordinary QwenChat records conservative L4 observations after L0 provenance is saved. Analysis runs on demand through `/analyze`. The maintainer confirmed the live Windows workflow and authorized this release.
 
-**Integrated `main`:** the accepted L0–L3 implementation history and the frozen L4 research milestones are now integrated into the default branch. The latest bounded L4 checkpoint is [`v9.6-l4-p2-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6-l4-p2-frozen); frozen milestone tags remain immutable and authoritative for their exact evidence boundaries.
+## v9.6.1: L4 recording and manual analysis
 
-**Branch integration:** the former L4 development line is now integrated into `main`. This does not enable L4 intervention in production: research closure, runtime deployment and cross-host replication remain separate decisions.
+- **Automatic recording:** deterministic T1 emits `FRAMING`, `ASYMMETRIC_EVIDENCE_REQUEST`, or ABSTAIN for short, explicit Slovak/English user instructions. Each observation links to its exact L0 turn/stage and content hash. Assistant text is outside this classifier's scope; observations are reported signals, not proven bias or user traits.
+- **Manual analysis:** `/analyze` summarizes the last 8 turn IDs in the current epoch; `/analyze 20` changes the window (1–100). The existing A1/A2 chain reports counts, recurrence and up to 12 source references without a model call. No automatic T2 trigger is used.
+- **Response behavior:** P1/P2 response intervention is disconnected and P2 stays OFF. D1 remains offline. L4 works with LOCAL conversations and has no FRONTIER dependency. L4 errors leave ordinary chat operational.
+- **Bounded reads:** no ordinary-turn L4 analytics reads. Explicit analysis uses the frozen A1/A2 capped-epoch readers (200 records, pages of 50), then selects the turn window. Exceeding the cap reports an unavailable analysis instead of a partial result.
+
+### Enable recording
+
+Use an existing initialized R1 SurrealDB 3.3.0 service and its current-user runtime credential. Set `L4.Endpoint` and `L4.CredentialPath` in the chat config, or supply `LFO_L4_ENDPOINT` and `LFO_L4_RUNTIME_CREDENTIAL`. `LFO_L4_ENABLED=1` enables recording; `0` disables it. The shipped config enables L4 recording and L0 stage-source capture, but leaves connection details empty. Custom configs need `Memory.Enabled` and `Memory.L0StageSourcesEnabled` enabled explicitly. Missing configuration leaves L4 unavailable and chat functional. This release creates no service, database schema or credentials automatically.
+
+Startup `CONFIGURED` confirms settings were loaded. Per-turn `CREATED` confirms an R1 write; `UNKNOWN` means the write could not be confirmed. ABSTAIN performs no R1 I/O. `/clear` starts a new conversation epoch and retains historical observations.
+
+See [configuration, limits and live test steps](docs/L4_RECORDING_MANUAL_ANALYSIS.md) and [I1 extraction evidence](docs/L4_V961_GATE1.md).
+
+### Validation and release scope
+
+- Windows PowerShell 5.1 / SurrealDB 3.3.0 recording and command-loop suite: **33/33 PASS**, including real isolated R1 writes, source drill-back, idempotent replay, manual read-only analysis and failure isolation.
+- Preserved I1 regression: **128/128 PASS**, including **108/108 pre-inference checks**; adapter checks **8/8 PASS**. Gate 1 also compared **45 output artifact pairs** against the recovered original I1 harness.
+- Automated validation used **zero model inference calls** and **zero FRONTIER calls**.
+- Live Windows chat/manual-analysis operation: **maintainer-reported success on 2026-10-14**. This adds no cross-host replication or general detector-accuracy claim.
+
+The release implements the revised recording/manual-analysis scope. Automatic rare triggers and response interventions are not release requirements. The separate Windows bootstrap development branches remain separate; this tag publishes the tested source and configuration.
+
+## Accepted research baselines
 
 | Layer | Accepted role and status |
 | --- | --- |
-| **L0 - FIXED** | Authoritative conversation JSONL and source provenance. The accepted patch adds optional USER/LOCAL/FRONTIER/FINAL stage-source capture, including synthesis, answer recovery and actual final-answer producer. |
-| **L1 - FIXED** | Single-pass semantic micro-memory and pressure-triggered compaction; accepted existing behavior retained. |
-| **L2 - CLOSED/FROZEN** | Typed current/historical factual state and accepted selective read/write safeguards; immutable tag [`v9.4-l2-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.4-l2-frozen). |
-| **L3 - CLOSED/FROZEN** | Reconstructible faceted retrieval/index over L0/L2, bounded context, baseline fallback and verified L0 byte locators; immutable tag [`v9.5-l3-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.5-l3-frozen). Accepted milestone complete (100%). |
-| **L4 - P2 FROZEN; I1 INTEGRATION ACCEPTED** | R1 store, R2 annotation pilot, A1/A2 analytics, D1 detector experiment, P1 policy capsule and P2 bounded intervention experiment are frozen for their stated scopes. I1 additionally proved the integrated L0 provenance -> SurrealDB -> analytics -> policy -> intervention -> real local-model path with full reverse provenance. Runtime intervention remains default-OFF. |
+| **L0** | Authoritative conversation JSONL and USER/LOCAL/FRONTIER/FINAL provenance. v9.6.1 adds an isolated post-L0 callback and enables source-stage capture in the shipped config. |
+| **L1** | Single-pass semantic micro-memory and pressure-triggered compaction; accepted behavior retained. |
+| **L2** | Typed current/historical factual state and selective read/write safeguards; immutable [`v9.4-l2-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.4-l2-frozen). |
+| **L3** | Reconstructible faceted retrieval/index and bounded context with baseline fallback; immutable [`v9.5-l3-frozen`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.5-l3-frozen). |
+| **L4 research** | R1/R2/A1/A2/D1/P1/P2 retain their frozen research scopes. [Accepted I1](docs/L4_I1_INTEGRATION_EVIDENCE.md) demonstrated the prepared-observation chain through a real local model. v9.6.1 reuses its integration logic for ordinary recording and manual analytics. |
 
-**L4 integration state:** see [P2 frozen baseline](docs/L4_P2_FROZEN_BASELINE.md), [experiment design](docs/L4_P2_INTERVENTION_EXPERIMENT.md), [evaluation results](docs/L4_P2_EVALUATION_RESULTS.md), and [accepted I1 integration evidence](docs/L4_I1_INTEGRATION_EVIDENCE.md). P2's frozen decision remains `PROMISING_BOUNDED_EFFECT`. I1 closes the end-to-end integration evidence gap; clean bootstrap/build acceptance is the next engineering gate, while broader/cross-host replication remains a separate research/deployment evidence class.
+Frozen milestone tags, policy rules, intervention text and historical evidence remain unchanged. P2's frozen decision is `PROMISING_BOUNDED_EFFECT`; its [integrity compatibility contract](docs/L4_P2_INTEGRITY_COMPATIBILITY.md) remains in place. Frozen research evidence and the v9.6.1 operational release have distinct scopes.
 
-**P2 packaging repair:** current development code includes [integrity compatibility v1](docs/L4_P2_INTEGRITY_COMPATIBILITY.md), which verifies the original accepted map across Git line-ending representations. Frozen tags, policy rules, intervention text and historical evidence remain unchanged.
-
-**Fix policy:** keep L0-L3 stable while L4 is developed. The L0 provenance patch is accepted and the resulting baseline is fixed again. Reopen an accepted layer only for a demonstrated material defect or an explicitly versioned new research scope; never move frozen tags. L0/L1 are fixed by this accepted checkpoint and scope decision; no separate L0/L1 frozen tags are claimed. Production use is an operational acceptance decision, not a claim of universal reliability or measured performance on every host.
-
-**L0 patch validation:** 10 synthetic scenarios / 20 OFF-ON variants passed on Linux PowerShell 7 and Windows PowerShell, with **0 real model calls** and **production memory untouched**. The tests cover initial responses, synthesis, recovery, frontier fallback/failure, final-producer attribution, fresh-process reads, and L3 locator/scan evidence parity without stage-data leakage. Stage capture works independently of research logging and adds no model call. `Memory.L0StageSourcesEnabled` remains **false by default**; publishing the patch does not enable it in an existing deployment. Existing L2/L3 opt-in defaults are also preserved.
-
-**Start here:** [L0 patch contract](https://github.com/tomasgal/local-frontier-orchestrator/blob/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd/docs/L0_STAGE_SOURCE_CAPTURE.md) | [L2 frozen contract](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_BASELINE.md) | [L3 frozen contract](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.5-l3-frozen/docs/L3_FROZEN_BASELINE.md) | [L4 design and R1 scope](https://github.com/tomasgal/local-frontier-orchestrator/blob/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd/docs/L4_EPISTEMIC_OBSERVATORY_DESIGN.md) | [Current development roadmap](https://github.com/tomasgal/local-frontier-orchestrator/blob/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd/docs/ROADMAP.md).
+**Start here:** [L0 source contract](docs/L0_STAGE_SOURCE_CAPTURE.md) | [L2 baseline](docs/L2_FROZEN_BASELINE.md) | [L3 baseline](docs/L3_FROZEN_BASELINE.md) | [L4 runtime guide](docs/L4_RECORDING_MANUAL_ANALYSIS.md) | [P2 research baseline](docs/L4_P2_FROZEN_BASELINE.md).
 
 DEV5's architecture-first optimization direction was materially informed by Daniel Correa Villa's *Pushing Four Raspberry Pis to the Memory Wall* (DOI `10.5281/zenodo.20357376`). LFO transfers the general principle of eliminating unnecessary work and context/data movement before hardware-specific tuning; it does not claim a reproduction of the paper or transfer of its Raspberry Pi measurements. The exact accepted mapping is documented in [docs/DEV5_IMPLEMENTATION_SUMMARY.md](docs/DEV5_IMPLEMENTATION_SUMMARY.md).
 
@@ -181,7 +197,7 @@ See [`docs/HUMAN_AI_BIAS_BALANCER.md`](docs/HUMAN_AI_BIAS_BALANCER.md).
 
 A narrower **generic, non-personalized mediation** workstream is documented in [`docs/GENERIC_EPISTEMIC_MEDIATOR.md`](docs/GENERIC_EPISTEMIC_MEDIATOR.md). It focuses on operationalizing observable interaction-level phenomena, measuring **bias magnitude relative to explicit reference/control conditions** rather than assigning a generic risk score, defining auditable pre/post-response interventions, and evaluating direct versus mediated interaction on reproducible benchmarks. Candidate implementation ideas that are not yet frozen are collected in [`docs/CANDIDATE_SOLUTION_DESIGNS.md`](docs/CANDIDATE_SOLUTION_DESIGNS.md).
 
-The active L4 milestone is **Epistemic Observatory & Balancer**, with `EpistemicObservation` as its core object. Bias is one observation class; framing or presupposition are not automatically biases. L4 will use SurrealDB (`lfo / epistemic / observations`) as its canonical observation store, while full conversation sources remain in L0. Its default design is **write-mostly, read-rarely**. Observations are separate from L2 factual evidence; implicit future use may supply only a bounded policy capsule after a rare trigger.
+L4 uses `EpistemicObservation` as its core object and SurrealDB (`lfo / epistemic / observations`) as its canonical store; full conversation sources remain in L0. v9.6.1 implements write-mostly recording with explicit `/analyze` reads. Observations remain separate from L2 factual evidence. Framing and presupposition are not automatically biases.
 
 **L4-R1 scope:** runtime/store contract, observation schema, source provenance, create/read APIs and isolated persistence/restart tests. Automatic interventions, answer rewrites, persistent user profiling, graph/vector features and continuous prompt injection are outside R1. The [current L4 design](https://github.com/tomasgal/local-frontier-orchestrator/blob/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd/docs/L4_EPISTEMIC_OBSERVATORY_DESIGN.md) governs this milestone; [earlier research notes](docs/L4_RESEARCH_ANALYSIS.md) remain background. **SurrealDB and L4 are not dependencies of the working L0-L3 baseline.**
 
@@ -251,7 +267,7 @@ The scripts avoid hard-coded personal paths. Runtime paths can be supplied throu
 
 ## Quick start
 
-For the complete accepted L0-L3 version, first use the [published baseline checkpoint](https://github.com/tomasgal/local-frontier-orchestrator/tree/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd). A default checkout of `main` still runs the older v9.3 code. Existing host-specific settings and opt-in switches must be selected explicitly; the commands below do not migrate or enable them.
+Use the [v9.6.1 release](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.1) for the current L0-L4 recording/manual-analysis source. Select host-specific model settings explicitly and configure R1 as described above; existing installations are not migrated automatically.
 
 Start Ollama:
 
@@ -303,9 +319,9 @@ The transport path is working:
 local model -> ask_codex -> native Codex frontier -> local model
 ```
 
-**L0-L3 are fixed and accepted for current production use.** LOCAL/FRONTIER routing, synthesis and persistent memory operate without L4. The latest accepted combined checkpoint is `2d80f1d` on `v9.6-l4-l0-provenance`; the L0 patch and its Windows acceptance are complete. L2 and L3 retain their immutable frozen tags.
+**v9.6.1 is the current operational release.** LOCAL/FRONTIER routing, synthesis and persistent memory continue to operate independently of L4 availability. Ordinary L4 recording and manual analysis are now integrated; L2/L3 immutable research baselines remain unchanged.
 
-Development now proceeds to **L4-R1: Epistemic Observation Store**. L4 implementation remains separate from the accepted lower-layer semantics. The fixed baseline is not reopened for routine tuning while L4 is under development. This README-only update leaves the v9.3 runtime on `main` unchanged.
+Further detector coverage, automatic analytics scheduling and response intervention require separate scope and validation. The accepted v9.6.1 behavior is conservative recording plus manual `/analyze`.
 
 ## License
 
