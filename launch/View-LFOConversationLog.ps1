@@ -1,6 +1,6 @@
 param(
     [string]$InstallRoot,
-    [ValidatePattern('^\\d{4}-\\d{2}$')][string]$Month = (Get-Date -Format 'yyyy-MM')
+    [ValidatePattern('^\d{4}-\d{2}$')][string]$Month = (Get-Date -Format 'yyyy-MM')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -8,7 +8,7 @@ if ([string]::IsNullOrWhiteSpace($InstallRoot)) {
     $InstallRoot = Split-Path -Parent $PSScriptRoot
 }
 
-$logPath = Join-Path $InstallRoot ("data\\memory\\logs\\conversation-{0}.jsonl" -f $Month)
+$logPath = Join-Path $InstallRoot ("data\memory\logs\conversation-{0}.jsonl" -f $Month)
 if (-not (Test-Path -LiteralPath $logPath -PathType Leaf)) {
     throw "Conversation log not found: $logPath"
 }
