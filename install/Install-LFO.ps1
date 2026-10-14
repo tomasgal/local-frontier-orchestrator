@@ -423,7 +423,7 @@ $preferredStores=@(
     $env:LFO_OLLAMA_MODELS,
     $env:OLLAMA_MODELS
 )
-$preExistingAliasStore=Resolve-LfoAliasModelStore @($ollamaStoreCandidates) $preferredStores
+$preExistingAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates) -Preferred $preferredStores
 if($preExistingAliasStore){Info "Existing shared LFO Ollama model store: $preExistingAliasStore"}
 
 # Prefer a compatible already-running API only when it does not conflict with a
@@ -533,7 +533,7 @@ if(-not $SkipModelPull){
                 }
             } catch {}
         }
-        $resolvedAliasStore=Resolve-LfoAliasModelStore @($ollamaStoreCandidates) @($ollamaModelsDir,$preExistingAliasStore,$env:LFO_OLLAMA_MODELS,$env:OLLAMA_MODELS)
+        $resolvedAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates) -Preferred @($ollamaModelsDir,$preExistingAliasStore,$env:LFO_OLLAMA_MODELS,$env:OLLAMA_MODELS)
         Assert-Lfo $resolvedAliasStore 'Both LFO aliases exist through the Ollama API, but their shared filesystem model store could not be resolved. Set LFO_OLLAMA_MODELS to the intended Ollama model directory and rerun the bootstrap.'
         $ollamaModelsDir=$resolvedAliasStore
         Info "Shared LFO Ollama model store: $ollamaModelsDir"
