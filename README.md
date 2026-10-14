@@ -2,9 +2,9 @@
 
 **Current version: [v9.6.1](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.1) (2026-10-14).** Ordinary QwenChat records conservative L4 observations after L0 provenance is saved. Analysis runs on demand through `/analyze`. The maintainer confirmed the live Windows workflow and authorized this release.
 
-## Windows bootstrap candidate for v9.6.1
+## Windows bootstrap for v9.6.1
 
-The development branch `build/windows-bootstrap-v1` is synchronized with the v9.6.1 runtime contract and adds the Windows installer/service launchers that are intentionally not part of the immutable `v9.6.1` tag. Clean installed-tree acceptance is still required before this bootstrap is promoted as stable.
+The Windows bootstrap is integrated into `main` for the v9.6.1 runtime contract. The immutable `v9.6.1` tag remains the runtime release/evidence boundary; `main` additionally carries the tested Windows installer and service launchers. Clean installed-tree Windows acceptance passed on 2026-10-14.
 
 The installer:
 
@@ -21,13 +21,13 @@ From Windows PowerShell 5.1, choose the bootstrap command for the profile you wa
 **CPU bootstrap** — forces the default LFO launcher to use the CPU model profile (`num_gpu 0`, 5120-token context):
 
 ~~~powershell
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/build/windows-bootstrap-v1/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile CPU
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/main/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile CPU
 ~~~
 
 **GPU bootstrap** — makes the GPU model profile the default (`num_gpu 99`, 8192-token context; Ollama performs the actual supported GPU offload):
 
 ~~~powershell
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/build/windows-bootstrap-v1/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile GPU
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/main/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile GPU
 ~~~
 
 Both bootstrap paths install/reuse the same LFO runtime and prepare **both** CPU and GPU model aliases and launchers. `-Profile` selects the default profile recorded for the installation; `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain explicit overrides. The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` only when you intentionally need a separate installation, such as an isolated acceptance tree. `-SkipL4Acceptance` is for explicit troubleshooting only and is not part of the normal install path.
@@ -54,7 +54,7 @@ See [configuration, limits and live test steps](docs/L4_RECORDING_MANUAL_ANALYSI
 - Automated validation used **zero model inference calls** and **zero FRONTIER calls**.
 - Live Windows chat/manual-analysis operation: **maintainer-reported success on 2026-10-14**. This adds no cross-host replication or general detector-accuracy claim.
 
-The release implements the revised recording/manual-analysis scope. Automatic rare triggers and response interventions are not release requirements. The separate Windows bootstrap development branches remain separate; this tag publishes the tested source and configuration.
+The release implements the revised recording/manual-analysis scope. Automatic rare triggers and response interventions are not release requirements. The immutable `v9.6.1` tag publishes the tested runtime source and configuration; Windows bootstrap packaging is maintained on `main`.
 
 ## Accepted research baselines
 

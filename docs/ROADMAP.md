@@ -12,7 +12,7 @@ limitations and reopen criteria.
 
 **v9.6.1 is published** as the operational recording/manual-analysis release. Ordinary QwenChat now performs conservative post-L0 T1 recording into R1 and supports explicit bounded `/analyze` A1/A2 reads. D1 remains offline and P1/P2 response intervention remains OFF.
 
-The active packaging gate is the Windows bootstrap candidate on `build/windows-bootstrap-v1`. It is synchronized with the v9.6.1 runtime contract, reuses/provisions Ollama and SurrealDB, generates isolated L4 configuration/credentials, and runs the deterministic 33-check recording suite. The next decision point is **clean installed-tree Windows acceptance**; packaging acceptance does not reopen frozen L0-L3 or frozen L4 research milestones.
+The Windows bootstrap for v9.6.1 passed clean installed-tree acceptance on 2026-10-14 and is integrated into `main`. It reuses/provisions Ollama and SurrealDB, generates isolated L4 configuration/credentials, creates CPU/GPU launch profiles, and runs the deterministic 33-check recording suite. Packaging acceptance does not reopen frozen L0-L3 or frozen L4 research milestones.
 
 ### L3 closure
 

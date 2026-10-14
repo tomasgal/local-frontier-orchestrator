@@ -1,8 +1,8 @@
 # Windows bootstrap build v1 — v9.6.1 runtime
 
-Status: **DEVELOPMENT CANDIDATE — CLEAN INSTALLED-TREE ACCEPTANCE PENDING**
+Status: **ACCEPTED WINDOWS BOOTSTRAP — CLEAN INSTALLED-TREE ACCEPTANCE PASSED 2026-10-14**
 
-This branch is the Windows bootstrap packaging line for the published **LFO v9.6.1 runtime contract**. It carries the v9.6.1 runtime changes plus installer/service launchers. The immutable `v9.6.1` tag remains the release evidence boundary; this branch adds packaging only.
+This document describes the Windows bootstrap packaging for the published **LFO v9.6.1 runtime contract**. The immutable `v9.6.1` tag remains the runtime release evidence boundary; `main` carries the accepted installer/service packaging.
 
 ## Runtime contract
 
@@ -40,4 +40,4 @@ The published v9.6.1 suite expects **33/33 PASS** and uses deterministic LOCAL f
 
 Run the installer from Windows PowerShell 5.1 into a clean isolated root. Acceptance requires source acquisition, SQLite PASS, Ollama readiness/model aliases, SurrealDB 3.3.0 discovery or verified provisioning, isolated datastore/schema and credentials, generated v9.6.1 L4 config, deterministic recording-suite PASS, installed launchers, live L4 `CONFIGURED`, and a LOCAL recording plus explicit `/analyze` from the installed tree.
 
-Do not merge this bootstrap branch into `main` or call the packaging stable until the clean installed-tree acceptance result has been reviewed.
+Clean installed-tree acceptance was reviewed and passed on 2026-10-14, including bootstrap completion, deterministic 33-check L4 recording acceptance, installed-tree GPU launcher startup, live LOCAL routing, two live L4 `CREATED` writes, and `/analyze` readback with exact L0 references.
