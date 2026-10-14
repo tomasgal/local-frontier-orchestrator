@@ -2,6 +2,7 @@
 param(
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'LFO'),
     [string]$SourceRef = 'build/windows-bootstrap-v1',
+    [ValidateSet('CPU','GPU')][string]$Profile = 'GPU',
     [string]$BaseModel = 'qwen3.5:4b-q4_K_M',
     [switch]$SkipModelPull,
     [switch]$SkipL4Acceptance
@@ -621,7 +622,7 @@ $state=[ordered]@{
     Ollama=[ordered]@{Executable=$ollamaExe;ExecutableVersion=[string]$ollamaExeVersion;ApiVersion=$ollamaApiVersion;Managed=$ollamaManaged;BaseUri=$ollamaBase;HostAddress=$hostAddress;ModelsDirectory=$ollamaModelsDir;BaseModel=$BaseModel;GPUModel=$GpuModel;CPUModel=$CpuModel}
     SurrealDB=[ordered]@{Executable=$surrealExe;Version=$SurrealVersion;SHA256=$surrealHash;Managed=$surrealManaged;BaseUri=$surrealBase;Port=$surrealPort;DataDirectory=$surrealData;BootstrapCredentialPath=$bootstrapCredPath;RuntimeCredentialPath=$runtimeCredPath;Namespace='lfo';Database='epistemic'}
     Frontier=[ordered]@{CodexDetected=[bool]$codexPath;CodexExecutable=$codexPath;CodexVersion=$codexVersion;AdapterSelection='PENDING'}
-    LFO=[ordered]@{RuntimeContract=$RuntimeContract;ConfigPath=$installConfigPath;MemoryDirectory=$memoryDir;L0StageSourcesEnabled=$true;L4RecordingEnabled=$true;L4Acceptance=$l4Acceptance}
+    LFO=[ordered]@{RuntimeContract=$RuntimeContract;DefaultProfile=$Profile;ConfigPath=$installConfigPath;MemoryDirectory=$memoryDir;L0StageSourcesEnabled=$true;L4RecordingEnabled=$true;L4Acceptance=$l4Acceptance}
 }
 $statePath=Join-Path $ConfigRoot 'install-state.json'
 [IO.File]::WriteAllText($statePath,($state|ConvertTo-Json -Depth 12),$utf8)
@@ -644,6 +645,7 @@ Step 'Bootstrap complete'
 Write-Host ('Install root:  '+$InstallRoot) -ForegroundColor Green
 Write-Host ('Source:        '+$SourceCommit) -ForegroundColor Green
 Write-Host ('Runtime:       '+$RuntimeContract) -ForegroundColor Green
+Write-Host ('Profile:       '+$Profile+' (default; CPU/GPU launchers both installed)') -ForegroundColor Green
 Write-Host ('SQLite:       PASS '+$sqliteVersion) -ForegroundColor Green
 Write-Host ('Ollama:       '+$ollamaApiVersion+' @ '+$ollamaBase) -ForegroundColor Green
 Write-Host ('SurrealDB:    '+$SurrealVersion+' @ '+$surrealBase) -ForegroundColor Green

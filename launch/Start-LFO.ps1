@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('GPU','CPU')][string]$Profile = 'GPU',
+    [ValidateSet('GPU','CPU')][string]$Profile,
     [string]$InstallRoot,
     [switch]$NoChat
 )
@@ -24,6 +24,9 @@ function Open-Monitor([string]$Service,[string]$BaseUri,[string]$MonitorPath) {
 $statePath = Join-Path $InstallRoot 'config\install-state.json'
 if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) { throw "LFO install state not found: $statePath. Run Install-LFO.ps1 first." }
 $state = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json
+if ([string]::IsNullOrWhiteSpace($Profile)) {
+    if ($state.LFO -and $state.LFO.DefaultProfile -in @('CPU','GPU')) { $Profile = [string]$state.LFO.DefaultProfile } else { $Profile = 'GPU' }
+}
 $monitor = Join-Path $state.AppRoot 'launch\Watch-LFOService.ps1'
 
 Write-Host ''

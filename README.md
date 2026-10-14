@@ -16,13 +16,21 @@ The installer:
 - runs the deterministic v9.6.1 L4 recording suite by default (**33 checks, zero model/FRONTIER calls**);
 - exposes CPU/GPU launchers for the same installed source tree.
 
-From Windows PowerShell 5.1:
+From Windows PowerShell 5.1, choose the bootstrap command for the profile you want to use by default.
+
+**CPU bootstrap** — forces the default LFO launcher to use the CPU model profile (`num_gpu 0`, 5120-token context):
 
 ~~~powershell
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/build/windows-bootstrap-v1/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1"
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/build/windows-bootstrap-v1/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile CPU
 ~~~
 
-The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` for an isolated acceptance installation. `-SkipL4Acceptance` exists only for explicit troubleshooting; normal acceptance must not use it.
+**GPU bootstrap** — makes the GPU model profile the default (`num_gpu 99`, 8192-token context; Ollama performs the actual supported GPU offload):
+
+~~~powershell
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/build/windows-bootstrap-v1/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile GPU
+~~~
+
+Both bootstrap paths install/reuse the same LFO runtime and prepare **both** CPU and GPU model aliases and launchers. `-Profile` selects the default profile recorded for the installation; `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain explicit overrides. The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` only when you intentionally need a separate installation, such as an isolated acceptance tree. `-SkipL4Acceptance` is for explicit troubleshooting only and is not part of the normal install path.
 
 ## v9.6.1: L4 recording and manual analysis
 
