@@ -8,6 +8,22 @@ This document describes the Windows bootstrap packaging for the published **LFO 
 
 The normal installer defaults to `SourceRef = 'main'`, which is the canonical accepted packaging/source line. `-SourceRef <commit-or-ref>` remains available for pinned acceptance or reconstruction work.
 
+## Post-bootstrap launch behavior
+
+After all installation and deterministic acceptance steps succeed, the installer
+still opens the installed `launch` directory in Windows Explorer for convenient
+shortcut creation. Unless `-SkipLaunch` is supplied, it then starts a new
+PowerShell window using the selected profile's installed-tree launcher:
+
+```text
+-Profile CPU -> Start-LFO-CPU.ps1
+-Profile GPU -> Start-LFO-GPU.ps1
+```
+
+The automatic chat launch occurs only after the bootstrap has reached its
+successful completion boundary. Failure to open the chat window does not undo a
+completed installation; the installed launcher path is printed for manual use.
+
 ## Runtime contract
 
 The installed runtime provides Qwen 3.5 4B via Ollama, OpenAI Codex CLI as the current reference frontier adapter, SQLite through `winsqlite3.dll`, SurrealDB 3.3.0, v9.6.1 conservative post-L0 L4 recording, explicit `/analyze` bounded A1/A2 reads, and P1/P2 response intervention **OFF**. L4 remains fail-open with respect to ordinary chat.

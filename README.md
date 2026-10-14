@@ -14,23 +14,25 @@ The installer:
 - writes the L4 endpoint and runtime credential into the installed local config and also exports them to the launcher environment;
 - enables v9.6.1 L0 provenance and conservative L4 recording;
 - runs the deterministic v9.6.1 L4 recording suite by default (**33 checks, zero model/FRONTIER calls**);
-- exposes CPU/GPU launchers for the same installed source tree.
+- exposes CPU/GPU launchers for the same installed source tree;
+- opens the installed `launch` directory in Windows Explorer so shortcuts can be created easily;
+- after a successful bootstrap, automatically starts LFO/Qwen with the selected CPU or GPU profile.
 
 From Windows PowerShell 5.1, choose the bootstrap command for the profile you want to use by default.
 
-**CPU bootstrap** — forces the default LFO launcher to use the CPU model profile (`num_gpu 0`, 5120-token context):
+**CPU bootstrap** — selects the CPU model profile (`num_gpu 0`, 5120-token context) and automatically starts Qwen with that profile after a successful install:
 
 ~~~powershell
 Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/main/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile CPU
 ~~~
 
-**GPU bootstrap** — makes the GPU model profile the default (`num_gpu 99`, 8192-token context; Ollama performs the actual supported GPU offload):
+**GPU bootstrap** — selects the GPU model profile (`num_gpu 99`, 8192-token context; Ollama performs the actual supported GPU offload) and automatically starts Qwen with that profile after a successful install:
 
 ~~~powershell
 Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/main/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile GPU
 ~~~
 
-Both bootstrap paths install/reuse the same LFO runtime and prepare **both** CPU and GPU model aliases and launchers. `-Profile` selects the default profile recorded for the installation; `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain explicit overrides. The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` only when you intentionally need a separate installation, such as an isolated acceptance tree. `-SkipL4Acceptance` is for explicit troubleshooting only and is not part of the normal install path.
+Both bootstrap paths install/reuse the same LFO runtime and prepare **both** CPU and GPU model aliases and launchers. `-Profile` selects the default profile recorded for the installation and the profile that is launched automatically at the end. Windows Explorer still opens the installed `launch` directory so the user can create shortcuts wherever desired; `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain explicit overrides. The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` only when you intentionally need a separate installation, such as an isolated acceptance tree. `-SkipLaunch` suppresses only the final automatic Qwen launch; `-SkipL4Acceptance` is for explicit troubleshooting only and is not part of the normal install path.
 
 ## v9.6.1: L4 recording and manual analysis
 

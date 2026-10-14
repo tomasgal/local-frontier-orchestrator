@@ -5,7 +5,8 @@ param(
     [ValidateSet('CPU','GPU')][string]$Profile = 'GPU',
     [string]$BaseModel = 'qwen3.5:4b-q4_K_M',
     [switch]$SkipModelPull,
-    [switch]$SkipL4Acceptance
+    [switch]$SkipL4Acceptance,
+    [switch]$SkipLaunch
 )
 
 $ErrorActionPreference = 'Stop'
@@ -664,4 +665,17 @@ Write-Host ''
 Write-Host 'No shortcuts are created outside the LFO install tree; create any Windows shortcuts where you prefer.'
 Write-Host 'Opening the LFO launch directory in Windows Explorer...' -ForegroundColor Cyan
 try { Start-Process explorer.exe -ArgumentList ('"'+$installedLaunchDir+'"') | Out-Null } catch { Warn ("Unable to open Explorer: "+$_.Exception.Message) }
-Write-Host 'The first clean-build acceptance should be executed through these installed-tree launchers, not from a development checkout.'
+
+if($SkipLaunch){
+    Write-Host 'Automatic Qwen/LFO launch skipped (-SkipLaunch).' -ForegroundColor Yellow
+} else {
+    $selectedLauncherName = if($Profile -eq 'CPU') { 'Start-LFO-CPU.ps1' } else { 'Start-LFO-GPU.ps1' }
+    $selectedLauncher = Join-Path $installedLaunchDir $selectedLauncherName
+    Write-Host ("Starting LFO/Qwen with the selected {0} profile..." -f $Profile) -ForegroundColor Cyan
+    try {
+        Start-Process powershell.exe -WindowStyle Normal -ArgumentList @('-NoLogo','-NoProfile','-NoExit','-ExecutionPolicy','Bypass','-File',$selectedLauncher) | Out-Null
+    } catch {
+        Warn ("Installation completed, but automatic LFO/Qwen launch failed: "+$_.Exception.Message)
+        Write-Host ("Start it manually from: "+$selectedLauncher) -ForegroundColor Yellow
+    }
+}
