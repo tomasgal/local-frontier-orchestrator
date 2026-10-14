@@ -515,11 +515,18 @@ try{$c=New-LfoEpistemicConnection $surrealBase $runtimeCred;$null=Invoke-LfoEpis
 # even when install-state.json was not reached. Runtime credentials make the probe
 # installation-specific; an unrelated SurrealDB listener will not authenticate.
 if(-not $existingLfoDb){
-    foreach($candidatePort in 18080..18120){
+    $listeningRecoveryPorts=@()
+    try {
+        $listeningRecoveryPorts=@(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+            Where-Object { $_.LocalPort -ge 18080 -and $_.LocalPort -le 18120 } |
+            Select-Object -ExpandProperty LocalPort -Unique | Sort-Object)
+    } catch {}
+    if($listeningRecoveryPorts.Count){Info ("SurrealDB recovery: probing listening ports "+($listeningRecoveryPorts -join ', '))}
+    foreach($candidatePort in $listeningRecoveryPorts){
         if($candidatePort -eq $surrealPort){continue}
         $candidateBase='http://127.0.0.1:'+$candidatePort
         try {
-            $candidateConnection=New-LfoEpistemicConnection $candidateBase $runtimeCred
+            $candidateConnection=New-LfoEpistemicConnection $candidateBase $runtimeCred -TimeoutSec 2
             $null=Invoke-LfoEpistemicQuery $candidateConnection 'RETURN 1;'
             $candidateVersion=[string](Invoke-RestMethod -Uri ($candidateBase+'/version') -TimeoutSec 2)
             if($candidateVersion -match '(^|[- ])3\.3\.0($|[ +])'){
