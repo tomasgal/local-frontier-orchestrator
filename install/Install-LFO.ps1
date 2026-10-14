@@ -532,7 +532,11 @@ $configText=[regex]::Replace($configText,"(?m)^\s*BaseUri\s*=\s*'[^']*'","    Ba
 $configText=[regex]::Replace($configText,'(?m)^\s*L0StageSourcesEnabled\s*=\s*\$false','        L0StageSourcesEnabled = $true',1)
 $configText=[regex]::Replace($configText,"(?m)^\s*DataDirectory\s*=\s*'[^']*'","        DataDirectory = '"+(Quote-PsSingle $memoryDir)+"'",1)
 $l4Line="    L4 = @{ Enabled = `$true; Endpoint = '"+(Quote-PsSingle $surrealBase)+"'; CredentialPath = '"+(Quote-PsSingle $runtimeCredPath)+"' }"
-$configText=[regex]::Replace($configText,"(?m)^\s*L4\s*=\s*@\{[^\r\n]*\}$",$l4Line,1)
+$l4Pattern="(?m)^\s*L4\s*=\s*@\{[^\r\n]*\}$"
+$l4Matches=[regex]::Matches($configText,$l4Pattern)
+Assert-Lfo ($l4Matches.Count -eq 1) ("Expected exactly one L4 config line, found "+$l4Matches.Count+".")
+$l4Match=$l4Matches[0]
+$configText=$configText.Substring(0,$l4Match.Index)+$l4Line+$configText.Substring($l4Match.Index+$l4Match.Length)
 $installConfigPath=Join-Path $ConfigRoot 'QwenChat.install.local.psd1'
 [IO.File]::WriteAllText($installConfigPath,$configText,$utf8)
 $parsedInstallConfig=Import-PowerShellDataFile -LiteralPath $installConfigPath
