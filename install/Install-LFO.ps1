@@ -496,13 +496,53 @@ if(-not $bootstrapExists){
     Info 'Generated current-user DPAPI-protected SurrealDB credentials.'
 }
 $bootstrapCred=Import-Clixml -LiteralPath $bootstrapCredPath;$runtimeCred=Import-Clixml -LiteralPath $runtimeCredPath
+$surrealRuntimeMarker=Join-Path $ConfigRoot 'surreal-runtime.json'
 $surrealPort=18080
-if($oldState -and $oldState.SurrealDB -and $oldState.SurrealDB.Port){$surrealPort=[int]$oldState.SurrealDB.Port}
+if($oldState -and $oldState.SurrealDB -and $oldState.SurrealDB.Port){
+    $surrealPort=[int]$oldState.SurrealDB.Port
+} elseif(Test-Path -LiteralPath $surrealRuntimeMarker -PathType Leaf) {
+    try {
+        $runtimeMarker=Get-Content -LiteralPath $surrealRuntimeMarker -Raw -Encoding UTF8 | ConvertFrom-Json
+        if($runtimeMarker.Port){$surrealPort=[int]$runtimeMarker.Port}
+    } catch { Warn 'Ignoring unreadable SurrealDB runtime marker.' }
+}
 $surrealBase='http://127.0.0.1:'+$surrealPort
 . (Join-Path $AppRoot 'src\LfoEpistemicStore.ps1')
 $existingLfoDb=$false
 try{$c=New-LfoEpistemicConnection $surrealBase $runtimeCred;$null=Invoke-LfoEpistemicQuery $c 'RETURN 1;';$existingLfoDb=$true}catch{}
+
+# Recover a live installer-owned datastore after a partial prior bootstrap failure,
+# even when install-state.json was not reached. Runtime credentials make the probe
+# installation-specific; an unrelated SurrealDB listener will not authenticate.
 if(-not $existingLfoDb){
+    foreach($candidatePort in 18080..18120){
+        if($candidatePort -eq $surrealPort){continue}
+        $candidateBase='http://127.0.0.1:'+$candidatePort
+        try {
+            $candidateConnection=New-LfoEpistemicConnection $candidateBase $runtimeCred
+            $null=Invoke-LfoEpistemicQuery $candidateConnection 'RETURN 1;'
+            $candidateVersion=[string](Invoke-RestMethod -Uri ($candidateBase+'/version') -TimeoutSec 2)
+            if($candidateVersion -match '(^|[- ])3\.3\.0($|[ +])'){
+                $surrealPort=$candidatePort
+                $surrealBase=$candidateBase
+                $existingLfoDb=$true
+                Info "Recovered existing LFO SurrealDB datastore at $surrealBase"
+                break
+            }
+        } catch {}
+    }
+}
+
+if(-not $existingLfoDb){
+    $sameDatastoreProcesses=@()
+    try {
+        $sameDatastoreProcesses=@(Get-CimInstance Win32_Process -Filter "Name='surreal.exe'" -ErrorAction SilentlyContinue | Where-Object {
+            $_.CommandLine -and $_.CommandLine.IndexOf($surrealData,[StringComparison]::OrdinalIgnoreCase) -ge 0
+        })
+    } catch {}
+    if($sameDatastoreProcesses.Count -gt 0){
+        throw "An existing SurrealDB process already owns the LFO datastore at $surrealData, but the runtime credential probe could not recover its endpoint. Stop that process or repair the stored runtime marker before retrying."
+    }
     if(@(Get-NetTCPConnection -State Listen -LocalPort $surrealPort -ErrorAction SilentlyContinue).Count -gt 0){$surrealPort=Get-FreePort 18080;$surrealBase='http://127.0.0.1:'+$surrealPort}
     $serverScript=Join-Path $AppRoot 'tools\Start-LfoEpistemicServer.ps1'
     $code='$ErrorActionPreference=''Continue'';chcp 65001 > $null;$c=Import-Clixml -LiteralPath '''+(Quote-PsSingle $bootstrapCredPath)+''';$env:SURREAL_USER=$c.UserName;$env:SURREAL_PASS=$c.GetNetworkCredential().Password;Write-Host ''LFO SurrealDB foreground server. Live logs follow.'' -ForegroundColor Cyan;& '''+(Quote-PsSingle $serverScript)+''' -Binary '''+(Quote-PsSingle $surrealExe)+''' -DataDirectory '''+(Quote-PsSingle $surrealData)+''' -Port '+$surrealPort+' -LogLevel info;Write-Host (''SurrealDB exited: ''+$LASTEXITCODE) -ForegroundColor Yellow'
@@ -521,7 +561,9 @@ if(-not $runtimeSchemaReady){
     Info 'Initialized L4 SurrealDB schema and runtime user.'
 }
 $c=New-LfoEpistemicConnection $surrealBase $runtimeCred;$null=Invoke-LfoEpistemicQuery $c 'RETURN 1;'
+[IO.File]::WriteAllText($surrealRuntimeMarker,(@{Version=$SurrealVersion;Port=$surrealPort;BaseUri=$surrealBase;DataDirectory=$surrealData;UpdatedAt=[DateTime]::UtcNow.ToString('o')}|ConvertTo-Json -Compress),$utf8)
 Info "SurrealDB LFO datastore PASS: $surrealBase"
+Info "SurrealDB runtime marker: $surrealRuntimeMarker"
 
 Step 'Generate installed LFO configuration'
 $baseConfigPath=Join-Path $AppRoot 'config\QwenChat.config.psd1'
