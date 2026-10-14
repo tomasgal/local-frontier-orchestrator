@@ -2,9 +2,11 @@
 
 ## Testing a Local Epistemic Balancer in Human–Frontier-LLM Interaction
 
-**Status:** research concept / protocol under development
+**Status:** research concept / protocol under development; the supporting LFO L2-L4 substrate is implemented/frozen far enough to host bounded research prototypes, while validated debiasing efficacy remains an open research question.
 
 For the narrowed **generic, non-personalized mediation** workstream focused on operationalization, bias magnitude, benchmark design, and a bounded engineering prototype, see [GENERIC_EPISTEMIC_MEDIATOR.md](GENERIC_EPISTEMIC_MEDIATOR.md).
+
+**Reference implementation:** Local Frontier Orchestrator **v9.6.2** (Zenodo software archive DOI [`10.5281/zenodo.23373391`](https://doi.org/10.5281/zenodo.23373391)). The software archive establishes a reproducible implementation boundary; it is not itself evidence that the proposed mediator reduces bias.
 
 This research track uses Local Frontier Orchestrator as an experimental platform for studying reciprocal bias in Human–LLM interaction.
 
@@ -264,13 +266,29 @@ Initial work should avoid making political persuasion, clinical advice, identity
 
 ## 11. Research status
 
-This document is intentionally shorter than the full study design. The project is not yet a preregistered experiment and the implementation does not yet claim to provide validated debiasing.
+This document is intentionally shorter than the full study design. The project is not yet a preregistered experiment and the implementation does not claim validated debiasing efficacy.
 
-The current prototype already provides auditable policy/config separation, persistent conversational state, raw interaction traces, local/frontier intervention points, restart continuity, and validated historical-retrieval behaviour. The active memory work is now focused on L2 structured factual state, while L3 retrieval/resolution and L4 research-analysis remain planned architectural boundaries rather than implemented feature claims.
+The infrastructure boundary has advanced materially since the original concept note. In the accepted LFO line:
 
-The generic mediator workstream can therefore proceed now at the level of theory, operationalization, benchmark design, and interface specification, while implementation should avoid premature coupling to unstable L3/L4 details.
+- L2 is frozen at `v9.4-l2-frozen`;
+- L3 is frozen at `v9.5-l3-frozen`;
+- L4 R1/R2/A1/D1/A2/P1/P2 have frozen evidence boundaries;
+- v9.6.2 operationally preserves conservative post-L0 T1 recording of `FRAMING` / `ASYMMETRIC_EVIDENCE_REQUEST` and explicit bounded `/analyze` A1/A2 reads;
+- the broader D1 detector remains offline;
+- P1/P2 response intervention remains disconnected/OFF.
 
-Only after the relevant interfaces and bias-balancing policies are sufficiently stable should controlled human-subject and personalized-mediation experiments be frozen.
+The next research problem is therefore no longer to invent the L4 substrate. It is to validate a separately versioned **mediator research contract** on top of that substrate without retrofitting the frozen storage/retrieval layers around a desired result.
+
+The immediate research sequence is:
+
+1. define phenomenon-specific **bias magnitude** against explicit reference/control conditions;
+2. build paired/counterbalanced direct-versus-framed-versus-mediated benchmarks;
+3. evaluate a generic, non-personalized mediator first;
+4. measure false-intervention rate, appropriate reliance, evidence preservation, distortion, latency and model-call overhead;
+5. treat the existing R1 `confidence` field only as detector metadata, not as a bias-magnitude score;
+6. consider adaptive/personalized mediation only after the generic condition has defensible measurement and falsification criteria.
+
+Controlled human-subject and personalized-mediation studies should be frozen only after these operational definitions, benchmark conditions and intervention policies are stable enough to support preregistration or an equivalent protocol.
 
 ## Selected background
 
