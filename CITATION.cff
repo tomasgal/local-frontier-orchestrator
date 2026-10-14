@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "Local Frontier Orchestrator"
+type: software
+authors:
+  - family-names: "Gal"
+    given-names: "Tomas"
+version: "9.6.2"
+date-released: "2026-10-14"
+repository-code: "https://github.com/tomasgal/local-frontier-orchestrator"
+url: "https://github.com/tomasgal/local-frontier-orchestrator"
+abstract: >-
+  Local-first LLM orchestration runtime using Ollama/Qwen for local interaction
+  and an authenticated Codex CLI as a bounded on-demand frontier subagent, with
+  structured persistent memory, provenance, and conservative epistemic
+  observation tooling.
+keywords:
+  - "local-first AI"
+  - "LLM orchestration"
+  - "Ollama"
+  - "Qwen"
+  - "Codex"
+  - "epistemic observation"
+  - "human-AI interaction"

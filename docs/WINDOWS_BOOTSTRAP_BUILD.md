@@ -1,8 +1,8 @@
-# Windows bootstrap build v1 — v9.6.1 runtime
+# Windows bootstrap build v1 — v9.6.2 runtime
 
 Status: **ACCEPTED WINDOWS BOOTSTRAP — CLEAN INSTALLED-TREE ACCEPTANCE PASSED 2026-10-14**
 
-This document describes the Windows bootstrap packaging for the published **LFO v9.6.1 runtime contract**. The immutable `v9.6.1` tag remains the runtime release evidence boundary; `main` carries the accepted installer/service packaging.
+This document describes the Windows bootstrap packaging promoted into the **LFO v9.6.2 runtime contract**. v9.6.2 preserves the v9.6.1 L4 recording/manual-analysis semantics and adds the accepted installer/service packaging and shared model-store lifecycle to the immutable release boundary.
 
 ## Source selection
 
@@ -26,7 +26,7 @@ completed installation; the installed launcher path is printed for manual use.
 
 ## Runtime contract
 
-The installed runtime provides Qwen 3.5 4B via Ollama, OpenAI Codex CLI as the current reference frontier adapter, SQLite through `winsqlite3.dll`, SurrealDB 3.3.0, v9.6.1 conservative post-L0 L4 recording, explicit `/analyze` bounded A1/A2 reads, and P1/P2 response intervention **OFF**. L4 remains fail-open with respect to ordinary chat.
+The installed runtime provides Qwen 3.5 4B via Ollama, OpenAI Codex CLI as the current reference frontier adapter, SQLite through `winsqlite3.dll`, SurrealDB 3.3.0, v9.6.1-compatible conservative post-L0 L4 recording, explicit `/analyze` bounded A1/A2 reads, and P1/P2 response intervention **OFF**. L4 remains fail-open with respect to ordinary chat.
 
 ## Reuse before provisioning
 
@@ -42,7 +42,7 @@ The installer reuses a compatible running/installed Ollama runtime and existing 
 
 If a compatible Ollama listener is already running but does not expose a uniquely discovered existing LFO CPU/GPU alias store, the bootstrap leaves that listener untouched and starts an LFO listener on a free local port against the shared LFO store. After alias creation the exact store is written to `install-state.json`. Runtime startup verifies that both aliases are visible before chat begins, so model-store drift fails early with a diagnostic instead of failing during LOCAL or post-FRONTIER synthesis.
 
-## v9.6.1 L4 wiring
+## v9.6.2 L4 wiring (semantics inherited from v9.6.1)
 
 The installer verifies `src/LfoL4Runtime.ps1` and the recording test, generates a local config with L4 enabled, the actual isolated SurrealDB endpoint and runtime credential, L0 stage-source provenance enabled, and an installation-local memory directory. The launcher also exports `LFO_L4_ENABLED=1`, `LFO_L4_ENDPOINT` and `LFO_L4_RUNTIME_CREDENTIAL`.
 
@@ -56,11 +56,11 @@ Unless `-SkipL4Acceptance` is explicitly supplied, installation runs:
 tests/Test-LfoL4Recording.ps1 -SurrealBinary <detected-or-provisioned-surreal.exe>
 ~~~
 
-The published v9.6.1 suite expects **33/33 PASS** and uses deterministic LOCAL fixtures with **zero model inference and zero FRONTIER calls**. It exercises real isolated R1 writes, exact L0 drill-back, idempotent replay, manual read-only analysis and fail-open behavior.
+The v9.6.2 release gate retains the published v9.6.1 suite and expects **33/33 PASS** and uses deterministic LOCAL fixtures with **zero model inference and zero FRONTIER calls**. It exercises real isolated R1 writes, exact L0 drill-back, idempotent replay, manual read-only analysis and fail-open behavior.
 
 ## Clean acceptance
 
-Run the installer from Windows PowerShell 5.1 into a clean isolated root. Acceptance requires source acquisition, SQLite PASS, Ollama readiness/model aliases, SurrealDB 3.3.0 discovery or verified provisioning, isolated datastore/schema and credentials, generated v9.6.1 L4 config, deterministic recording-suite PASS, installed launchers, live L4 `CONFIGURED`, and a LOCAL recording plus explicit `/analyze` from the installed tree.
+Run the installer from Windows PowerShell 5.1 into a clean isolated root. Acceptance requires source acquisition, SQLite PASS, Ollama readiness/model aliases, SurrealDB 3.3.0 discovery or verified provisioning, isolated datastore/schema and credentials, generated v9.6.2 L4 config, deterministic recording-suite PASS, installed launchers, live L4 `CONFIGURED`, and a LOCAL recording plus explicit `/analyze` from the installed tree.
 
 Clean installed-tree acceptance was reviewed and passed on 2026-10-14, including bootstrap completion, deterministic 33-check L4 recording acceptance, installed-tree GPU launcher startup, live LOCAL routing, two live L4 `CREATED` writes, and `/analyze` readback with exact L0 references.
 

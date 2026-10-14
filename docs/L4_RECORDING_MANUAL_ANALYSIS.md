@@ -28,9 +28,9 @@ on demand with a three-second timeout per request; errors leave chat operational
 Missing/invalid configuration reports UNAVAILABLE and requires configuration
 repair and a chat restart. A transient DB outage needs no restart.
 
-### Candidate detector tuning (not implemented in v9.6.1)
+### Candidate detector tuning (not implemented in v9.6.2)
 
-The current v9.6.1 T1 detector has no user-facing sensitivity parameter. Its
+The current v9.6.2 T1 detector retains the v9.6.1 semantics and has no user-facing sensitivity parameter. Its
 matching rules are intentionally conservative and are hard-coded in
 `Get-LfoL4TurnObservationType`. A future implementation could expose either a
 named profile:
@@ -150,7 +150,7 @@ covered by the deterministic suite. No cross-host or efficacy claim is added.
 
 Run the modified `src/QwenChat.ps1` with your usual host config/model and the R1
 connection settings above. An older installed copy will not contain this patch.
-Use the published v9.6.1 source for this procedure.
+Use the published v9.6.2 source for this procedure; its L4 recording semantics are inherited from v9.6.1.
 
 1. Confirm `L4 recording: CONFIGURED`; use a fresh conversation epoch if desired.
 2. Send `Explain confirmation bias.` Expect ABSTAIN.

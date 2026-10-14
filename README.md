@@ -1,10 +1,10 @@
 # Local Frontier Orchestrator
 
-**Current version: [v9.6.1](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.1) (2026-10-14).** Ordinary QwenChat records conservative L4 observations after L0 provenance is saved. Analysis runs on demand through `/analyze`. The maintainer confirmed the live Windows workflow and authorized this release.
+**Current version: v9.6.2 (2026-10-14).** This packaging/runtime release preserves the accepted v9.6.1 L4 recording and `/analyze` semantics while incorporating the accepted Windows bootstrap, shared Ollama model-store binding, CPU/GPU launch profiles, and live installed-tree FRONTIER/CPU closure results. The immutable `v9.6.2` tag is the intended release boundary for this state.
 
-## Windows bootstrap for v9.6.1
+## Windows bootstrap for v9.6.2
 
-The Windows bootstrap is integrated into `main` for the v9.6.1 runtime contract. The immutable `v9.6.1` tag remains the runtime release/evidence boundary; `main` additionally carries the tested Windows installer and service launchers. Clean installed-tree Windows acceptance passed on 2026-10-14.
+The Windows bootstrap is part of the v9.6.2 runtime contract. v9.6.2 promotes the accepted installer/service packaging from `main` into the release boundary without changing the frozen L0–L3 baselines or the conservative v9.6.1 L4 observation semantics. Clean installed-tree Windows acceptance and release-closure smokes passed on 2026-10-14.
 
 The installer:
 
@@ -12,8 +12,8 @@ The installer:
 - discovers and reuses a compatible **SurrealDB 3.3.0** binary from explicit override, prior install state, PATH, bounded `%LOCALAPPDATA%\` discovery, or a running process; it never hardcodes a host-specific path;
 - always creates/reuses an **LFO-owned isolated datastore and current-user DPAPI credentials**, independent of where the SurrealDB executable was found;
 - writes the L4 endpoint and runtime credential into the installed local config and also exports them to the launcher environment;
-- enables v9.6.1 L0 provenance and conservative L4 recording;
-- runs the deterministic v9.6.1 L4 recording suite by default (**33 checks, zero model/FRONTIER calls**);
+- preserves v9.6.1 L0 provenance and conservative L4 recording semantics;
+- runs the inherited deterministic L4 recording suite by default (**33 checks, zero model/FRONTIER calls**);
 - exposes CPU/GPU launchers for the same installed source tree;
 - opens the installed `launch` directory in Windows Explorer so shortcuts can be created easily;
 - after a successful bootstrap, automatically starts LFO/Qwen with the selected CPU or GPU profile.
@@ -61,7 +61,7 @@ See [configuration, limits and live test steps](docs/L4_RECORDING_MANUAL_ANALYSI
 
 These live checks add no cross-host replication or general detector-accuracy claim.
 
-The release implements the revised recording/manual-analysis scope. Automatic rare triggers and response interventions are not release requirements. The immutable `v9.6.1` tag publishes the tested runtime source and configuration; Windows bootstrap packaging is maintained on `main`.
+v9.6.2 packages the already accepted recording/manual-analysis scope together with the accepted Windows bootstrap and model-store lifecycle fixes. Automatic rare triggers and response interventions are not release requirements. The immutable `v9.6.1` tag remains the earlier L4 operational evidence boundary; `v9.6.2` is the packaging/runtime release boundary.
 
 ## Accepted research baselines
 
@@ -365,9 +365,9 @@ The transport path is working:
 local model -> ask_codex -> native Codex frontier -> local model
 ```
 
-**v9.6.1 is the current operational release.** LOCAL/FRONTIER routing, synthesis and persistent memory continue to operate independently of L4 availability. Ordinary L4 recording and manual analysis are now integrated; L2/L3 immutable research baselines remain unchanged.
+**v9.6.2 is the current operational packaging/runtime release.** LOCAL/FRONTIER routing, synthesis and persistent memory continue to operate independently of L4 availability. It preserves the v9.6.1 ordinary L4 recording/manual-analysis behavior, adds the accepted Windows bootstrap/model-store lifecycle, and leaves the L2/L3 immutable research baselines unchanged.
 
-Further detector coverage, automatic analytics scheduling and response intervention require separate scope and validation. The accepted v9.6.1 behavior is conservative recording plus manual `/analyze`.
+Further detector coverage, automatic analytics scheduling and response intervention require separate scope and validation. The accepted v9.6.2 behavior remains conservative recording plus manual `/analyze`.
 
 ## License
 

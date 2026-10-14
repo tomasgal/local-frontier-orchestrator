@@ -120,7 +120,7 @@ The current canonical L4 record is an event-scoped `EpistemicObservation`
 stored in SurrealDB and linked back to exact L0 provenance. Observations remain
 annotations, not external-world facts or permanent user traits.
 
-v9.6.1 operationally records only a conservative subset of USER-side signals
+v9.6.2 preserves the v9.6.1 operational behavior: only a conservative subset of USER-side signals
 after L0 persistence and exposes explicit `/analyze` A1/A2 reads. The broader
 D1 detector remains offline; P1/P2 response intervention remains OFF.
 

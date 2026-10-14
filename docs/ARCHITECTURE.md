@@ -145,7 +145,7 @@ Avoid using a single surprising answer as a reason to retune the sampler or rout
 
 ## 7. Context, memory, provenance and L4
 
-The current v9.6.1 runtime separates complementary roles:
+The current v9.6.2 runtime separates complementary roles:
 
 ```text
 L0  raw conversation evidence / stage provenance
@@ -175,7 +175,7 @@ owns structured current/historical state. L3 narrows evidence without becoming
 authoritative. L4 records derived epistemic observations and never becomes
 factual merely because an annotation exists.
 
-v9.6.1 enables L0 stage-source capture for L4 provenance. Positive conservative
+v9.6.1 introduced L0 stage-source capture for L4 provenance; v9.6.2 preserves it. Positive conservative
 T1 observations are written only after durable L0 persistence. Explicit
 `/analyze` performs bounded A1/A2 reads; ordinary turns do not receive
 continuous L4 history. P1/P2 response intervention remains OFF.

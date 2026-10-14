@@ -28,7 +28,7 @@ $SurrealUrl = 'https://github.com/surrealdb/surrealdb/releases/download/v3.3.0/s
 $SurrealSHA256 = '3e5e9d363a352be81f5a983d53f0bc0cd77a90e305f01e2fed929987cf79735c'
 $GpuModel = 'lfo-qwen3.5-4b-gpu8k:latest'
 $CpuModel = 'lfo-qwen3.5-4b-cpu5k:latest'
-$RuntimeContract = 'v9.6.1'
+$RuntimeContract = 'v9.6.2'
 
 function Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
 function Info([string]$Text) { Write-Host "    $Text" }
@@ -318,8 +318,8 @@ if ($git) {
     } finally { Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\QwenChat.ps1')) 'LFO source checkout is incomplete.'
-Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\LfoL4Runtime.ps1')) 'LFO source does not contain the v9.6.1 L4 runtime module.'
-Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'tests\Test-LfoL4Recording.ps1')) 'LFO source does not contain the v9.6.1 L4 recording acceptance suite.'
+Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\LfoL4Runtime.ps1')) 'LFO source does not contain the v9.6.1/v9.6.2 L4 runtime module.'
+Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'tests\Test-LfoL4Recording.ps1')) 'LFO source does not contain the v9.6.1/v9.6.2 L4 recording acceptance suite.'
 foreach($requiredLauncher in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1')){
     Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot ('launch\'+$requiredLauncher))) ("Bootstrap source is missing launcher: "+$requiredLauncher)
 }
@@ -705,14 +705,14 @@ Assert-Lfo ([string]$parsedInstallConfig.L4.CredentialPath -ceq $runtimeCredPath
 
 $l4Acceptance='SKIPPED'
 if(-not $SkipL4Acceptance){
-    Step 'Run v9.6.1 deterministic L4 recording acceptance'
+    Step 'Run v9.6.2 deterministic L4 recording acceptance'
     $acceptScript=Join-Path $AppRoot 'tests\Test-LfoL4Recording.ps1'
     $acceptProc=Start-Process powershell.exe -Wait -PassThru -NoNewWindow -ArgumentList @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',$acceptScript,'-SurrealBinary',$surrealExe)
-    Assert-Lfo ($acceptProc.ExitCode -eq 0) ("v9.6.1 L4 recording acceptance failed with exit code "+$acceptProc.ExitCode)
+    Assert-Lfo ($acceptProc.ExitCode -eq 0) ("v9.6.2 L4 recording acceptance failed with exit code "+$acceptProc.ExitCode)
     $l4Acceptance='PASS'
     Info 'L4 recording acceptance: release suite PASS.'
 } else {
-    Warn 'v9.6.1 L4 recording acceptance skipped by request.'
+    Warn 'v9.6.2 L4 recording acceptance skipped by request.'
 }
 
 $state=[ordered]@{

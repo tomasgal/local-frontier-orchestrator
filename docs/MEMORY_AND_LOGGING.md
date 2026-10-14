@@ -1,6 +1,6 @@
 # Memory, provenance and logging
 
-This document describes the **current v9.6.1 operational storage and logging
+This document describes the **current v9.6.2 operational storage and logging
 contract**. Design rationale and historical evolution are in
 [MEMORY_STRATEGY.md](MEMORY_STRATEGY.md).
 
@@ -191,7 +191,7 @@ The trace log records the clear event when research logging is enabled.
 
 ## 9. L4 recording
 
-v9.6.1 performs conservative L4 recording **after durable L0 persistence**.
+v9.6.2 preserves the v9.6.1 conservative L4 recording behavior **after durable L0 persistence**.
 
 Current online T1 can emit:
 

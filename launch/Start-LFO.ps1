@@ -39,7 +39,7 @@ $ctx = if ($Profile -eq 'CPU') { 5120 } else { 8192 }
 
 Write-Host ''
 Write-Host 'Local Frontier Orchestrator (LFO) - Windows runtime' -ForegroundColor Cyan
-Write-Host 'Runtime contract: v9.6.1 | accepted Windows bootstrap'
+Write-Host 'Runtime contract: v9.6.2 | accepted Windows bootstrap'
 Write-Host 'Local-first path: Qwen via Ollama handles ordinary conversation and routing.'
 Write-Host 'Frontier path: authenticated Codex CLI is called only when routing/policy requires stronger or fresh external reasoning.'
 Write-Host 'Memory path: local L0/L1/L2/L3 state preserves conversation evidence, working memory and structured retrieval.'

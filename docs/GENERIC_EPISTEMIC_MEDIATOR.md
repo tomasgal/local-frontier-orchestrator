@@ -3,7 +3,7 @@
 ## Interaction-level bias measurement and mitigation in Human–LLM systems
 
 **Status:** narrowed research/design workstream under [Balancing the Loop](HUMAN_AI_BIAS_BALANCER.md).  
-**Implementation status:** research/measurement layer still experimental, but the LFO substrate is now concrete: L2 and L3 are frozen, L4 R1/R2/A1/D1/A2/P1/P2 have frozen evidence boundaries, and v9.6.1 operationally records conservative T1 observations with explicit `/analyze`. P1/P2 response intervention remains OFF.
+**Implementation status:** research/measurement layer still experimental, but the LFO substrate is now concrete: L2 and L3 are frozen, L4 R1/R2/A1/D1/A2/P1/P2 have frozen evidence boundaries, and v9.6.2 operationally preserves conservative T1 observations with explicit `/analyze`. P1/P2 response intervention remains OFF.
 
 This document defines a narrower, non-personalized engineering research track within the broader Human–AI Bias Balancer program.
 

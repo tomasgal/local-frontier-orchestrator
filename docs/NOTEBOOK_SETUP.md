@@ -77,7 +77,7 @@ After bootstrap completion, inspect:
 The bootstrap summary should report:
 
 - exact source commit;
-- runtime contract `v9.6.1`;
+- runtime contract `v9.6.2`;
 - SQLite PASS;
 - Ollama API/version;
 - SurrealDB 3.3.0 endpoint;

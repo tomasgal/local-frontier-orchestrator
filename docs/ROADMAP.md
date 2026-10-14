@@ -8,11 +8,11 @@ See [L2 frozen baseline](L2_FROZEN_BASELINE.md) and
 [L3 frozen baseline](L3_FROZEN_BASELINE.md) for the exact contracts, evidence,
 limitations and reopen criteria.
 
-### v9.6.1 operational runtime and Windows bootstrap
+### v9.6.2 operational packaging/runtime release
 
-**v9.6.1 is published** as the operational recording/manual-analysis release. Ordinary QwenChat now performs conservative post-L0 T1 recording into R1 and supports explicit bounded `/analyze` A1/A2 reads. D1 remains offline and P1/P2 response intervention remains OFF.
+**v9.6.2 is the release target for the accepted operational packaging/runtime state.** It preserves the v9.6.1 conservative post-L0 T1 recording and explicit bounded `/analyze` A1/A2 reads, while promoting the accepted Windows bootstrap, shared Ollama model-store lifecycle, CPU/GPU launch profiles and live closure smokes into one immutable release boundary. D1 remains offline and P1/P2 response intervention remains OFF.
 
-The Windows bootstrap for v9.6.1 passed clean installed-tree acceptance on 2026-10-14 and is integrated into `main`. It reuses/provisions Ollama and SurrealDB, generates isolated L4 configuration/credentials, creates CPU/GPU launch profiles, and runs the deterministic 33-check recording suite. Packaging acceptance does not reopen frozen L0-L3 or frozen L4 research milestones.
+The Windows bootstrap promoted into v9.6.2 passed clean installed-tree acceptance on 2026-10-14 and is integrated into `main`. It reuses/provisions Ollama and SurrealDB, generates isolated L4 configuration/credentials, creates CPU/GPU launch profiles, and runs the deterministic 33-check recording suite. Packaging acceptance does not reopen frozen L0-L3 or frozen L4 research milestones.
 
 **2026-10-14 release-closure checks are complete.** Against installed source commit `dbd14629d2318bc5f340271b225518c39d217f16`:
 
@@ -20,7 +20,7 @@ The Windows bootstrap for v9.6.1 passed clean installed-tree acceptance on 2026-
 - CPU execution-profile acceptance: **PASS** — `lfo-qwen3.5-4b-cpu5k:latest`, `num_gpu=0`, 5120-token context, successful LOCAL inference with `route=LOCAL`.
 - shared Ollama model-store lifecycle: **PASS** after repair — CPU/GPU aliases resolve from one persisted store across restart and post-FRONTIER synthesis can reload the selected alias.
 
-The CPU check validates the CPU profile on the accepted Windows installation; a separate physical host remains additional compatibility coverage rather than a release blocker. With these two closure items complete, the next packaging step is preparation of an immutable **v9.6.2** release; no v9.6.2 tag is created by this checkpoint.
+The CPU check validates the CPU profile on the accepted Windows installation; a separate physical host remains additional compatibility coverage rather than a release blocker. With these closure items complete, the release-candidate source is being promoted as immutable **v9.6.2**. The functional acceptance evidence remains the tested `dbd14629d2318bc5f340271b225518c39d217f16` installed tree plus documentation-only closure commit `795761c4821e5435b38736718c6eaff48fbc4770`; the version-promotion commit changes version labels/metadata rather than orchestration semantics.
 
 ### L3 closure
 
