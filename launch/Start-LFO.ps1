@@ -20,6 +20,12 @@ function Wait-LfoReady([scriptblock]$Probe,[string]$Name,[int]$Seconds=30) {
 function Open-Monitor([string]$Service,[string]$BaseUri,[string]$MonitorPath) {
     Start-Process powershell.exe -WindowStyle Normal -ArgumentList @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',$MonitorPath,'-Service',$Service,'-BaseUri',$BaseUri) | Out-Null
 }
+function Get-LfoOllamaModels([string]$BaseUri) {
+    try {
+        $tags=Invoke-RestMethod -Uri ($BaseUri.TrimEnd('/') + '/api/tags') -TimeoutSec 5
+        return @($tags.models | ForEach-Object {[string]$_.name})
+    } catch { return @() }
+}
 
 $statePath = Join-Path $InstallRoot 'config\install-state.json'
 if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) { throw "LFO install state not found: $statePath. Run Install-LFO.ps1 first." }
@@ -28,6 +34,8 @@ if ([string]::IsNullOrWhiteSpace($Profile)) {
     if ($state.LFO -and $state.LFO.DefaultProfile -in @('CPU','GPU')) { $Profile = [string]$state.LFO.DefaultProfile } else { $Profile = 'GPU' }
 }
 $monitor = Join-Path $state.AppRoot 'launch\Watch-LFOService.ps1'
+$model = if ($Profile -eq 'CPU') { [string]$state.Ollama.CPUModel } else { [string]$state.Ollama.GPUModel }
+$ctx = if ($Profile -eq 'CPU') { 5120 } else { 8192 }
 
 Write-Host ''
 Write-Host 'Local Frontier Orchestrator (LFO) - Windows runtime' -ForegroundColor Cyan
@@ -54,6 +62,15 @@ if ($ollamaReady) {
     Wait-LfoReady { Invoke-RestMethod -Uri ($ollamaUri.TrimEnd('/') + '/api/version') -TimeoutSec 2 } 'Ollama' 60
 }
 
+$ollamaModels=@(Get-LfoOllamaModels $ollamaUri)
+$requiredModels=@([string]$state.Ollama.CPUModel,[string]$state.Ollama.GPUModel)
+$missingModels=@($requiredModels | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and $_ -notin $ollamaModels })
+if($missingModels.Count -gt 0){
+    $expectedStore=[string]$state.Ollama.ModelsDirectory
+    if([string]::IsNullOrWhiteSpace($expectedStore)){$expectedStore='<unresolved in install-state.json>'}
+    throw ("Ollama API at "+$ollamaUri+" is running, but the shared LFO model aliases are incomplete. Missing: "+($missingModels -join ', ')+". Expected model store: "+$expectedStore+". Rerun the current bootstrap to repair model-store binding; LFO will not continue into chat with an inconsistent Ollama store.")
+}
+
 # SurrealDB: only an LFO-owned datastore is reused. Otherwise start it visibly.
 $surrealUri = [string]$state.SurrealDB.BaseUri
 $surrealReady = $false
@@ -73,8 +90,6 @@ if ($surrealReady) {
 }
 
 if ($NoChat) { return }
-$model = if ($Profile -eq 'CPU') { [string]$state.Ollama.CPUModel } else { [string]$state.Ollama.GPUModel }
-$ctx = if ($Profile -eq 'CPU') { 5120 } else { 8192 }
 $env:LFO_INSTALL_ROOT = $InstallRoot
 $env:LFO_L4_ENABLED = '1'
 $env:LFO_L4_ENDPOINT = $surrealUri
@@ -86,6 +101,7 @@ Write-Host "Runtime ready." -ForegroundColor Green
 Write-Host "Profile:   $Profile"
 Write-Host "Model:     $model"
 Write-Host "Ollama:    $ollamaUri"
+Write-Host "Models:    $([string]$state.Ollama.ModelsDirectory)"
 Write-Host "SurrealDB: $surrealUri"
 Write-Host "L4:        recording enabled; /analyze manual; P2 OFF"
 Write-Host "Config:    $config"

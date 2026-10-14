@@ -8,7 +8,7 @@ The Windows bootstrap is integrated into `main` for the v9.6.1 runtime contract.
 
 The installer:
 
-- reuses a compatible existing Ollama runtime/model store where possible;
+- reuses a compatible existing Ollama runtime/model store where possible, but persists one **shared LFO model store** for both CPU/GPU aliases and refuses to reuse a listener that points at a conflicting store;
 - discovers and reuses a compatible **SurrealDB 3.3.0** binary from explicit override, prior install state, PATH, bounded `%LOCALAPPDATA%\` discovery, or a running process; it never hardcodes a host-specific path;
 - always creates/reuses an **LFO-owned isolated datastore and current-user DPAPI credentials**, independent of where the SurrealDB executable was found;
 - writes the L4 endpoint and runtime credential into the installed local config and also exports them to the launcher environment;
@@ -32,7 +32,7 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/l
 Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/main/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile GPU
 ~~~
 
-Both bootstrap paths install/reuse the same LFO runtime and prepare **both** CPU and GPU model aliases and launchers. `-Profile` selects the default profile recorded for the installation and the profile that is launched automatically at the end. Windows Explorer still opens the installed `launch` directory so the user can create shortcuts wherever desired; `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain explicit overrides. The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` only when you intentionally need a separate installation, such as an isolated acceptance tree. `-SkipLaunch` suppresses only the final automatic Qwen launch; `-SkipL4Acceptance` is for explicit troubleshooting only and is not part of the normal install path.
+Both bootstrap paths install/reuse the same LFO runtime and prepare **both** CPU and GPU model aliases and launchers in one shared Ollama model store. CPU/GPU selection changes execution parameters only; it does not split model storage, LFO memory, logs, or L2–L4 state. `-Profile` selects the default profile recorded for the installation and the profile that is launched automatically at the end. Windows Explorer still opens the installed `launch` directory so the user can create shortcuts wherever desired; `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain explicit overrides. The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` only when you intentionally need a separate installation, such as an isolated acceptance tree. `-SkipLaunch` suppresses only the final automatic Qwen launch; `-SkipL4Acceptance` is for explicit troubleshooting only and is not part of the normal install path.
 
 ## v9.6.1: L4 recording and manual analysis
 

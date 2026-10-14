@@ -66,6 +66,40 @@ function Get-OllamaExeVersion([string]$Path) {
         return Parse-SemVer $out
     } catch { return $null }
 }
+function Get-OllamaLibraryManifestPath([string]$Store,[string]$Model) {
+    if ([string]::IsNullOrWhiteSpace($Store) -or [string]::IsNullOrWhiteSpace($Model)) { return $null }
+    $name=$Model;$tag='latest'
+    $colon=$Model.LastIndexOf(':')
+    if($colon -gt 0){$name=$Model.Substring(0,$colon);$tag=$Model.Substring($colon+1)}
+    if($name.IndexOf('/') -ge 0 -or $name.IndexOf('\') -ge 0){return $null}
+    return Join-Path $Store ('manifests\registry.ollama.ai\library\'+$name+'\'+$tag)
+}
+function Test-OllamaStoreHasModel([string]$Store,[string]$Model) {
+    $manifest=Get-OllamaLibraryManifestPath $Store $Model
+    return (-not [string]::IsNullOrWhiteSpace($manifest) -and (Test-Path -LiteralPath $manifest -PathType Leaf))
+}
+function Resolve-LfoAliasModelStore([string[]]$Candidates,[string[]]$Preferred=@()) {
+    $matches=New-Object Collections.Generic.List[string]
+    foreach($candidate in @($Candidates | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)){
+        try{$full=[IO.Path]::GetFullPath([string]$candidate)}catch{continue}
+        if((Test-OllamaStoreHasModel $full $GpuModel) -and (Test-OllamaStoreHasModel $full $CpuModel)){
+            if(-not $matches.Contains($full)){$matches.Add($full)}
+        }
+    }
+    foreach($preferred in @($Preferred | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })){
+        try{$fullPreferred=[IO.Path]::GetFullPath([string]$preferred)}catch{continue}
+        foreach($match in $matches){if($match -ieq $fullPreferred){return $match}}
+    }
+    if($matches.Count -eq 1){return [string]$matches[0]}
+    if($matches.Count -gt 1){throw ('Multiple Ollama model stores contain both LFO aliases: '+(($matches|ForEach-Object{[string]$_}) -join '; ')+'. Set LFO_OLLAMA_MODELS or preserve the intended store in install-state.json before rerunning.')}
+    return $null
+}
+function Get-OllamaApiModelNames([string]$Uri) {
+    try {
+        $tags=Invoke-RestMethod -Uri ($Uri.TrimEnd('/')+'/api/tags') -TimeoutSec 5
+        return @($tags.models | ForEach-Object {[string]$_.name})
+    } catch { return @() }
+}
 function Get-SurrealExeVersion([string]$Path) {
     if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
     try {
@@ -356,7 +390,45 @@ if(-not $ollamaExe){
     Info "Provisioned Ollama $ollamaExeVersion at $ollamaExe"
 } else { Info "Reusing Ollama $ollamaExeVersion at $ollamaExe" }
 
-# Prefer a compatible already-running API. Otherwise start the selected executable on a free local port.
+# Discover any existing shared LFO alias store before deciding whether a running
+# Ollama listener is actually reusable for this installation. CPU/GPU profiles
+# share one model store; profile selection changes execution parameters only.
+$ollamaStoreCandidates=New-Object Collections.Generic.List[string]
+foreach($candidateStore in @(
+    $env:LFO_OLLAMA_MODELS,
+    $env:OLLAMA_MODELS,
+    $(if($oldState -and $oldState.Ollama){[string]$oldState.Ollama.ModelsDirectory}else{$null}),
+    $ModelsRoot,
+    (Join-Path $env:USERPROFILE '.ollama\models')
+)){
+    if(-not [string]::IsNullOrWhiteSpace([string]$candidateStore)){$ollamaStoreCandidates.Add([string]$candidateStore)}
+}
+$probe=Split-Path -Parent $ollamaExe
+for($depth=0;$depth -lt 4 -and $probe;$depth++) {
+    $candidateStore=Join-Path $probe 'models'
+    if(Test-Path -LiteralPath (Join-Path $candidateStore 'manifests') -PathType Container){$ollamaStoreCandidates.Add($candidateStore)}
+    $next=Split-Path -Parent $probe
+    if($next -eq $probe){break}
+    $probe=$next
+}
+foreach($pattern in @('*\models\manifests','*\*\models\manifests','*\*\*\models\manifests')) {
+    try {
+        foreach($manifestDir in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -Directory -ErrorAction SilentlyContinue)) {
+            $ollamaStoreCandidates.Add((Split-Path -Parent $manifestDir.FullName))
+        }
+    } catch {}
+}
+$preferredStores=@(
+    $(if($oldState -and $oldState.Ollama){[string]$oldState.Ollama.ModelsDirectory}else{$null}),
+    $env:LFO_OLLAMA_MODELS,
+    $env:OLLAMA_MODELS
+)
+$preExistingAliasStore=Resolve-LfoAliasModelStore @($ollamaStoreCandidates) $preferredStores
+if($preExistingAliasStore){Info "Existing shared LFO Ollama model store: $preExistingAliasStore"}
+
+# Prefer a compatible already-running API only when it does not conflict with a
+# known LFO alias store. Otherwise leave it untouched and start an LFO listener
+# on a free local port using the shared store.
 $ollamaPort=11434;$ollamaBase='http://127.0.0.1:11434';$ollamaApiVersion=Get-ApiVersion $ollamaBase
 $runningCompatible=$false
 $runningOllamaExe=$null
@@ -367,15 +439,21 @@ try {
 if($ollamaApiVersion){
     $rv=Parse-SemVer $ollamaApiVersion
     if($rv -and $rv -ge $OllamaMinVersion){
-        $runningCompatible=$true
-        Info "Reusing compatible Ollama API already listening on 127.0.0.1:11434 (version=$ollamaApiVersion)."
-        if($runningOllamaExe){ Info "Running Ollama executable: $runningOllamaExe" }
+        $apiModels=@(Get-OllamaApiModelNames $ollamaBase)
+        $apiHasLfoAliases=($apiModels -contains $GpuModel) -and ($apiModels -contains $CpuModel)
+        if($preExistingAliasStore -and -not $apiHasLfoAliases){
+            Warn ("Compatible Ollama is already listening on 127.0.0.1:11434, but it does not expose the existing LFO CPU/GPU aliases from "+$preExistingAliasStore+". It will be left untouched; LFO will start its own listener on a free port using that shared store.")
+        } else {
+            $runningCompatible=$true
+            Info "Reusing compatible Ollama API already listening on 127.0.0.1:11434 (version=$ollamaApiVersion)."
+            if($runningOllamaExe){ Info "Running Ollama executable: $runningOllamaExe" }
+        }
     }
 }
-$ollamaModelsDir=$null
-if($ollamaManaged){
+$ollamaModelsDir=$preExistingAliasStore
+if(-not $ollamaModelsDir -and $ollamaManaged){
     $ollamaModelsDir=$ModelsRoot
-} elseif(-not $runningCompatible) {
+} elseif(-not $ollamaModelsDir -and -not $runningCompatible) {
     # Discover a model store associated with the selected portable executable.
     $probe=Split-Path -Parent $ollamaExe
     for($depth=0;$depth -lt 4 -and $probe;$depth++) {
@@ -389,8 +467,9 @@ if($ollamaManaged){
         $standardStore=Join-Path $env:USERPROFILE '.ollama\models'
         if(Test-Path -LiteralPath (Join-Path $standardStore 'manifests') -PathType Container){$ollamaModelsDir=$standardStore}
     }
-    if($ollamaModelsDir){Info "Reusing Ollama model store: $ollamaModelsDir"}
 }
+if($ollamaModelsDir){Info "Ollama model store selected for LFO: $ollamaModelsDir"}
+
 if(-not $runningCompatible){
     if(@(Get-NetTCPConnection -State Listen -LocalPort 11434 -ErrorAction SilentlyContinue).Count -gt 0){$ollamaPort=Get-FreePort 11435;$ollamaBase='http://127.0.0.1:'+$ollamaPort}
     $hostAddress='127.0.0.1:'+$ollamaPort
@@ -442,13 +521,37 @@ if(-not $SkipModelPull){
         $tags=Invoke-RestMethod -Uri ($ollamaBase+'/api/tags') -TimeoutSec 10
         Assert-Lfo (@($tags.models|Where-Object{$_.name -ceq $GpuModel}).Count -eq 1) 'GPU model alias missing after create.'
         Assert-Lfo (@($tags.models|Where-Object{$_.name -ceq $CpuModel}).Count -eq 1) 'CPU model alias missing after create.'
+
+        # Resolve the filesystem store that now contains both aliases. This is
+        # persisted once and shared by CPU/GPU launchers so a later Ollama
+        # restart cannot silently fall back to another default store.
+        if($ollamaModelsDir){$ollamaStoreCandidates.Add($ollamaModelsDir)}
+        foreach($pattern in @('*\models\manifests','*\*\models\manifests','*\*\*\models\manifests')) {
+            try {
+                foreach($manifestDir in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -Directory -ErrorAction SilentlyContinue)) {
+                    $ollamaStoreCandidates.Add((Split-Path -Parent $manifestDir.FullName))
+                }
+            } catch {}
+        }
+        $resolvedAliasStore=Resolve-LfoAliasModelStore @($ollamaStoreCandidates) @($ollamaModelsDir,$preExistingAliasStore,$env:LFO_OLLAMA_MODELS,$env:OLLAMA_MODELS)
+        Assert-Lfo $resolvedAliasStore 'Both LFO aliases exist through the Ollama API, but their shared filesystem model store could not be resolved. Set LFO_OLLAMA_MODELS to the intended Ollama model directory and rerun the bootstrap.'
+        $ollamaModelsDir=$resolvedAliasStore
+        Info "Shared LFO Ollama model store: $ollamaModelsDir"
         Info "GPU launcher model: $GpuModel"
         Info "CPU launcher model: $CpuModel"
     } finally {
         if($null -eq $oldHost){Remove-Item Env:OLLAMA_HOST -ErrorAction SilentlyContinue}else{$env:OLLAMA_HOST=$oldHost}
         if($null -eq $oldModels){Remove-Item Env:OLLAMA_MODELS -ErrorAction SilentlyContinue}else{$env:OLLAMA_MODELS=$oldModels}
     }
-} else { Warn 'Model pull/alias creation skipped by request.' }
+} else {
+    Warn 'Model pull/alias creation skipped by request.'
+    if($preExistingAliasStore){
+        $ollamaModelsDir=$preExistingAliasStore
+        Info "Shared LFO Ollama model store: $ollamaModelsDir"
+    } elseif([string]::IsNullOrWhiteSpace([string]$ollamaModelsDir)){
+        Warn 'No shared LFO alias store was resolved; a later launcher will refuse to start if the configured Ollama API does not expose both aliases.'
+    }
+}
 
 Step 'Resolve SurrealDB runtime: reuse compatible 3.3.0 binary, otherwise provision pinned binary'
 $surrealCandidates=New-Object Collections.Generic.List[string]
@@ -649,6 +752,7 @@ Write-Host ('Runtime:       '+$RuntimeContract) -ForegroundColor Green
 Write-Host ('Profile:       '+$Profile+' (default; CPU/GPU launchers both installed)') -ForegroundColor Green
 Write-Host ('SQLite:       PASS '+$sqliteVersion) -ForegroundColor Green
 Write-Host ('Ollama:       '+$ollamaApiVersion+' @ '+$ollamaBase) -ForegroundColor Green
+Write-Host ('Model store:  '+$(if($ollamaModelsDir){$ollamaModelsDir}else{'UNRESOLVED'})) -ForegroundColor Green
 Write-Host ('SurrealDB:    '+$SurrealVersion+' @ '+$surrealBase) -ForegroundColor Green
 Write-Host ('L4 recording: ENABLED; acceptance='+$l4Acceptance+'; /analyze available; P2 OFF') -ForegroundColor Green
 Write-Host ('Codex:        FOUND ('+$codexVersion+')') -ForegroundColor Green

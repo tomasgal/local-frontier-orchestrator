@@ -27,7 +27,7 @@ and SurrealDB runtimes, prepares the reference Qwen model and both CPU/GPU model
 aliases, creates an installation-local data/configuration tree, initializes the
 L4 datastore and runs the deterministic L4 recording acceptance suite.
 
-The selected `-Profile` chooses both the **default** profile and the profile automatically launched after a successful bootstrap. Both `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` are installed. The bootstrap also opens the installed `launch` directory in Explorer so shortcuts can be created easily. Use `-SkipLaunch` only when the final automatic Qwen launch is not wanted.
+The selected `-Profile` chooses both the **default** profile and the profile automatically launched after a successful bootstrap. Both `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` are installed. They share the same Ollama model store and all LFO state; CPU/GPU is an execution profile only. The bootstrap also opens the installed `launch` directory in Explorer so shortcuts can be created easily. Use `-SkipLaunch` only when the final automatic Qwen launch is not wanted.
 
 The normal install root is:
 

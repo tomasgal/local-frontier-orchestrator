@@ -38,7 +38,9 @@ Binary reuse never implies datastore reuse. Each installation owns its datastore
 
 ### Ollama
 
-The installer reuses a compatible running/installed Ollama runtime and existing model store when possible. Otherwise it provisions pinned Ollama 0.34.4 and verifies SHA-256. CPU and GPU aliases share the same base weights.
+The installer reuses a compatible running/installed Ollama runtime and existing model store when possible. Otherwise it provisions pinned Ollama 0.34.4 and verifies SHA-256. CPU and GPU aliases share the same base weights **and the same persisted model store**; profile selection is an execution policy, not a storage boundary.
+
+If a compatible Ollama listener is already running but does not expose a uniquely discovered existing LFO CPU/GPU alias store, the bootstrap leaves that listener untouched and starts an LFO listener on a free local port against the shared LFO store. After alias creation the exact store is written to `install-state.json`. Runtime startup verifies that both aliases are visible before chat begins, so model-store drift fails early with a diagnostic instead of failing during LOCAL or post-FRONTIER synthesis.
 
 ## v9.6.1 L4 wiring
 
