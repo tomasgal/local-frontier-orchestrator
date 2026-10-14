@@ -63,3 +63,36 @@ The published v9.6.1 suite expects **33/33 PASS** and uses deterministic LOCAL f
 Run the installer from Windows PowerShell 5.1 into a clean isolated root. Acceptance requires source acquisition, SQLite PASS, Ollama readiness/model aliases, SurrealDB 3.3.0 discovery or verified provisioning, isolated datastore/schema and credentials, generated v9.6.1 L4 config, deterministic recording-suite PASS, installed launchers, live L4 `CONFIGURED`, and a LOCAL recording plus explicit `/analyze` from the installed tree.
 
 Clean installed-tree acceptance was reviewed and passed on 2026-10-14, including bootstrap completion, deterministic 33-check L4 recording acceptance, installed-tree GPU launcher startup, live LOCAL routing, two live L4 `CREATED` writes, and `/analyze` readback with exact L0 references.
+
+### Release-closure live smokes — 2026-10-14
+
+The final packaging smokes were run from the installed tree at source commit `dbd14629d2318bc5f340271b225518c39d217f16` after repairing shared Ollama model-store binding.
+
+**FRONTIER/Codex E2E: PASS**
+
+A current-web request produced the expected visible chain:
+
+~~~text
+[policy -> FRONTIER; reason=explicit-frontier-or-web]
+[ask_codex; ... characters]
+[ask_codex -> Qwen; ... characters]
+...
+route=FRONTIER
+~~~
+
+The authenticated Codex call returned successfully and Qwen completed the post-FRONTIER synthesis. This closes the distinction between merely detecting `codex --version` and demonstrating the installed authenticated frontier path.
+
+**CPU execution profile: PASS**
+
+The CPU launcher selected:
+
+~~~text
+Profile: CPU
+Model:   lfo-qwen3.5-4b-cpu5k:latest
+~~~
+
+A LOCAL arithmetic prompt completed correctly with `route=LOCAL`. The CPU alias is defined with `num_gpu=0` and a 5120-token context. This test was performed on the accepted Windows installation in CPU-only execution mode; it does not claim separate-host replication.
+
+**Shared model-store lifecycle: PASS**
+
+The bootstrap resolved one persisted Ollama model store containing both CPU and GPU aliases. A cold runtime restart then found the selected GPU alias, completed FRONTIER handoff, and successfully re-entered local Qwen synthesis. The earlier failure mode — Codex returning successfully followed by `model ... not found` during synthesis — is therefore closed for the accepted installed-tree path.

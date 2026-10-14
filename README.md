@@ -54,7 +54,12 @@ See [configuration, limits and live test steps](docs/L4_RECORDING_MANUAL_ANALYSI
 - Windows PowerShell 5.1 / SurrealDB 3.3.0 recording and command-loop suite: **33/33 PASS**, including real isolated R1 writes, source drill-back, idempotent replay, manual read-only analysis and failure isolation.
 - Preserved I1 regression: **128/128 PASS**, including **108/108 pre-inference checks**; adapter checks **8/8 PASS**. Gate 1 also compared **45 output artifact pairs** against the recovered original I1 harness.
 - Automated validation used **zero model inference calls** and **zero FRONTIER calls**.
-- Live Windows chat/manual-analysis operation: **maintainer-reported success on 2026-10-14**. This adds no cross-host replication or general detector-accuracy claim.
+- Live Windows chat/manual-analysis operation: **maintainer-reported success on 2026-10-14**.
+- Installed-tree **FRONTIER/Codex end-to-end smoke: PASS on 2026-10-14** against source commit `dbd14629d2318bc5f340271b225518c39d217f16`. A hard web/freshness request routed to FRONTIER, completed one authenticated `ask_codex` call, returned evidence to Qwen, completed post-FRONTIER local synthesis, and finished with `route=FRONTIER`.
+- Installed-tree **CPU execution-profile acceptance: PASS on 2026-10-14** on the same Windows installation using `lfo-qwen3.5-4b-cpu5k:latest` (`num_gpu=0`, 5120-token context). A LOCAL arithmetic turn completed successfully with `route=LOCAL`. This verifies the CPU profile itself; it is not a separate-host compatibility claim.
+- The shared Ollama model-store repair was exercised by a clean runtime restart: both CPU/GPU aliases resolved from one persisted store and the post-FRONTIER synthesis no longer failed after Codex returned.
+
+These live checks add no cross-host replication or general detector-accuracy claim.
 
 The release implements the revised recording/manual-analysis scope. Automatic rare triggers and response interventions are not release requirements. The immutable `v9.6.1` tag publishes the tested runtime source and configuration; Windows bootstrap packaging is maintained on `main`.
 

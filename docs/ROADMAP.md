@@ -14,6 +14,14 @@ limitations and reopen criteria.
 
 The Windows bootstrap for v9.6.1 passed clean installed-tree acceptance on 2026-10-14 and is integrated into `main`. It reuses/provisions Ollama and SurrealDB, generates isolated L4 configuration/credentials, creates CPU/GPU launch profiles, and runs the deterministic 33-check recording suite. Packaging acceptance does not reopen frozen L0-L3 or frozen L4 research milestones.
 
+**2026-10-14 release-closure checks are complete.** Against installed source commit `dbd14629d2318bc5f340271b225518c39d217f16`:
+
+- FRONTIER/Codex installed-tree smoke: **PASS** — hard web/freshness gate → one authenticated `ask_codex` call → returned frontier result → Qwen post-FRONTIER synthesis → final `route=FRONTIER`.
+- CPU execution-profile acceptance: **PASS** — `lfo-qwen3.5-4b-cpu5k:latest`, `num_gpu=0`, 5120-token context, successful LOCAL inference with `route=LOCAL`.
+- shared Ollama model-store lifecycle: **PASS** after repair — CPU/GPU aliases resolve from one persisted store across restart and post-FRONTIER synthesis can reload the selected alias.
+
+The CPU check validates the CPU profile on the accepted Windows installation; a separate physical host remains additional compatibility coverage rather than a release blocker. With these two closure items complete, the next packaging step is preparation of an immutable **v9.6.2** release; no v9.6.2 tag is created by this checkpoint.
+
 ### L3 closure
 
 Accepted L3 properties:
