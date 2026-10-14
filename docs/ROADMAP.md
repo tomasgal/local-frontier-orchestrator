@@ -1,6 +1,6 @@
 # Roadmap
 
-## Current programme — L2 CLOSED → L3 CLOSED → L4
+## Current programme — L2 CLOSED → L3 CLOSED → L4 operational recording / frozen research milestones
 
 **2026-10-12 decision:** L2 is frozen at `v9.4-l2-frozen` and L3 is closed for
 the accepted scope at `v9.5-l3-frozen`. Do not reopen either layer by default.
@@ -136,16 +136,17 @@ One descriptive model outcome missed its predeclared target
 as a stochastic model outcome, not promoted into an I1 integration failure or
 an efficacy estimate.
 
-**Next engineering gate:** construct the first complete Windows L0-L4 bootstrap
-and perform clean-install/build acceptance. The bootstrap must obtain/verify the
-runtime prerequisites, clone the canonical LFO source, provide generic CPU-only
-and GPU-capable launch profiles, expose visible Ollama and SurrealDB service
-consoles, preserve the L0-L3 baseline with L4 intervention OFF, and verify
-explicit L4 activation without unintended state mutation.
+**Bootstrap gate CLOSED 2026-10-14.** The Windows L0-L4 bootstrap passed
+installed-tree acceptance and is integrated into `main`: source acquisition,
+SQLite, Ollama/Qwen CPU+GPU aliases, SurrealDB 3.3.0, isolated credentials/data,
+33-check deterministic L4 recording acceptance, installed-tree GPU startup,
+live LOCAL routing, two live L4 `CREATED` writes and explicit `/analyze`
+readback were verified.
 
-Broader/cross-host replication remains valuable follow-up research/deployment
-evidence, but it is not a prerequisite for constructing or accepting this
-implementation-cycle build.
+The next work is no longer bootstrap construction. Follow-up work is
+cross-host/CPU acceptance, explicit FRONTIER/Codex end-to-end smoke on the
+accepted install path, and separately versioned research on detector breadth,
+bias magnitude and intervention efficacy.
 
 ### Planned v10.0 — flexible frontier client layer
 

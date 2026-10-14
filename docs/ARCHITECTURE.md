@@ -143,72 +143,59 @@ A change to language policy or synthesis behaviour should not require editing th
 
 Avoid using a single surprising answer as a reason to retune the sampler or routing policy. The system is stochastic; changes should be driven by repeated, categorized failures or explicit experimental conditions.
 
-## 7. Context, persistent memory, exact data, and logs
+## 7. Context, memory, provenance and L4
 
-QwenChat v9.1 treats terminal restarts as continuation of one ongoing conversation. `/exit` ends the process but preserves memory. `/clear` resets active context and memory while retaining historical logs.
-
-The persistent layer separates four roles:
+The current v9.6.1 runtime separates complementary roles:
 
 ```text
-recent raw turns              immediate conversational continuity
-0-40 char micro-notes         tiny per-turn orientation
-0-160 char rolling state      compact active workstream
-conversation / trace JSONL    authoritative raw history and research evidence
+L0  raw conversation evidence / stage provenance
+L1  bounded conversational orientation
+L2  typed factual state
+L3  selective retrieval/index metadata
+L4  epistemic observations and bounded analytics
 ```
 
-Every completed turn triggers a bounded local micro-memory extraction. Every five memory steps, pending notes are compacted into the rolling state.
+`/exit` preserves persistent state. `/clear` starts a new conversation epoch:
+active messages and L1 state are cleared while historical JSONL, scoped L2/L3
+records and L4 observations remain available as historical evidence.
 
-The state is deliberately lossy. Exact historical facts are preserved in raw JSONL and can be reintroduced through deterministic lexical retrieval. Retrieval uses the current request plus memory cues, excludes already-present recent turns, and returns only a bounded number of older raw snippets.
-
-This yields the active context pattern:
+The model-visible context is bounded. Depending on enabled features it may
+combine:
 
 ```text
-rolling state
-+ pending micro-notes
-+ relevant exact old data
+rolling L1 state
++ pending notes
++ selected L0/L2 evidence
 + recent raw turns
 + current request
 ```
 
-Frequency is a relevance signal, not an epistemic signal. Repetition must never upgrade a claim into a verified fact. Explicit later corrections may supersede an earlier value in the rolling state, while the original and corrected values remain available in the raw history.
+L0 monthly JSONL remains the authority for captured interaction history. L2
+owns structured current/historical state. L3 narrows evidence without becoming
+authoritative. L4 records derived epistemic observations and never becomes
+factual merely because an annotation exists.
 
-Qwen receives no filesystem tool. The PowerShell wrapper owns persistence, lexical retrieval, migration, clearing, and logging.
+v9.6.1 enables L0 stage-source capture for L4 provenance. Positive conservative
+T1 observations are written only after durable L0 persistence. Explicit
+`/analyze` performs bounded A1/A2 reads; ordinary turns do not receive
+continuous L4 history. P1/P2 response intervention remains OFF.
 
-Host-specific capacity remains separate from memory semantics. A constrained 5k-context host can use smaller recent-history and retrieval budgets than a 22k host while running identical shared memory logic.
+The PowerShell wrapper, not Qwen, owns persistence, retrieval, provenance,
+logging and database access. Qwen receives no filesystem/shell tool.
 
-Research traces preserve raw intermediate/final text, retrieval context, timing/token metadata, memory changes, and policy fingerprints for later Local Epistemic Balancer replay. Bias labels are not automatically written into working memory.
-
-The longer-term memory/research boundary is:
-
-```text
-L0  raw evidence/history
-L1  semantic working memory
-L2  structured factual state
-L3  retrieval & resolution fabric
-L4  research / epistemic analysis output
-```
-
-L3 may retrieve from L0/L2 and optional external knowledge adapters. L4 is a derived analytical output layer for observations, hypotheses, interventions and outcomes. L4 records must preserve provenance and uncertainty and must not silently become L2 facts or hidden user attributes. The current v9.4 implementation milestone remains L2.
-
-
-Durable factual/project memory should not be conflated with opaque model weights.
+For the detailed runtime contract see
+[MEMORY_AND_LOGGING.md](MEMORY_AND_LOGGING.md),
+[L2_FROZEN_BASELINE.md](L2_FROZEN_BASELINE.md),
+[L3_FROZEN_BASELINE.md](L3_FROZEN_BASELINE.md) and
+[L4_RECORDING_MANUAL_ANALYSIS.md](L4_RECORDING_MANUAL_ANALYSIS.md).
 
 ### Generic epistemic mediator research boundary
 
-The planned bias-aware research mode has a narrower **generic, non-personalized mediator** workstream documented in [GENERIC_EPISTEMIC_MEDIATOR.md](GENERIC_EPISTEMIC_MEDIATOR.md).
-
-Its first design target is not a universal bias classifier. It should:
-
-- inspect observable properties of the current interaction;
-- keep direct evidence separate from derived interpretation;
-- compare behaviour against an explicit ground-truth, neutral, balanced, or counterbalanced reference condition;
-- express **bias magnitude / effect strength** as a phenomenon-specific deviation from that reference rather than as a generic risk score;
-- support auditable pre-response and post-response interventions;
-- preserve event, method, evidence, intervention and outcome provenance for later L4 analysis.
-
-The first candidate phenomena are user-side framing / confirmation-seeking signals, model-side sycophancy / agreement bias, and automation bias / appropriate reliance primarily as an outcome variable.
-
-This research contract should remain technology-neutral until the L3 retrieval/resolution and L4 research-analysis interfaces are stable enough to justify implementation coupling.
+The generic mediator workstream is documented in
+[GENERIC_EPISTEMIC_MEDIATOR.md](GENERIC_EPISTEMIC_MEDIATOR.md). It distinguishes
+observable interaction signals from stronger interpretations, measures
+phenomenon-specific magnitude against explicit reference/control conditions and
+keeps experimental interventions separate from the current default runtime.
 
 ## 8. Synthesis policy
 

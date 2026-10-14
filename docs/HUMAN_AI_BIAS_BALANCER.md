@@ -103,45 +103,28 @@ The mediator should **not** learn “what the user believes” as a preference t
 
 Persistent conversational memory is therefore distinct from the experimental user model. Conversation state may preserve task goals, corrections, constraints, and interaction continuity, while inferred bias or metacognitive labels should remain separate research variables rather than being fed back into active conversational memory by default.
 
-## 4. L4 research-analysis layer
+## 4. L4 research-analysis substrate
 
-The planned LFO **L4** layer gives the Bias Balancer a place to persist explicit research interpretations without contaminating operational factual memory.
-
-The intended boundary is:
+LFO now has an implemented L4 substrate for this research rather than only a
+planned layer. The operational/frozen boundary is:
 
 ```text
 L0  raw interaction evidence
 L1  conversational working memory
 L2  structured factual state
 L3  retrieval & resolution
-L4  research / epistemic analysis output
+L4  epistemic observations / bounded analytics
 ```
 
-L4 is primarily an **output layer**. L3 may retrieve analogous historical events, relevant L2 state, and external conceptual context; L4 records the resulting analytical observation, intervention, outcome or longitudinal hypothesis.
+The current canonical L4 record is an event-scoped `EpistemicObservation`
+stored in SurrealDB and linked back to exact L0 provenance. Observations remain
+annotations, not external-world facts or permanent user traits.
 
-The DokuWiki search subsystem can be useful during this analysis through an L3 read-only adapter. For example, it may retrieve methodological notes, bias definitions, prior experimental decisions or related project context. A retrieved wiki segment is context/evidence for analysis, not itself a bias label.
+v9.6.1 operationally records only a conservative subset of USER-side signals
+after L0 persistence and exposes explicit `/analyze` A1/A2 reads. The broader
+D1 detector remains offline; P1/P2 response intervention remains OFF.
 
-Bias should be represented at the interaction-event level. Prefer a reified observation such as:
-
-```text
-BiasObservation
-  event_ref = turn:918
-  actor = human
-  bias_type = confirmation_bias
-  confidence = 0.64
-  status = hypothesis
-  evidence = [...]
-```
-
-rather than a permanent relationship such as:
-
-```text
-User HAS_BIAS ConfirmationBias
-```
-
-The same structure can represent model-side observations such as possible sycophancy.
-
-For intervention research, the important chain is:
+For the research program, the important causal/evaluation chain remains:
 
 ```text
 event
@@ -150,9 +133,18 @@ event
   -> outcome
 ```
 
-Repeated observations may later support a LongitudinalHypothesis, but such a hypothesis remains conditional, provenance-linked and revisable. It must not be silently promoted to L2 factual state or automatically injected into ordinary conversational memory.
+A later longitudinal hypothesis must remain conditional, provenance-linked and
+revisable. It must not be silently promoted to L2 factual state or automatically
+injected into ordinary conversational memory.
 
-See [L4_RESEARCH_ANALYSIS.md](L4_RESEARCH_ANALYSIS.md).
+L3 or external adapters such as DokuWiki may supply evidence/context to an
+analysis, but retrieved context is not itself a bias label. L3 retrieval
+relevance and L4 analytical validity are separate questions.
+
+The generic, non-personalized operationalization is consolidated in
+[GENERIC_EPISTEMIC_MEDIATOR.md](GENERIC_EPISTEMIC_MEDIATOR.md); current runtime
+details are in
+[L4_RECORDING_MANUAL_ANALYSIS.md](L4_RECORDING_MANUAL_ANALYSIS.md).
 
 ## 5. Primary research questions
 

@@ -1,169 +1,234 @@
-# Persistent conversation memory and research logging
+# Memory, provenance and logging
 
-> **Superseding closure — 2026-10-12:** L2 is complete and frozen at `v9.4-l2-frozen`. Read [L2_FROZEN_BASELINE.md](L2_FROZEN_BASELINE.md) for the accepted profile, R1/R3/R4/R5 evidence and limitations. Earlier candidate, PENDING, PAUSED and next-test instructions below are historical. Do not restart L2 tuning automatically; next work is L3 design, then L4. The full 2414-character write policy is restored; A+B is accepted selectively, grouped extraction and C are not adopted.
+This document describes the **current v9.6.1 operational storage and logging
+contract**. Design rationale and historical evolution are in
+[MEMORY_STRATEGY.md](MEMORY_STRATEGY.md).
 
+## 1. Operational layers
 
-For design rationale, trade-offs, comparison with other memory approaches, and future direction, see [MEMORY_STRATEGY.md](MEMORY_STRATEGY.md).
+LFO separates storage by epistemic role:
 
-## Goals
+```text
+L0  append-only conversation evidence / provenance
+L1  bounded conversational orientation
+L2  typed factual state with scope and provenance
+L3  reconstructible selective retrieval metadata
+L4  epistemic observations and bounded analytics
+```
 
-QwenChat v9.2 treats the terminal as one continuing conversation rather than a set of disposable process sessions.
+These layers are complementary. L0 remains the authority for what was actually
+captured. L1 is lossy orientation. L2 is structured state. L3 narrows retrieval.
+L4 records derived epistemic observations and must not silently become factual
+memory.
 
-- `/exit` stops the process and preserves memory.
-- restarting QwenChat restores bounded recent raw turns plus persistent memory.
-- `/clear` resets active memory/context but never deletes historical logs.
-- Qwen itself receives no filesystem or shell tool.
+## 2. Data roots
 
-## Storage
-
-Default root:
+The repository default config uses:
 
 ```text
 %LOCALAPPDATA%\LocalFrontierOrchestrator
 ```
 
-Layout:
+The Windows bootstrap instead generates an **installation-local** memory root:
 
 ```text
-state/
-  working_memory.txt
-  pending_notes.jsonl
-  runtime_state.json
-logs/
-  conversation-YYYY-MM.jsonl
-  trace-YYYY-MM.jsonl
+<InstallRoot>\data\memory
 ```
 
-Legacy v9 JSON working-memory files are left untouched. On first v9.1 start, the runtime state migrates to memory schema 2, clears obsolete pending-note state, and rebuilds active continuity from the raw conversation logs.
-
-## Three context layers
-
-The memory design deliberately separates orientation from exact data.
-
-1. **Recent raw turns** — the newest conversation turns are passed verbatim within a host-specific character budget.
-2. **Micro-memory** — every completed turn produces a single 0–40 character orientation note. Every five completed memory steps, the current state plus pending notes are compacted into a 0–160 character rolling state.
-3. **Exact historical data** — full conversation JSONL is never replaced by summaries. A lightweight deterministic lexical retriever can inject a bounded number of relevant older raw snippets.
-
-The rolling state answers "what are we doing?" while the raw store answers "what exactly was said?".
-
-## Per-turn micro-memory
-
-v9.2 removes the separate post-turn local-model inference used by v9.1.3. The bounded micro-note is now emitted inside the **existing answer pass**:
-
-- LOCAL turns return a schema-constrained object containing `route`, the user-facing `answer`, and `memory_note`;
-- FRONTIER turns leave the routing-pass note empty, and the post-frontier synthesis pass returns the final `answer` plus `memory_note`;
-- the wrapper strips the structured envelope, displays only `answer`, and persists the cleaned 0–40 character note.
-
-The semantic contract remains user-delta-first: the note should primarily represent new durable user state rather than summarize the answer or copy older memory. Explicit replacements/corrections carry a `CORR ` marker plus enough target identity to let compaction supersede the obsolete value.
-
-The output schema guarantees structure, not perfect semantic extraction. The note is still produced by a small stochastic model, so occasional misses or over-tagging are expected. Raw conversation JSONL remains authoritative, and exact historical retrieval remains the correctness backstop.
-
-## Compaction
-
-Default compaction cadence is five completed memory steps.
-
-Input:
+For the normal install this is:
 
 ```text
-STATE: <=160 chars
-NOTES: up to five x <=40 chars
+%LOCALAPPDATA%\LFO\data\memory
 ```
 
-Output:
+Relevant layout:
 
 ```text
-STATE: <=160 chars
+data\memory\
+  state\
+    working_memory.txt
+    pending_notes.jsonl
+    runtime_state.json
+    l2-memory.db
+    l3-index.db              # when L3 is enabled/used
+  logs\
+    conversation-YYYY-MM.jsonl
+    trace-YYYY-MM.jsonl
+    l4-source-identity.json  # created when the L0 store is registered for L4
 ```
 
-Compaction is intentionally lossy. It preserves active entities, goals, decisions, constraints, preferences, and corrections, but it is not the authoritative data store. v9.1.3 also normalizes the result to state-only form: input labels are dropped and corrected values are stored once.
+L4 observations themselves live in the separate SurrealDB
+`lfo / epistemic / observations` store prepared by the bootstrap.
 
-Repeated mentions may increase salience, never factual certainty. Later explicit corrections should supersede obsolete values in the rolling state while the raw history remains intact.
+## 3. L0 conversation JSONL
 
-## Exact-data retrieval
-
-Before LOCAL answering, frontier delegation, or post-frontier synthesis, the wrapper can search older conversation JSONL using a small lexical scorer.
-
-The retrieval query combines:
-
-- the current user request;
-- current rolling state;
-- pending micro-notes.
-
-Recent raw turns are excluded from retrieval to avoid duplication. Older hits are ranked by lexical overlap and recency, then bounded by host-specific item and character limits.
-
-This is deliberately simple: no vector database, embedding model, agent tool, or extra model inference is required.
-
-## Context injection
-
-The three conversational paths receive the same bounded continuity substrate:
+Each completed persisted turn is appended as one UTF-8 JSON object to:
 
 ```text
-rolling state
-+ pending micro-notes
-+ relevant older raw snippets
-+ recent raw turns
-+ current request
+logs\conversation-YYYY-MM.jsonl
 ```
 
-Host launchers control capacity only. The semantic rules remain shared.
-
-## Validated v9.1.3 baseline — 2026-09-30
-
-On the constrained CPU-only Windows notebook, the final v9.1.3 validation used a clean memory epoch and a five-turn correction scenario.
-
-Observed results:
-
-- user-delta micro-notes preserved new facts, goals, constraints, and a later correction;
-- normalized compaction produced a clean rolling state without leaking internal `STATE`/`NOTES`/`CORR` labels;
-- post-turn micro-memory extraction was about **18–21 seconds** on this host;
-- the fifth-turn extraction plus compaction was about **40 seconds**;
-- after process exit and restart, the conversation continuity pipeline restored the corrected value and active goal/constraint correctly.
-
-The earlier verbose v9.1.1 policy roughly doubled post-turn memory latency on this CPU. v9.1.2 restored the same user-delta semantics with a much shorter policy prompt, and v9.1.3 added compaction-output normalization without reintroducing the latency regression.
-
-An isolated exact-data retrieval regression was then run with the target fact outside the recent raw-turn window and removed from active rolling state. The trace showed empty active `STATE`/`PENDING` fields, the correct older raw turn under `RELEVANT OLD DATA`, and a correct final recall. This validates the complete three-layer memory path:
+Core fields include:
 
 ```text
-recent raw turns
-+ compact working memory
-+ selective exact historical retrieval
+event
+timestamp
+turn_id
+epoch
+route
+user
+assistant
 ```
 
-The test also exposed one presentation issue rather than a retrieval failure: internal historical turn markers (for example `T34`) can be echoed in user-facing prose. v9.2 should suppress those internal identifiers.
+With `Memory.L0StageSourcesEnabled = true`, the row also carries
+`stage_sources_schema = 1` and ordered `stage_sources[]` for USER, LOCAL,
+FRONTIER and FINAL stages that actually occurred. USER and FINAL stages can
+reference the authoritative top-level `user` / `assistant` fields instead of
+duplicating text. L4 provenance binds observations to these exact persisted
+turn/stage sources and verifies the content hash.
 
-## Validated v9.2 single-pass memory — 2026-10-01
+The JSONL file is plain text and is intentionally inspectable.
 
-The v9.2 branch was validated on the same constrained CPU-only Windows notebook with `qwen3.5:4b-q4_K_M` at a 5120 context hint.
+The installed helper:
 
-Observed results:
+```powershell
+.\View-LFOConversationLog.ps1
+```
 
-- the separate v9.1.3 per-turn memory inference was removed;
-- ordinary post-answer memory persistence commonly measured about **0.01–0.05 seconds** instead of roughly **18–21 seconds** for the former extractor, with occasional local I/O outliers around 1–2 seconds;
-- every fifth completed turn still performs a separate compaction inference, observed around **19 seconds** in the v9.2 tests;
-- LOCAL structured output produced clean user-facing answers while keeping the note hidden from the terminal;
-- FRONTIER synthesis also produced an authoritative single-pass note without adding a second memory inference;
-- explicit correction notes now preserve an unambiguous `CORR <target>: <new value>`-style signal for compaction;
-- restart continuity passed: a fact persisted before `/exit` was recalled correctly after a new QwenChat process loaded the same state;
-- internal pending-note turn IDs are retained in JSONL for auditability but are no longer fed to the semantic compactor, preventing artifacts such as `T2` from leaking into rolling state.
+renders the current month's turn ID, epoch, route, user text and assistant text.
 
-This is a pragmatic conversational memory design, not a zero-error semantic extractor. The **90% figure is an engineering acceptance floor, not an estimate of the implementation's observed reliability**. The heterogeneous smoke suite performed materially better than that floor, while still exposing occasional semantic misses such as an omitted durable note or an unnecessary correction tag. The suite is intentionally too small and non-random to justify a statistical claim such as 99% reliability. The design therefore avoids prompt-tuning toward benchmark perfection while retaining authoritative raw history and exact retrieval as backstops for lossy micro-memory.
+## 4. L1 working memory
 
+L1 provides conversational orientation with bounded cost:
 
-## Research trace
+- recent raw turns;
+- one small same-pass `memory_note` when the normal LOCAL/synthesis response
+  produces a useful durable user delta;
+- `pending_notes.jsonl`;
+- bounded `working_memory.txt`;
+- pressure-triggered compaction.
 
-Monthly JSONL traces remain append-only and can record:
+Current common defaults are:
 
-- raw user request;
-- raw local result;
-- raw frontier result;
-- final answer;
-- route and route reason;
-- token/timing metadata;
-- retrieved older-data snippets;
-- memory before and after;
-- cleaned micro-note and raw memory-model output;
-- policy fingerprint.
+- recent turns: 4;
+- note limit: 40 characters;
+- state limit: 160 characters;
+- compact at 4 pending notes or 108 pending-note characters.
 
-These traces are intended for later offline replay and Local Epistemic Balancer research. Bias labels are not fed back into active memory by default, avoiding a self-reinforcing user model.
+The same answer pass normally produces the note; there is no mandatory extra
+per-turn memory-model call. Exact historical text is never replaced by this
+lossy state.
 
-Because the logs may contain full conversation text and frontier results, they should be treated as private local research data.
+## 5. Exact L0 retrieval
+
+The baseline lexical retriever scans only the current conversation epoch,
+scores older turns against terms from the current query (with bounded memory
+cues when necessary), excludes the recent-turn tail and injects only a bounded
+number of snippets.
+
+Common defaults:
+
+- scan cap: 500 turns;
+- at most 3 retrieved items;
+- at most 2500 characters.
+
+This is a retrieval mechanism, not a truth estimator. Repetition increases
+retrieval relevance, not factual certainty.
+
+## 6. L2 structured factual state
+
+When `Memory.StructuredEnabled = true`, L2 uses:
+
+```text
+state\l2-memory.db
+```
+
+L2 stores typed facts/relations with source-turn provenance and current versus
+historical state. Writes are guarded by current-user evidence/authorization
+rules and SQLite transactions.
+
+Current structured **read injection remains opt-in** in the common config
+(`StructuredReadEnabled = false`). When a LOCAL turn actually receives L2
+facts as read evidence, model-echoed L2 writes and companion L1 notes are
+suppressed by the read-side persistence guard.
+
+L2 scopes use the conversation epoch, e.g. `conversation:2`.
+
+## 7. L3 retrieval/index layer
+
+L3 uses a separate reconstructible SQLite index:
+
+```text
+state\l3-index.db
+```
+
+It can narrow L0/L2 evidence using deterministic facets and then fall open to
+the ordinary baseline path when classification/retrieval is unavailable. L3 is
+non-authoritative: deleting/rebuilding the index must not destroy L0 history or
+L2 factual state.
+
+The frozen L3 implementation is documented in
+[L3_FROZEN_BASELINE.md](L3_FROZEN_BASELINE.md). Deployment remains explicitly
+controlled; absent/false L3 switches mean the ordinary baseline retrieval path
+is used.
+
+## 8. /clear semantics
+
+`/clear` is intentionally an **epoch boundary**, not a history deletion.
+
+It:
+
+- clears active in-process messages;
+- increments `runtime_state.epoch`;
+- clears `working_memory.txt` and pending L1 notes;
+- retains historical conversation/trace JSONL;
+- retains L2/L3 databases and L4 observations as historical records.
+
+Because normal L2/L3 retrieval is scope/epoch bounded, facts from the previous
+epoch are not automatically reintroduced into the new conversation epoch.
+
+The trace log records the clear event when research logging is enabled.
+
+## 9. L4 recording
+
+v9.6.1 performs conservative L4 recording **after durable L0 persistence**.
+
+Current online T1 can emit:
+
+- `ASYMMETRIC_EVIDENCE_REQUEST`;
+- `FRAMING`;
+- or `ABSTAIN`.
+
+Positive observations are stored in SurrealDB with exact L0 provenance.
+`ABSTAIN` does not prove absence of bias; it means the current conservative
+detector did not emit one of its supported signals.
+
+`/analyze [1..100]` performs bounded explicit A1/A2 reads in the current epoch.
+No ordinary-turn L4 analytics history is injected into prompts. P1/P2 response
+intervention remains OFF.
+
+See [L4_RECORDING_MANUAL_ANALYSIS.md](L4_RECORDING_MANUAL_ANALYSIS.md).
+
+## 10. Trace logging
+
+When `ResearchLogging.Enabled = true`, LFO writes monthly trace JSONL under
+`logs\trace-YYYY-MM.jsonl`. Depending on configuration and path, traces may
+include raw/intermediate text, routing/policy decisions, memory snapshots,
+retrieval/context statistics, token/timing metadata, write/suppression outcomes
+and clear events.
+
+Trace records are research/diagnostic evidence. They are not a replacement for
+the canonical L0 conversation row or L2 structured state.
+
+## 11. Authority rules
+
+Keep these distinctions explicit:
+
+- **L0:** what was captured.
+- **L1:** what should remain actively in mind.
+- **L2:** structured current/historical state.
+- **L3:** what evidence/context should be considered.
+- **L4:** what epistemic observation/analysis is being reported.
+
+No L4 annotation should silently become an L2 fact or persistent L1 user trait.
+No retrieved context becomes true merely because it was retrieved.

@@ -1,80 +1,121 @@
-# Clean Windows notebook setup
+# Windows bootstrap and post-bootstrap host validation
 
-This checklist prepares a new Windows machine for Local Frontier Orchestrator without using Codex to modify the project.
+This document is the **post-bootstrap validation and tuning guide** for a new
+Windows LFO host. Manual Git/Ollama/Codex setup is no longer the normal install
+path. The supported entry point is the bootstrap command in the repository
+[README](../README.md).
 
-The goal is to install prerequisites, clone the repository, pull a neutral base model, and collect hardware facts. **Do not copy a tuned model/context profile from another PC.**
+## 1. Install from README
 
+Open Windows PowerShell 5.1 as a normal user and choose one default profile.
 
-## Before you start: capacity planning
-
-For the current reference model, use the following as practical guidance rather than strict universal limits:
-
-- **Model storage:** `qwen3.5:4b-q4_K_M` occupied about **3.3 GiB** in the validated Ollama installation.
-- **Project code:** the Local Frontier Orchestrator source/policy/config footprint is negligible compared with the model (well under 1 MiB).
-- **Free disk:** plan for at least **8 GB** free; **10 GB+** is preferable once Ollama, Node.js, Codex CLI, caches, and growing research logs are included.
-- **RAM:** **8 GB works** for the constrained CPU-only proof of concept, but it relies on a small context and normal Windows paging. **16 GB+** is a better general-purpose target.
-- **GPU:** optional. CPU-only operation is supported. A discrete GPU mainly improves response latency and can increase the usable context ceiling.
-- **Context:** start conservatively. 4096 is a safe fallback for the validated low-memory class; 5120 was also validated there. Larger contexts must be measured per host.
-
-The 8 GB result should not be read as a recommended interactive-performance specification. It demonstrates portability: the system can run there, but local generation and post-turn memory processing can take tens of seconds.
-
-
-## 1. Install base tools
-
-Open PowerShell as a normal user. Use elevation only when an installer requests it.
+**CPU default**
 
 ```powershell
-winget install --id Git.Git -e --source winget
-winget install --id OpenJS.NodeJS.LTS -e --source winget
-irm https://ollama.com/install.ps1 | iex
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/main/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile CPU
 ```
 
-Close and reopen PowerShell after installation, then verify:
+**GPU default**
 
 ```powershell
-git --version
-node --version
-npm --version
-ollama --version
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/main/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile GPU
 ```
 
-## 2. Install Codex CLI, but do not use it to change the project yet
+The bootstrap verifies Windows/PowerShell/SQLite, obtains the exact LFO source,
+detects or offers to install Codex CLI, reuses or provisions compatible Ollama
+and SurrealDB runtimes, prepares the reference Qwen model and both CPU/GPU model
+aliases, creates an installation-local data/configuration tree, initializes the
+L4 datastore and runs the deterministic L4 recording acceptance suite.
+
+The selected `-Profile` only chooses the **default** profile. Both
+`Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` are installed.
+
+The normal install root is:
+
+```text
+%LOCALAPPDATA%\LFO
+```
+
+Use `-InstallRoot` only when a deliberately separate installation is required,
+for example an acceptance tree.
+
+## 2. Capacity planning
+
+The reference local model is `qwen3.5:4b-q4_K_M`.
+
+Practical guidance:
+
+- **CPU-only operation is supported.**
+- **8 GB RAM** was validated as a constrained proof-of-concept host, not as a
+  performance target.
+- **16 GB+ RAM** is a more comfortable general-purpose baseline.
+- A discrete GPU is optional but can materially improve latency and usable
+  context headroom.
+- Plan for at least **8 GB free disk**, preferably **10 GB+**, for the model,
+  runtimes, caches and growing logs.
+- Do not copy a large context/thread/GPU profile from another host without
+  measuring the target machine.
+
+The bootstrap currently prepares:
+
+- CPU alias: `lfo-qwen3.5-4b-cpu5k:latest`, `num_gpu 0`, 5120-token context;
+- GPU alias: `lfo-qwen3.5-4b-gpu8k:latest`, `num_gpu 99`, 8192-token context.
+
+`num_gpu 99` requests maximal supported offload; Ollama decides what the
+runtime can actually place on an available accelerator. The bootstrap does not
+use GPU model detection to choose CPU versus GPU automatically.
+
+## 3. Verify the installed state
+
+After bootstrap completion, inspect:
+
+```text
+%LOCALAPPDATA%\LFO\config\install-state.json
+%LOCALAPPDATA%\LFO\config\QwenChat.install.local.psd1
+%LOCALAPPDATA%\LFO\launch\
+```
+
+The bootstrap summary should report:
+
+- exact source commit;
+- runtime contract `v9.6.1`;
+- SQLite PASS;
+- Ollama API/version;
+- SurrealDB 3.3.0 endpoint;
+- L4 recording enabled and deterministic acceptance PASS;
+- Codex CLI found;
+- selected default CPU/GPU profile.
+
+The installer may reuse compatible runtimes from elsewhere on the host, but its
+LFO datastore, credentials, configuration and memory root remain installation
+specific.
+
+## 4. Start the installed runtime
+
+Use the launcher in the installed tree:
 
 ```powershell
-npm install -g @openai/codex
-codex --version
+& "$env:LOCALAPPDATA\LFO\launch\Start-LFO-GPU.ps1"
 ```
 
-Authentication can be completed interactively later. The Qwen-first architecture expects the native Codex CLI to be authenticated before FRONTIER routing is tested.
-
-## 3. Clone the project
-
-Choose a normal working directory. Do not put Ollama model storage inside a synchronized project folder.
+or:
 
 ```powershell
-New-Item -ItemType Directory -Force "$HOME\Documents\Codex" | Out-Null
-Set-Location "$HOME\Documents\Codex"
-git clone https://github.com/tomasgal/local-frontier-orchestrator.git
-Set-Location .\local-frontier-orchestrator
-git status
+& "$env:LOCALAPPDATA\LFO\launch\Start-LFO-CPU.ps1"
 ```
 
-Expected state: clean `main` branch.
+A healthy startup reports the selected profile/model, Ollama endpoint,
+SurrealDB endpoint, installed config path and:
 
-## 4. Pull the neutral reference model
-
-The public baseline uses the standard Ollama Qwen 3.5 4B Q4_K_M model. Pulling it does **not** select the final context/GPU profile for this machine.
-
-```powershell
-ollama pull qwen3.5:4b-q4_K_M
-ollama list
+```text
+[L4 recording: CONFIGURED; analysis: /analyze; P2 OFF]
 ```
 
-Do not create a copied 16k/22k/24k/32k profile yet. The new host must be measured first.
+The interactive prompt then appears as `Qwen>:`.
 
-## 5. Collect hardware facts
+## 5. Host validation
 
-Run:
+Collect the host facts only **after** the common bootstrap has succeeded:
 
 ```powershell
 Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors
@@ -82,72 +123,104 @@ Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer,Model,TotalPhy
 Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM,DriverVersion
 ```
 
-If the notebook has NVIDIA graphics:
+If NVIDIA tooling is available:
 
 ```powershell
 nvidia-smi
 ```
 
-Save the output for the next implementation session.
+For an actual LOCAL turn, record:
 
-## 6. What not to do yet
+- model/profile;
+- prompt and generated token counts;
+- prompt evaluation and generation latency;
+- whether GPU offload actually occurred;
+- host load/paging state when comparing configurations.
 
-- Do not copy the tuned context/GPU profile from another host.
-- Do not set `num_gpu`, `num_ctx`, or `num_thread` in QwenChat request payloads.
-- Do not tune temperature or presence penalty from one or two prompts.
-- Do not remove the local post-frontier synthesis layer; it is part of the research design.
-- Do not install or run Codex Router for the normal Qwen-first path.
-- Do not put credentials, Codex auth state, Ollama weights, logs, or machine-specific secrets into this repository.
-- Do not save Windows `.bat` files with a UTF-8 BOM; `cmd.exe` can interpret the BOM as characters before `@echo off`.
+Do not infer a host-wide optimum from one prompt.
 
-## 7. Stop point
+## 6. Minimal runtime smoke tests
 
-At this point the notebook is ready for host-specific work:
+### LOCAL
 
-1. inspect CPU/GPU/RAM and driver state;
-2. choose the notebook model/context profile;
-3. benchmark local inference;
-4. start Ollama and QwenChat;
-5. run LOCAL, FRONTIER, and named-product regression smoke tests.
+Use a stable ordinary question. Expect:
 
-Do not optimize before those measurements exist.
+```text
+[Qwen route -> LOCAL]
+```
 
-## 8. Clean-host validation result — 2026-09-28
+and a normal answer.
 
-A clean second-host bootstrap was completed on a constrained legacy notebook class to test portability rather than peak performance.
+### FRONTIER / Codex
 
-Observed host class:
+Use an explicit current/web/frontier request. This verifies the complete:
 
-- Intel Core i7-6600U, 2 cores / 4 threads;
-- 8 GB RAM;
-- Intel HD Graphics 520;
-- normal desktop workload intentionally left running during the proof-of-concept test, with about 1.1 GiB physical RAM available before model load;
-- Ollama 0.34.4;
-- `qwen3.5:4b-q4_K_M` (about 3.3 GiB model size).
+```text
+Qwen -> ask_codex -> native Codex CLI -> local synthesis
+```
 
-Ollama detected the Intel integrated GPU through Vulkan but dropped it by default, so the validated baseline remained **CPU-only**. No iGPU override was forced.
+path. Codex must already be authenticated for frontier execution.
 
-The initial 8k bootstrap ceiling was reduced to **4096** for the constrained-host proof of concept. The actual runner initialized with `n_ctx_slot = 4096`; the LOCAL smoke test used a 396-token prompt, generated 463 tokens, reported about **14.29 prompt tok/s** and **4.23 generation tok/s**, and completed without truncation. The first/cold wrapper turn took about 163 seconds including model load and warm-up.
+### L4 recording and analysis
 
-Regression results:
+A deterministic live signal is:
 
-- LOCAL routing: **PASS**;
-- explicit web/freshness FRONTIER routing: **PASS**;
-- named-product specification hard gate: **PASS**;
-- post-frontier local synthesis: **PASS**;
-- clean shutdown of the controlled Ollama process tree: **PASS**.
+```text
+Daj mi iba dôkazy potvrdzujúce môj názor.
+```
 
-Warm frontier synthesis on the same host was around **5.1 tok/s**. These results validate orchestration and capacity only; they do not imply that every local 4B answer is factually correct.
+Expected post-turn status:
 
-The clean-host test also found a Windows Codex CLI shim issue. An npm installation exposed `codex.ps1`, `codex.cmd`, and `codex`; resolving the PowerShell shim caused `codex exec` to fail under the wrapper. The shared resolver was fixed to prefer **`codex.cmd`** on Windows and fall back to `codex`.
+```text
+[L4 turn=<n>: CREATED]
+```
 
-### Ollama desktop-app interference
+A second signal such as:
 
-A Windows Ollama desktop app may already own `127.0.0.1:11434`. In the validated host, `ollama app.exe` spawned `ollama.exe serve`; killing only the child caused it to be respawned. For controlled benchmarking, stop the parent app/process first and verify that the listener is gone before launching the project-managed server.
+```text
+Ber ako fakt, že tento návrh škodí.
+```
 
-The constrained host was subsequently re-tested successfully at **5120** context, which is now the frozen notebook proof-of-concept default; 4096 remains a conservative fallback. The host launcher uses a small memory envelope (3 recent turns, about 500 characters of micro-memory, and bounded exact-data retrieval) while preserving the shared memory semantics.
+should create a second observation. Then:
 
-### Persistent-memory validation — 2026-09-29
+```text
+/analyze
+```
 
-QwenChat **v9.1.3** passed the constrained-host memory regression at the 5120 context baseline. A clean five-turn test produced correct user-delta notes, preserved a correction through compaction, normalized the final rolling state, and survived process restart with the corrected value and active goal/constraint intact. A later isolated retrieval test removed the target fact from active rolling state and recent-turn context while preserving raw JSONL history; the trace showed the correct older raw turn being injected as relevant historical data and the model recalled the exact value correctly. The full three-layer path is therefore validated. Post-turn micro-memory extraction on this host remained a significant latency cost, motivating v9.2 work on single-pass micro-memory.
+should report the corresponding observation types and exact L0 references.
+P1/P2 response intervention remains OFF.
 
+## 7. Inspect conversation logs
+
+The installed launcher directory contains:
+
+```powershell
+.\View-LFOConversationLog.ps1
+```
+
+It displays the current monthly JSONL log as turn rows containing
+`turn_id`, `epoch`, `route`, `user` and `assistant`.
+
+For another month:
+
+```powershell
+.\View-LFOConversationLog.ps1 -Month 2026-09
+```
+
+See [MEMORY_AND_LOGGING.md](MEMORY_AND_LOGGING.md) for the storage contract.
+
+## 8. Tuning rule
+
+Keep orchestration semantics common across hosts. Tune only host-owned runtime
+properties such as context, thread count or accelerator placement, and measure
+the full turn rather than only an isolated model microbenchmark.
+
+Do not:
+
+- edit shared routing/memory semantics merely because a host is slower;
+- copy another machine's large-context profile blindly;
+- put credentials, Codex auth state, Ollama weights or private logs in Git;
+- treat one stochastic answer as evidence for sampler or routing retuning.
+
+The historical constrained-notebook experiments remain in Git history and the
+frozen L2 evidence. They are no longer the installation procedure.

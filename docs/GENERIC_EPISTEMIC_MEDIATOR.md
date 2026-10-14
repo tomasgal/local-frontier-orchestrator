@@ -3,7 +3,7 @@
 ## Interaction-level bias measurement and mitigation in Human–LLM systems
 
 **Status:** narrowed research/design workstream under [Balancing the Loop](HUMAN_AI_BIAS_BALANCER.md).  
-**Implementation status:** not frozen; the current priority is theoretical operationalization, benchmark design, and interface specification while the LFO L2/L3/L4 boundaries are still evolving.
+**Implementation status:** research/measurement layer still experimental, but the LFO substrate is now concrete: L2 and L3 are frozen, L4 R1/R2/A1/D1/A2/P1/P2 have frozen evidence boundaries, and v9.6.1 operationally records conservative T1 observations with explicit `/analyze`. P1/P2 response intervention remains OFF.
 
 This document defines a narrower, non-personalized engineering research track within the broader Human–AI Bias Balancer program.
 
@@ -39,6 +39,66 @@ user-facing answer
 ```
 
 The broader longitudinal and personalized questions remain part of [Balancing the Loop](HUMAN_AI_BIAS_BALANCER.md), but are outside this narrowed workstream.
+
+## Current LFO substrate and merged L4 research boundary
+
+The earlier `L4_RESEARCH_ANALYSIS.md` and
+`L4_EPISTEMIC_OBSERVATORY_DESIGN.md` design notes are superseded by the frozen
+L4 baselines and this research specification. Their enduring invariants are
+retained here.
+
+The authority chain is:
+
+```text
+L0  evidence of what happened
+L1  lossy conversational orientation
+L2  structured factual state
+L3  non-authoritative retrieval / resolution
+L4  derived epistemic observations and analytics
+```
+
+L3 answers **what evidence/context should be considered**. L4 answers **what
+epistemic interpretation or interaction signal is being reported**. Retrieval
+relevance and analytical validity are separate questions.
+
+The canonical L4 first-class record is `EpistemicObservation`, not a permanent
+`User HAS_BIAS ...` relation. The current store is SurrealDB
+`lfo / epistemic / observations`, with exact L0 source linkage, actor/stage,
+observation type, nullable detector confidence, detector/version and optional
+interaction linkage.
+
+The research chain remains:
+
+```text
+event -> observation -> optional intervention -> outcome
+```
+
+Repeated observations may support a later conditional longitudinal hypothesis,
+but repetition does not create a stable psychological fact. Any such hypothesis
+must remain provenance-linked, revisable and able to represent contradicting
+evidence.
+
+The operational invariant is:
+
+> **L4 history is not continuously injected context. It is primarily a
+> write-mostly epistemic event record with bounded explicit analytics and,
+> only in separately authorized research modes, a possible policy signal.**
+
+v9.6.1 implements only a conservative online subset: post-L0 T1 recording of
+`FRAMING` / `ASYMMETRIC_EVIDENCE_REQUEST` and explicit `/analyze` reads.
+The broader D1 detector remains offline and P1/P2 response intervention remains
+disconnected/OFF.
+
+The frozen milestones provide the implementation evidence:
+
+- [L4_R1_FROZEN_BASELINE.md](L4_R1_FROZEN_BASELINE.md) — observation store/provenance;
+- [L4_R2_FROZEN_BASELINE.md](L4_R2_FROZEN_BASELINE.md) — explicit annotation workflow;
+- [L4_A1_FROZEN_BASELINE.md](L4_A1_FROZEN_BASELINE.md) — bounded Observatory;
+- [L4_D1_FROZEN_BASELINE.md](L4_D1_FROZEN_BASELINE.md) — detector experiment;
+- [L4_A2_FROZEN_BASELINE.md](L4_A2_FROZEN_BASELINE.md) — interaction analytics;
+- [L4_P1_FROZEN_BASELINE.md](L4_P1_FROZEN_BASELINE.md) — default-OFF policy capsule;
+- [L4_P2_FROZEN_BASELINE.md](L4_P2_FROZEN_BASELINE.md) — bounded intervention experiment;
+- [L4_RECORDING_MANUAL_ANALYSIS.md](L4_RECORDING_MANUAL_ANALYSIS.md) — current runtime wiring.
 
 ## 2. Theoretical scope
 
@@ -78,7 +138,7 @@ user has confirmation bias
 
 Likewise, a model response can be described as agreement with a false premise, answer reversal under changed framing, or omission of counter-evidence without assuming a human-like psychological mechanism inside the model.
 
-This is consistent with the planned L4 research-analysis boundary: bias-related outputs are **derived, defeasible observations about events**, not permanent user attributes and not L2 factual state.
+This is consistent with the implemented L4 boundary: bias-related outputs are **derived, defeasible observations about events**, not permanent user attributes and not L2 factual state.
 
 ## 4. Bias strength, not generic risk
 
@@ -298,7 +358,7 @@ A structured observation should preserve:
 - method/version;
 - status such as observation or hypothesis.
 
-The exact schema should converge with [L4_RESEARCH_ANALYSIS.md](L4_RESEARCH_ANALYSIS.md) once the L3/L4 implementation boundary is stable.
+The research schema should extend rather than blur the frozen R1 observation contract. New magnitude/intervention/outcome fields require an explicitly versioned schema or derived analytic contract; the existing R1 `confidence` field is not a bias-magnitude score.
 
 ## 9. Relationship to LFO layers
 
@@ -340,7 +400,7 @@ Important boundaries:
 - ordinary conversational memory should not automatically contain derived bias labels;
 - L3 retrieval relevance and L4 analytical validity are separate problems.
 
-The LFO implementation should not be forced prematurely around this research track. The current preparation can proceed through theory, operationalization, benchmark design, and interface specification while the underlying L2/L3/L4 interfaces mature.
+The current LFO substrate is sufficiently stable to host bounded research prototypes, but the mediator itself should still be versioned independently. Operationalization, benchmark design and falsification criteria should determine detector/intervention changes rather than retrofitting the frozen L0-L4 contracts around a desired result.
 
 ## 10. Staged work plan
 
@@ -402,7 +462,7 @@ The first generic mediator should not:
 - claim universal debiasing;
 - treat model sycophancy as psychologically identical to human confirmation bias;
 - make political persuasion, clinical advice, or identity-sensitive persuasion the primary experimental domain;
-- depend on L3/L4 implementation details before those interfaces are stable.
+- treat the existence of the L3/L4 substrate as evidence that a detector, magnitude metric or intervention is valid.
 
 ## Core reading
 

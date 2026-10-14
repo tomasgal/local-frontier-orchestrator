@@ -229,7 +229,16 @@ A narrower **generic, non-personalized mediation** workstream is documented in [
 
 L4 uses `EpistemicObservation` as its core object and SurrealDB (`lfo / epistemic / observations`) as its canonical store; full conversation sources remain in L0. v9.6.1 implements write-mostly recording with explicit `/analyze` reads. Observations remain separate from L2 factual evidence. Framing and presupposition are not automatically biases.
 
-**L4-R1 scope:** runtime/store contract, observation schema, source provenance, create/read APIs and isolated persistence/restart tests. Automatic interventions, answer rewrites, persistent user profiling, graph/vector features and continuous prompt injection are outside R1. The [current L4 design](https://github.com/tomasgal/local-frontier-orchestrator/blob/2d80f1d64a4ed213e9c8163dbb227db4fb2f1ddd/docs/L4_EPISTEMIC_OBSERVATORY_DESIGN.md) governs this milestone; [earlier research notes](docs/L4_RESEARCH_ANALYSIS.md) remain background. **SurrealDB and L4 are not dependencies of the working L0-L3 baseline.**
+The L4 substrate is now documented through frozen R1/R2/A1/D1/A2/P1/P2 baselines. v9.6.1 operationally enables only conservative post-L0 recording and explicit `/analyze`; P1/P2 response intervention remains OFF. The consolidated research boundary and future bias-magnitude work are in [`docs/GENERIC_EPISTEMIC_MEDIATOR.md`](docs/GENERIC_EPISTEMIC_MEDIATOR.md), while runtime behavior is in [`docs/L4_RECORDING_MANUAL_ANALYSIS.md`](docs/L4_RECORDING_MANUAL_ANALYSIS.md). The historical pre-freeze L4 design notes are retained under `docs/archive/`.
+
+## Documentation map
+
+- **Install/runtime:** [Windows bootstrap](docs/WINDOWS_BOOTSTRAP_BUILD.md) · [host validation/tuning](docs/NOTEBOOK_SETUP.md) · [architecture](docs/ARCHITECTURE.md)
+- **Memory/provenance:** [runtime storage and logs](docs/MEMORY_AND_LOGGING.md) · [memory strategy](docs/MEMORY_STRATEGY.md) · [L2 frozen baseline](docs/L2_FROZEN_BASELINE.md) · [L3 frozen baseline](docs/L3_FROZEN_BASELINE.md)
+- **L4 runtime:** [recording and manual analysis](docs/L4_RECORDING_MANUAL_ANALYSIS.md) · [v9.6.1 gate](docs/L4_V961_GATE1.md) · frozen L4 baselines in `docs/L4_*_FROZEN_BASELINE.md`
+- **Research:** [Balancing the Loop](docs/HUMAN_AI_BIAS_BALANCER.md) · [Generic Epistemic Mediator](docs/GENERIC_EPISTEMIC_MEDIATOR.md) · [candidate solution designs](docs/CANDIDATE_SOLUTION_DESIGNS.md)
+- **Alternative Codex-first branch:** [Codex Router notes](docs/CODEX_ROUTER_NOTES.md)
+- **Historical records:** [docs/archive/](docs/archive/README.md)
 
 ## Repository layout
 
@@ -240,17 +249,20 @@ L4 uses `EpistemicObservation` as its core object and SurrealDB (`lfo / epistemi
 â”śâ”€â”€ config/
 â”‚   â”śâ”€â”€ host.example.psd1
 â”‚   â””â”€â”€ QwenChat.config.psd1
-â”śâ”€â”€ docs/
-â”‚   â”śâ”€â”€ ARCHITECTURE.md
-â”‚   â”śâ”€â”€ CODEX_ROUTER_NOTES.md
-â”‚   â”śâ”€â”€ HUMAN_AI_BIAS_BALANCER.md
-â”‚   â”śâ”€â”€ GENERIC_EPISTEMIC_MEDIATOR.md
-â”‚   â”śâ”€â”€ CANDIDATE_SOLUTION_DESIGNS.md
-â”‚   â”śâ”€â”€ DOKUWIKI_SEARCH_SUBSYSTEM.md
-â”‚   â”śâ”€â”€ L4_RESEARCH_ANALYSIS.md
-â”‚   â”śâ”€â”€ NOTEBOOK_SETUP.md
-â”‚   â””â”€â”€ ROADMAP.md
-â”śâ”€â”€ policy/
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── ROADMAP.md
+│   ├── WINDOWS_BOOTSTRAP_BUILD.md
+│   ├── NOTEBOOK_SETUP.md
+│   ├── MEMORY_AND_LOGGING.md
+│   ├── MEMORY_STRATEGY.md
+│   ├── L2_FROZEN_BASELINE.md
+│   ├── L3_FROZEN_BASELINE.md
+│   ├── L4_RECORDING_MANUAL_ANALYSIS.md
+│   ├── HUMAN_AI_BIAS_BALANCER.md
+│   ├── GENERIC_EPISTEMIC_MEDIATOR.md
+│   └── archive/
+├── policy/
 â”‚   â”śâ”€â”€ orchestrator-system.txt
 â”‚   â”śâ”€â”€ synthesis-system.txt
 â”‚   â””â”€â”€ frontier-subagent.txt
@@ -297,37 +309,27 @@ The scripts avoid hard-coded personal paths. Runtime paths can be supplied throu
 
 ## Quick start
 
-Use the [v9.6.1 release](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.1) for the current L0-L4 recording/manual-analysis source. Select host-specific model settings explicitly and configure R1 as described above; existing installations are not migrated automatically.
+For Windows, use the bootstrap commands near the top of this README. The
+bootstrap installs/reuses the supported runtime components, creates both CPU and
+GPU aliases/launchers, prepares the installation-local memory/L4 stores and runs
+the deterministic L4 acceptance gate.
 
-Start Ollama:
+After installation, start the explicit profile you want:
 
 ```powershell
-.\launch\Start-Ollama.ps1
+& "$env:LOCALAPPDATA\LFO\launch\Start-LFO-GPU.ps1"
 ```
 
 or:
 
-```text
-launch\Start-Ollama.bat
-```
-
-Then start the chat client:
-
 ```powershell
-.\src\QwenChat.ps1 -Model "your-local-model:tag"
+& "$env:LOCALAPPDATA\LFO\launch\Start-LFO-CPU.ps1"
 ```
 
-or use the BAT wrapper:
-
-```text
-launch\QwenChat.bat -Model "your-local-model:tag"
-```
-
-The local model profile should carry hardware/runtime placement settings appropriate for that machine. The chat client intentionally avoids overriding GPU/CPU placement, context length, or thread count per request.
-
-QwenChat v9.3 keeps persistent local state under `%LOCALAPPDATA%\LocalFrontierOrchestrator` by default. Ordinary memory remains **single-pass**: the LOCAL answer or post-frontier synthesis may emit a bounded 0â€“40 character user-delta micro-note without a separate per-turn memory inference. Pending notes are compacted into a 0â€“160 character rolling state when semantic pressure reaches **4 notes or 108 pending-note characters**. If the user explicitly asks the system to remember something and the single-pass note is empty, the wrapper permits at most one focused memory-only recovery call. Exact historical data is not compressed away: full conversation JSONL remains authoritative and bounded relevant raw snippets can be retrieved when needed.
-
-For a clean Windows host bootstrap, see [`docs/NOTEBOOK_SETUP.md`](docs/NOTEBOOK_SETUP.md). Do not copy a tuned context/GPU profile from another machine before measuring the new host.
+For post-bootstrap hardware validation and tuning, see
+[`docs/NOTEBOOK_SETUP.md`](docs/NOTEBOOK_SETUP.md). For current storage/log
+semantics, see
+[`docs/MEMORY_AND_LOGGING.md`](docs/MEMORY_AND_LOGGING.md).
 
 ## Security and privacy notes
 

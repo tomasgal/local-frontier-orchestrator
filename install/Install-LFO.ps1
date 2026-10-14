@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'LFO'),
-    [string]$SourceRef = 'build/windows-bootstrap-v1',
+    [string]$SourceRef = 'main',
     [ValidateSet('CPU','GPU')][string]$Profile = 'GPU',
     [string]$BaseModel = 'qwen3.5:4b-q4_K_M',
     [switch]$SkipModelPull,

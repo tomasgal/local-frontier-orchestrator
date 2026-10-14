@@ -44,3 +44,13 @@ Canonical outcome: [../L4_R2_FROZEN_BASELINE.md](../L4_R2_FROZEN_BASELINE.md).
 Files are moved here when their detailed development history remains useful but
 a later frozen baseline or accepted summary has become authoritative. Git history
 remains the final source for earlier versions and deleted/superseded material.
+
+## Superseded L4 design notes
+
+- `L4_RESEARCH_ANALYSIS.md` — pre-implementation conceptual L4 research model.
+  Its enduring observation/provenance/intervention/hypothesis boundaries are
+  consolidated into [../GENERIC_EPISTEMIC_MEDIATOR.md](../GENERIC_EPISTEMIC_MEDIATOR.md).
+- `L4_EPISTEMIC_OBSERVATORY_DESIGN.md` — pre-freeze Observatory/Balancer
+  architecture. Its write-mostly/read-rarely invariant, SurrealDB decision and
+  observation/analytics/policy separation are now reflected in the frozen L4
+  baselines and current runtime documentation.

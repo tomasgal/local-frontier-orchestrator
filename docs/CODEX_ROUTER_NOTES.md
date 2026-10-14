@@ -1,73 +1,59 @@
-# Codex Router notes
+# Codex Router — alternative Codex-first research path
 
-## Why it matters to this project
+## Status
 
-Early experiments used [Codex Router](https://github.com/duolahypercho/codex-router) to place a local Ollama/Qwen model behind the Codex interface.
+Codex Router is **not a dependency of the current LFO runtime**. The supported
+v9.6.1 architecture is Qwen-first:
 
-That work demonstrated an important complementary capability:
+```text
+Qwen local UI -> bounded ask_codex -> native Codex CLI
+```
+
+This document is retained because the complementary Codex-first topology remains
+a useful research branch:
 
 ```text
 Codex CLI -> Codex Router -> Ollama -> local Qwen
 ```
 
-In other words, **Codex can serve as the user-facing agent interface while the underlying model is local Qwen**.
+The two paths answer different questions and should not be conflated.
 
-A related experimental fork is maintained at:
+## What the Codex-first path demonstrated
+
+A local Ollama/Qwen model can participate behind the Codex interface. This is
+useful for experiments on:
+
+- local models inside an established coding/agent interface;
+- Codex tool-surface compatibility with alternative model backends;
+- prompt/tool-schema overhead on small models;
+- context and timeout requirements for slow local inference.
+
+For small local models, however, the Codex agent/tool/session context can be
+large relative to the user task. The primary LFO runtime therefore keeps Qwen
+as the outer conversational orchestrator and escalates selectively to native
+Codex.
+
+## Upstream contribution
+
+The local-context/timeout work was contributed upstream as:
+
+- **duolahypercho/codex-router PR #925 — _Allow local Ollama context and timeout overrides_**
+
+The PR was **merged on 2026-10-05** (merge commit
+`85259b6725ced1c1f0f56325b0c97a7b6660a726`). It added bounded local Ollama
+context/timeout overrides and preserved the no-retry local transport behavior.
+The PR included a Windows end-to-end Codex -> Router -> LiteLLM -> Ollama -> Qwen
+smoke test that completed successfully under a very long local request.
+
+The experimental fork remains:
 
 - <https://github.com/tomasgal/codex-router>
 
-## What worked
+## Project boundary
 
-The local-model transport path through Codex Router works. The approach is useful for experiments where a local model should participate in the Codex agent environment rather than act as the outer conversational orchestrator.
+Normal users installing LFO from the README should **not install Codex Router**
+for the Qwen-first path. Native Codex CLI is the supported reference FRONTIER
+adapter.
 
-## Why the main project pivoted to Qwen-first
-
-For small local models, the full Codex agent/tool/session surface can be expensive relative to the actual user task. This creates several practical issues:
-
-- large prompt prefill;
-- context pressure;
-- slower local inference;
-- tool-schema overhead;
-- more demanding instruction-following requirements for the local model.
-
-The current primary path therefore reverses the topology:
-
-```text
-Qwen local UI -> bounded ask_codex -> native Codex frontier
-```
-
-Codex Router is not required for this path.
-
-## Why keep both?
-
-They answer different research questions.
-
-### Qwen-first
-
-Best suited for:
-
-- cheap local conversation;
-- local privacy/policy layer;
-- selective frontier escalation;
-- bias-aware mediation before and after frontier calls;
-- heterogeneous local hardware.
-
-### Codex-first
-
-Best suited for exploring:
-
-- local models inside an established coding/agent interface;
-- Codex tool use with alternative/local model backends;
-- the limits of small models under a rich agent harness;
-- compatibility and tool-surface reduction.
-
-The Codex-first branch remains active research and will continue to be tuned independently.
-
-
-## Upstream contribution status
-
-An upstream contribution is currently under review:
-
-- [duolahypercho/codex-router PR #925 — Allow local Ollama context and timeout overrides](https://github.com/duolahypercho/codex-router/pull/925)
-
-As of **2026-09-28**, the PR is open, mergeable, and not yet merged. The project therefore records this as an **open upstream contribution**, not yet as a merged upstream-contributor credit.
+Revisit Codex Router only when explicitly working on the Codex-first research
+branch or on the planned provider/client abstraction work.
