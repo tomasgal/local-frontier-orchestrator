@@ -85,7 +85,7 @@ if (-not (Test-Path -LiteralPath $l2ReadModule)) {
 . $l2ReadModule
 
 $telemetryModule = Join-Path $PSScriptRoot 'LfoTurnTelemetry.ps1'
-if (-not (Test-Path -LiteralPath $telemetryModule)) { throw "LFO telemetry module not found: $telemetryModule" }
+if (-not (Test-Path -LiteralPath $telemetryModule)) { throw "Dev4 telemetry module not found: $telemetryModule" }
 . $telemetryModule
 
 $memoryModule = Join-Path $PSScriptRoot 'QwenMemory.ps1'
@@ -1051,21 +1051,16 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Local Frontier Orchestrator - local chat | v9.6.1" -ForegroundColor Cyan
-Write-Host "Local model: Qwen via Ollama; ordinary turns stay local when routing allows."
-Write-Host "Frontier escalation: ask_codex is read-only and limited to at most one call per user turn."
-Write-Host "Routing: deterministic hard gates plus Qwen LOCAL/FRONTIER routing; the local model has no direct Ollama tool access."
-Write-Host ("Thinking: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
-Write-Host "L4: conservative post-L0 recording; manual /analyze; P2 intervention OFF."
-Write-Host "Commands: /exit, /clear, /paste, /think on, /think off, /analyze [1..100 turns]"
+Write-Host "Qwen local chat v9.6.1. Commands: /exit, /clear, /paste, /think on, /think off, /analyze [1..100 turns]"
+Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
+Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
+Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
 if ($script:MemoryEnabled) {
-    Write-Host ("Memory: ON; recent turns={0}; compact at pending>={1} notes or >={2} chars; note<={3} chars; state<={4} chars" -f `
+    Write-Host ("Persistent memory: ON; recent turns={0}; compact at pending>={1} notes or >={2} chars; note<={3} chars; state<={4} chars" -f `
         $script:MemoryRecentTurns, $script:MemoryCompactionMaxPendingNotes, $script:MemoryCompactionMaxPendingChars, $script:MemoryNoteMaxChars, $script:MemoryStateMaxChars)
     Write-Host ("Exact-data retrieval: max {0} items / {1} chars" -f `
         $script:MemoryRetrievalMaxItems, $script:MemoryRetrievalMaxChars)
-    Write-Host ("Local memory/log path: {0}" -f $script:DataRoot)
-} else {
-    Write-Host "Memory: OFF"
+    Write-Host ("Memory/log path: {0}" -f $script:DataRoot)
 }
 Write-Host ""
 
@@ -1081,42 +1076,6 @@ while ($true) {
             continue
         }
         '^/exit$' {
-            exit 0
-        }
-        '^/clear$' {
-            Clear-PersistentConversationMemory
-            Write-Host "Working memory and active conversation context cleared. Historical logs retained."
-            continue
-        }
-        '^/paste$' {
-            $clip = Get-Clipboard -Raw
-            if ([string]::IsNullOrWhiteSpace($clip)) {
-                Write-Host "Clipboard is empty." -ForegroundColor Yellow
-                continue
-            }
-            Write-Host ("[Sending clipboard: {0} characters]" -f $clip.Length) -ForegroundColor DarkGray
-            Invoke-Qwen $clip
-            continue
-        }
-        '^/think\s+on$' {
-            $ThinkEnabled = $true
-            Write-Host "Thinking enabled."
-            continue
-        }
-        '^/think\s+off$' {
-            $ThinkEnabled = $false
-            Write-Host "Thinking disabled."
-            continue
-        }
-        '^\s*$' {
-            continue
-        }
-        default {
-            Invoke-Qwen $prompt
-        }
-    }
-}
- {
             exit 0
         }
         '^/clear$' {

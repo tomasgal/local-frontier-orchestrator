@@ -515,40 +515,42 @@ try{$c=New-LfoEpistemicConnection $surrealBase $runtimeCred;$null=Invoke-LfoEpis
 # even when install-state.json was not reached. Runtime credentials make the probe
 # installation-specific; an unrelated SurrealDB listener will not authenticate.
 if(-not $existingLfoDb){
-    $listeningRecoveryPorts=@()
+    # A file-backed SurrealDB does not persist its bind port in the datastore.
+    # Recover an installer-started instance from the exact process command line:
+    # Start-LfoEpistemicServer launches surreal.exe with both --bind and the
+    # normalized rocksdb://.../observations.db path.
+    $dbPathNormalized=(Join-Path ([IO.Path]::GetFullPath($surrealData)) 'observations.db').Replace('\','/')
+    $matchingSurrealProcesses=@()
     try {
-        $listeningRecoveryPorts=@(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
-            Where-Object { $_.LocalPort -ge 18080 -and $_.LocalPort -le 18120 } |
-            Select-Object -ExpandProperty LocalPort -Unique | Sort-Object)
+        $matchingSurrealProcesses=@(Get-CimInstance Win32_Process -Filter "Name='surreal.exe'" -ErrorAction SilentlyContinue | Where-Object {
+            $_.CommandLine -and $_.CommandLine.Replace('\','/').IndexOf($dbPathNormalized,[StringComparison]::OrdinalIgnoreCase) -ge 0
+        })
     } catch {}
-    if($listeningRecoveryPorts.Count){Info ("SurrealDB recovery: probing listening ports "+($listeningRecoveryPorts -join ', '))}
-    foreach($candidatePort in $listeningRecoveryPorts){
-        if($candidatePort -eq $surrealPort){continue}
-        $candidateBase='http://127.0.0.1:'+$candidatePort
-        try {
-            $candidateConnection=New-LfoEpistemicConnection $candidateBase $runtimeCred -TimeoutSec 2
-            $null=Invoke-LfoEpistemicQuery $candidateConnection 'RETURN 1;'
-            $candidateVersion=[string](Invoke-RestMethod -Uri ($candidateBase+'/version') -TimeoutSec 2)
-            if($candidateVersion -match '(^|[- ])3\.3\.0($|[ +])'){
-                $surrealPort=$candidatePort
-                $surrealBase=$candidateBase
-                $existingLfoDb=$true
-                Info "Recovered existing LFO SurrealDB datastore at $surrealBase"
-                break
-            }
-        } catch {}
+    foreach($process in $matchingSurrealProcesses){
+        $cmd=[string]$process.CommandLine
+        if($cmd -match '(?i)(?:--bind|-b)\s+["'']?(?:127\.0\.0\.1|localhost):(?<port>\d{2,5})'){
+            $candidatePort=[int]$Matches.port
+            $candidateBase='http://127.0.0.1:'+$candidatePort
+            Info ("SurrealDB recovery: process "+$process.ProcessId+" declares "+$candidateBase)
+            try {
+                $candidateConnection=New-LfoEpistemicConnection $candidateBase $runtimeCred -TimeoutSec 2
+                $null=Invoke-LfoEpistemicQuery $candidateConnection 'RETURN 1;'
+                $candidateVersion=[string](Invoke-RestMethod -Uri ($candidateBase+'/version') -TimeoutSec 2)
+                if($candidateVersion -match '(^|[- ])3\.3\.0($|[ +])'){
+                    $surrealPort=$candidatePort
+                    $surrealBase=$candidateBase
+                    $existingLfoDb=$true
+                    Info "Recovered existing LFO SurrealDB datastore at $surrealBase"
+                    break
+                }
+            } catch {}
+        }
     }
 }
 
 if(-not $existingLfoDb){
-    $sameDatastoreProcesses=@()
-    try {
-        $sameDatastoreProcesses=@(Get-CimInstance Win32_Process -Filter "Name='surreal.exe'" -ErrorAction SilentlyContinue | Where-Object {
-            $_.CommandLine -and $_.CommandLine.IndexOf($surrealData,[StringComparison]::OrdinalIgnoreCase) -ge 0
-        })
-    } catch {}
-    if($sameDatastoreProcesses.Count -gt 0){
-        throw "An existing SurrealDB process already owns the LFO datastore at $surrealData, but the runtime credential probe could not recover its endpoint. Stop that process or repair the stored runtime marker before retrying."
+    if($matchingSurrealProcesses.Count -gt 0){
+        throw "An existing SurrealDB process already owns the LFO datastore at $surrealData, but its declared --bind endpoint could not be authenticated with this installation's runtime credential. Stop that process or repair the stored runtime marker before retrying."
     }
     if(@(Get-NetTCPConnection -State Listen -LocalPort $surrealPort -ErrorAction SilentlyContinue).Count -gt 0){$surrealPort=Get-FreePort 18080;$surrealBase='http://127.0.0.1:'+$surrealPort}
     $serverScript=Join-Path $AppRoot 'tools\Start-LfoEpistemicServer.ps1'
