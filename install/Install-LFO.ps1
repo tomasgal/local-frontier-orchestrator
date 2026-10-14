@@ -3,7 +3,8 @@ param(
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'LFO'),
     [string]$SourceRef = 'build/windows-bootstrap-v1',
     [string]$BaseModel = 'qwen3.5:4b-q4_K_M',
-    [switch]$SkipModelPull
+    [switch]$SkipModelPull,
+    [switch]$SkipL4Acceptance
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,6 +26,7 @@ $SurrealUrl = 'https://github.com/surrealdb/surrealdb/releases/download/v3.3.0/s
 $SurrealSHA256 = '3e5e9d363a352be81f5a983d53f0bc0cd77a90e305f01e2fed929987cf79735c'
 $GpuModel = 'lfo-qwen3.5-4b-gpu8k:latest'
 $CpuModel = 'lfo-qwen3.5-4b-cpu5k:latest'
+$RuntimeContract = 'v9.6.1'
 
 function Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
 function Info([string]$Text) { Write-Host "    $Text" }
@@ -156,7 +158,7 @@ function Open-EncodedWindow([string]$Title,[string]$Code) {
 }
 
 Write-Host ''
-Write-Host 'Local Frontier Orchestrator (LFO) - Windows bootstrap' -ForegroundColor Cyan
+Write-Host ('Local Frontier Orchestrator (LFO) - Windows bootstrap for '+$RuntimeContract) -ForegroundColor Cyan
 Write-Host 'Local-first AI orchestration with structured memory, provenance and bounded L4 epistemic tooling.'
 Write-Host 'Project: https://github.com/tomasgal/local-frontier-orchestrator'
 Write-Host 'Created by Tomas Gal; bootstrap and integration tooling developed with OpenAI ChatGPT/Codex assistance.'
@@ -280,7 +282,13 @@ if ($git) {
     } finally { Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\QwenChat.ps1')) 'LFO source checkout is incomplete.'
+Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\LfoL4Runtime.ps1')) 'LFO source does not contain the v9.6.1 L4 runtime module.'
+Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'tests\Test-LfoL4Recording.ps1')) 'LFO source does not contain the v9.6.1 L4 recording acceptance suite.'
+foreach($requiredLauncher in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1')){
+    Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot ('launch\'+$requiredLauncher))) ("Bootstrap source is missing launcher: "+$requiredLauncher)
+}
 Info "LFO source: $SourceCommit"
+Info "Runtime contract: $RuntimeContract"
 
 Step 'SQLite provider detection and functional self-test'
 $systemSqlite=Join-Path $env:WINDIR 'System32\winsqlite3.dll'
@@ -523,12 +531,29 @@ $configText=[regex]::Replace($configText,"(?m)^\s*Model\s*=\s*'[^']*'","    Mode
 $configText=[regex]::Replace($configText,"(?m)^\s*BaseUri\s*=\s*'[^']*'","    BaseUri = '"+(Quote-PsSingle $ollamaBase)+"'",1)
 $configText=[regex]::Replace($configText,'(?m)^\s*L0StageSourcesEnabled\s*=\s*\$false','        L0StageSourcesEnabled = $true',1)
 $configText=[regex]::Replace($configText,"(?m)^\s*DataDirectory\s*=\s*'[^']*'","        DataDirectory = '"+(Quote-PsSingle $memoryDir)+"'",1)
+$l4Line="    L4 = @{ Enabled = `$true; Endpoint = '"+(Quote-PsSingle $surrealBase)+"'; CredentialPath = '"+(Quote-PsSingle $runtimeCredPath)+"' }"
+$configText=[regex]::Replace($configText,"(?m)^\s*L4\s*=\s*@\{[^\r\n]*\}$",$l4Line,1)
 $installConfigPath=Join-Path $ConfigRoot 'QwenChat.install.local.psd1'
 [IO.File]::WriteAllText($installConfigPath,$configText,$utf8)
 $parsedInstallConfig=Import-PowerShellDataFile -LiteralPath $installConfigPath
 Assert-Lfo ([string]$parsedInstallConfig.BaseUri -ceq $ollamaBase) 'Generated LFO config has the wrong Ollama BaseUri.'
 Assert-Lfo ([bool]$parsedInstallConfig.Memory.L0StageSourcesEnabled) 'Generated LFO config did not enable L0 stage-source provenance.'
 Assert-Lfo ([string]$parsedInstallConfig.Memory.DataDirectory -ceq $memoryDir) 'Generated LFO config has the wrong memory directory.'
+Assert-Lfo ([bool]$parsedInstallConfig.L4.Enabled) 'Generated LFO config did not enable L4 recording.'
+Assert-Lfo ([string]$parsedInstallConfig.L4.Endpoint -ceq $surrealBase) 'Generated LFO config has the wrong L4 endpoint.'
+Assert-Lfo ([string]$parsedInstallConfig.L4.CredentialPath -ceq $runtimeCredPath) 'Generated LFO config has the wrong L4 runtime credential path.'
+
+$l4Acceptance='SKIPPED'
+if(-not $SkipL4Acceptance){
+    Step 'Run v9.6.1 deterministic L4 recording acceptance'
+    $acceptScript=Join-Path $AppRoot 'tests\Test-LfoL4Recording.ps1'
+    $acceptProc=Start-Process powershell.exe -Wait -PassThru -NoNewWindow -ArgumentList @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',$acceptScript,'-SurrealBinary',$surrealExe)
+    Assert-Lfo ($acceptProc.ExitCode -eq 0) ("v9.6.1 L4 recording acceptance failed with exit code "+$acceptProc.ExitCode)
+    $l4Acceptance='PASS'
+    Info 'L4 recording acceptance: release suite PASS.'
+} else {
+    Warn 'v9.6.1 L4 recording acceptance skipped by request.'
+}
 
 $state=[ordered]@{
     SchemaVersion=1
@@ -541,7 +566,7 @@ $state=[ordered]@{
     Ollama=[ordered]@{Executable=$ollamaExe;ExecutableVersion=[string]$ollamaExeVersion;ApiVersion=$ollamaApiVersion;Managed=$ollamaManaged;BaseUri=$ollamaBase;HostAddress=$hostAddress;ModelsDirectory=$ollamaModelsDir;BaseModel=$BaseModel;GPUModel=$GpuModel;CPUModel=$CpuModel}
     SurrealDB=[ordered]@{Executable=$surrealExe;Version=$SurrealVersion;SHA256=$surrealHash;Managed=$surrealManaged;BaseUri=$surrealBase;Port=$surrealPort;DataDirectory=$surrealData;BootstrapCredentialPath=$bootstrapCredPath;RuntimeCredentialPath=$runtimeCredPath;Namespace='lfo';Database='epistemic'}
     Frontier=[ordered]@{CodexDetected=[bool]$codexPath;CodexExecutable=$codexPath;CodexVersion=$codexVersion;AdapterSelection='PENDING'}
-    LFO=[ordered]@{ConfigPath=$installConfigPath;MemoryDirectory=$memoryDir;L0StageSourcesEnabled=$true;L4ObservabilityEnvironment=$true}
+    LFO=[ordered]@{RuntimeContract=$RuntimeContract;ConfigPath=$installConfigPath;MemoryDirectory=$memoryDir;L0StageSourcesEnabled=$true;L4RecordingEnabled=$true;L4Acceptance=$l4Acceptance}
 }
 $statePath=Join-Path $ConfigRoot 'install-state.json'
 [IO.File]::WriteAllText($statePath,($state|ConvertTo-Json -Depth 12),$utf8)
@@ -563,9 +588,11 @@ $gpuBatText="@echo off`r`npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Byp
 Step 'Bootstrap complete'
 Write-Host ('Install root:  '+$InstallRoot) -ForegroundColor Green
 Write-Host ('Source:        '+$SourceCommit) -ForegroundColor Green
+Write-Host ('Runtime:       '+$RuntimeContract) -ForegroundColor Green
 Write-Host ('SQLite:       PASS '+$sqliteVersion) -ForegroundColor Green
 Write-Host ('Ollama:       '+$ollamaApiVersion+' @ '+$ollamaBase) -ForegroundColor Green
 Write-Host ('SurrealDB:    '+$SurrealVersion+' @ '+$surrealBase) -ForegroundColor Green
+Write-Host ('L4 recording: ENABLED; acceptance='+$l4Acceptance+'; /analyze available; P2 OFF') -ForegroundColor Green
 Write-Host ('Codex:        FOUND ('+$codexVersion+')') -ForegroundColor Green
 $installedLaunchDir=Join-Path $InstallRoot 'launch'
 Write-Host ('Launch dir:    '+$installedLaunchDir) -ForegroundColor Green

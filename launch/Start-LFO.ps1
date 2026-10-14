@@ -27,11 +27,11 @@ $monitor = Join-Path $state.AppRoot 'launch\Watch-LFOService.ps1'
 
 Write-Host ''
 Write-Host 'Local Frontier Orchestrator (LFO) - Windows runtime' -ForegroundColor Cyan
-Write-Host 'Integrated baseline: v9.6 | Windows bootstrap/build candidate'
+Write-Host 'Runtime contract: v9.6.1 | Windows bootstrap/build candidate'
 Write-Host 'Local-first path: Qwen via Ollama handles ordinary conversation and routing.'
 Write-Host 'Frontier path: authenticated Codex CLI is called only when routing/policy requires stronger or fresh external reasoning.'
 Write-Host 'Memory path: local L0/L1/L2/L3 state preserves conversation evidence, working memory and structured retrieval.'
-Write-Host 'L4 datastore: SurrealDB endpoint is prepared for epistemic observability; automatic intervention is not enabled by this launcher.'
+Write-Host 'L4: conservative post-L0 recording is enabled; /analyze is manual; P1/P2 response intervention remains OFF.'
 Write-Host 'Service policy: reuse compatible running services where safe; do not stop unrelated services.'
 Write-Host ("Selected profile: {0}" -f $Profile)
 Write-Host ''
@@ -72,6 +72,7 @@ if ($NoChat) { return }
 $model = if ($Profile -eq 'CPU') { [string]$state.Ollama.CPUModel } else { [string]$state.Ollama.GPUModel }
 $ctx = if ($Profile -eq 'CPU') { 5120 } else { 8192 }
 $env:LFO_INSTALL_ROOT = $InstallRoot
+$env:LFO_L4_ENABLED = '1'
 $env:LFO_L4_ENDPOINT = $surrealUri
 $env:LFO_L4_RUNTIME_CREDENTIAL = [string]$state.SurrealDB.RuntimeCredentialPath
 $env:LFO_L4_OBSERVABILITY = '1'
@@ -82,6 +83,7 @@ Write-Host "Profile:   $Profile"
 Write-Host "Model:     $model"
 Write-Host "Ollama:    $ollamaUri"
 Write-Host "SurrealDB: $surrealUri"
+Write-Host "L4:        recording enabled; /analyze manual; P2 OFF"
 Write-Host "Config:    $config"
 Write-Host ''
 & $chat -Model $model -ConfigPath $config -ContextLengthHint $ctx

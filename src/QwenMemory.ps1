@@ -1404,7 +1404,8 @@ function Persist-TurnAndMemory(
     [string]$MemoryRecoveryReason,
     $MemoryRecoverySuccess,
     [string]$MemoryNoteSource,
-    [object[]]$StageSources = @()
+    [object[]]$StageSources = @(),
+    [scriptblock]$PostL0 = $null
 ) {
     if (-not $script:MemoryEnabled -and
         -not [bool]$script:Config.ResearchLogging.Enabled) {
@@ -1495,6 +1496,10 @@ function Persist-TurnAndMemory(
 
         $script:RuntimeState.next_turn_id = $turnId + 1
         Save-RuntimeState
+        if($null -ne $PostL0 -and $script:L0StageSourcesEnabled){
+            try { $null=& $PostL0 $conversationRow ([IO.Path]::GetFileName($conversationLogPath)) }
+            catch { Write-Host '[L4 FAILED_ISOLATED; chat continues.]' -ForegroundColor Yellow }
+        }
     }
 
     $l2Scope = "conversation:$epoch"

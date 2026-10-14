@@ -1005,6 +1005,7 @@ $recentContext
     if (-not [string]::IsNullOrWhiteSpace($finalContent)) {
         Add-LfoL0StageSource $stageSources 'FINAL' 'FINAL_RESPONSE' $finalPhase $finalProducer $finalContent 'delivered' 'assistant'
         Persist-TurnAndMemory `
+            -PostL0 $script:LfoL4PostL0 `
             -StageSources $stageSources.ToArray() `
             -Prompt $Prompt `
             -FinalContent $finalContent `
@@ -1029,16 +1030,34 @@ $recentContext
 
 
 Initialize-PersistentMemory
+$script:LfoL4PostL0=$null
+$script:LfoL4Loaded=$false
+try {
+    . (Join-Path $PSScriptRoot 'LfoL4Runtime.ps1')
+    $l4Settings=@{}
+    if($script:Config.ContainsKey('L4')){$l4Settings=$script:Config.L4}
+    $l4State=Initialize-LfoL4Recording -LogDirectory $script:LogDir -ProvenanceEnabled $script:L0StageSourcesEnabled -Settings $l4Settings
+    $script:LfoL4Loaded=$true
+    Write-Host ('[L4 recording: '+$l4State.Status+'; analysis: /analyze; P2 OFF]')
+    if($l4State.Status -ceq 'CONFIGURED'){
+        $script:LfoL4PostL0={
+            param($Row,$SourceFile)
+            $result=Invoke-LfoL4RecordTurn -Row $Row -SourceFile $SourceFile
+            Write-Host ("[L4 turn={0}: {1}]" -f $Row.turn_id,$result.Status) -ForegroundColor DarkGray
+        }
+    }
+} catch { Write-Host '[L4 unavailable; chat continues.]' -ForegroundColor Yellow }
 $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Local Frontier Orchestrator - local chat | v9.6 integrated baseline" -ForegroundColor Cyan
+Write-Host "Local Frontier Orchestrator - local chat | v9.6.1" -ForegroundColor Cyan
 Write-Host "Local model: Qwen via Ollama; ordinary turns stay local when routing allows."
 Write-Host "Frontier escalation: ask_codex is read-only and limited to at most one call per user turn."
 Write-Host "Routing: deterministic hard gates plus Qwen LOCAL/FRONTIER routing; the local model has no direct Ollama tool access."
 Write-Host ("Thinking: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
-Write-Host "Commands: /exit, /clear, /paste, /think on, /think off"
+Write-Host "L4: conservative post-L0 recording; manual /analyze; P2 intervention OFF."
+Write-Host "Commands: /exit, /clear, /paste, /think on, /think off, /analyze [1..100 turns]"
 if ($script:MemoryEnabled) {
     Write-Host ("Memory: ON; recent turns={0}; compact at pending>={1} notes or >={2} chars; note<={3} chars; state<={4} chars" -f `
         $script:MemoryRecentTurns, $script:MemoryCompactionMaxPendingNotes, $script:MemoryCompactionMaxPendingChars, $script:MemoryNoteMaxChars, $script:MemoryStateMaxChars)
@@ -1055,7 +1074,49 @@ while ($true) {
     if ($null -eq $prompt) { continue }
 
     switch -Regex ($prompt.Trim()) {
-        '^/exit$' {
+        '^/analyze(?:\s|$)' {
+            if($script:LfoL4Loaded){
+                Invoke-LfoL4AnalyzeCommand -Command $prompt -Epoch ([int]$script:RuntimeState.epoch) -LastTurn ([int]$script:RuntimeState.next_turn_id-1)
+            } else { Write-Host '[L4 analysis unavailable.]' }
+            continue
+        }
+        '^/exit
+            exit 0
+        }
+        '^/clear$' {
+            Clear-PersistentConversationMemory
+            Write-Host "Working memory and active conversation context cleared. Historical logs retained."
+            continue
+        }
+        '^/paste$' {
+            $clip = Get-Clipboard -Raw
+            if ([string]::IsNullOrWhiteSpace($clip)) {
+                Write-Host "Clipboard is empty." -ForegroundColor Yellow
+                continue
+            }
+            Write-Host ("[Sending clipboard: {0} characters]" -f $clip.Length) -ForegroundColor DarkGray
+            Invoke-Qwen $clip
+            continue
+        }
+        '^/think\s+on$' {
+            $ThinkEnabled = $true
+            Write-Host "Thinking enabled."
+            continue
+        }
+        '^/think\s+off$' {
+            $ThinkEnabled = $false
+            Write-Host "Thinking disabled."
+            continue
+        }
+        '^\s*$' {
+            continue
+        }
+        default {
+            Invoke-Qwen $prompt
+        }
+    }
+}
+ {
             exit 0
         }
         '^/clear$' {
