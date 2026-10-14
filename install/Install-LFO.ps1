@@ -673,7 +673,7 @@ if($SkipLaunch){
     $selectedLauncher = Join-Path $installedLaunchDir $selectedLauncherName
     Write-Host ("Starting LFO/Qwen with the selected {0} profile..." -f $Profile) -ForegroundColor Cyan
     try {
-        Start-Process powershell.exe -WindowStyle Normal -ArgumentList @('-NoLogo','-NoProfile','-NoExit','-ExecutionPolicy','Bypass','-File',$selectedLauncher) | Out-Null
+        Start-Process powershell.exe -WindowStyle Normal -ArgumentList @('-NoLogo','-NoProfile','-NoExit','-ExecutionPolicy','Bypass','-File',('"'+$selectedLauncher+'"')) | Out-Null
     } catch {
         Warn ("Installation completed, but automatic LFO/Qwen launch failed: "+$_.Exception.Message)
         Write-Host ("Start it manually from: "+$selectedLauncher) -ForegroundColor Yellow
