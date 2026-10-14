@@ -9,6 +9,10 @@ version: "9.6.2"
 date-released: "2026-10-14"
 repository-code: "https://github.com/tomasgal/local-frontier-orchestrator"
 url: "https://github.com/tomasgal/local-frontier-orchestrator"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.23373391"
+    description: "Zenodo archive for Local Frontier Orchestrator v9.6.2"
 abstract: >-
   Local-first LLM orchestration runtime using Ollama/Qwen for local interaction
   and an authenticated Codex CLI as a bounded on-demand frontier subagent, with

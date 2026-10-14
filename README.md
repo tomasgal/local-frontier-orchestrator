@@ -4,6 +4,8 @@
 
 Release notes: [docs/RELEASE_V9.6.2.md](docs/RELEASE_V9.6.2.md).
 
+**Zenodo archive (v9.6.2):** DOI [10.5281/zenodo.23373391](https://doi.org/10.5281/zenodo.23373391).
+
 ## Windows bootstrap for v9.6.2
 
 The Windows bootstrap is part of the v9.6.2 runtime contract. v9.6.2 promotes the accepted installer/service packaging from `main` into the release boundary without changing the frozen L0–L3 baselines or the conservative v9.6.1 L4 observation semantics. Clean installed-tree Windows acceptance and release-closure smokes passed on 2026-10-14.

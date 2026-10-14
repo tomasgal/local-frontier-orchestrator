@@ -22,6 +22,8 @@ The Windows bootstrap promoted into v9.6.2 passed clean installed-tree acceptanc
 
 The CPU check validates the CPU profile on the accepted Windows installation; a separate physical host remains additional compatibility coverage rather than a release blocker. With these closure items complete, the release-candidate source is being promoted as immutable **v9.6.2**. The functional acceptance evidence remains the tested `dbd14629d2318bc5f340271b225518c39d217f16` installed tree plus documentation-only closure commit `795761c4821e5435b38736718c6eaff48fbc4770`; the version-promotion commit changes version labels/metadata rather than orchestration semantics.
 
+**Publication closure:** the immutable GitHub `v9.6.2` release was archived by Zenodo on 2026-10-14 as software, DOI `10.5281/zenodo.23373391`. The DOI was added to moving `main` after archival; the already-published tag remains unchanged.
+
 ### L3 closure
 
 Accepted L3 properties:

@@ -61,3 +61,12 @@ The shared model-store defect discovered by the first FRONTIER smoke was repaire
 ## Publication note
 
 The repository currently has no explicit software license file. v9.6.2 does not silently choose one. A license decision should be made explicitly before or together with Zenodo publication if broader reuse rights are intended.
+
+
+## Zenodo archive
+
+The published v9.6.2 software release is archived on Zenodo with the version-specific DOI:
+
+`10.5281/zenodo.23373391`
+
+The immutable Git tag remains `v9.6.2`; this DOI documentation was added to `main` after Zenodo completed the archive ingest and does not rewrite the released tag.
