@@ -3,7 +3,7 @@
 ## Interaction-level bias measurement and mitigation in Human–LLM systems
 
 **Status:** narrowed research/design workstream under [Balancing the Loop](HUMAN_AI_BIAS_BALANCER.md).  
-**Implementation status:** research/measurement layer still experimental, but the LFO substrate is now concrete: L2 and L3 are frozen, L4 R1/R2/A1/D1/A2/P1/P2 have frozen evidence boundaries, and v9.6.2 operationally preserves conservative T1 observations with explicit `/analyze`. P1/P2 response intervention remains OFF.
+**Implementation status:** research/measurement layer still experimental, but the LFO substrate is now concrete: L2 and L3 are frozen, L4 R1/R2/A1/D1/A2/P1/P2 have frozen evidence boundaries, and v9.6.2 operationally preserves conservative T1 observations with explicit `/analyze`. P1/P2 response intervention remains OFF. The reference software boundary is archived on Zenodo as DOI [`10.5281/zenodo.23373391`](https://doi.org/10.5281/zenodo.23373391); this documents the platform state, not mediator efficacy.
 
 This document defines a narrower, non-personalized engineering research track within the broader Human–AI Bias Balancer program.
 
@@ -84,7 +84,7 @@ The operational invariant is:
 > write-mostly epistemic event record with bounded explicit analytics and,
 > only in separately authorized research modes, a possible policy signal.**
 
-v9.6.1 implements only a conservative online subset: post-L0 T1 recording of
+v9.6.2 operationally preserves the conservative v9.6.1 online subset: post-L0 T1 recording of
 `FRAMING` / `ASYMMETRIC_EVIDENCE_REQUEST` and explicit `/analyze` reads.
 The broader D1 detector remains offline and P1/P2 response intervention remains
 disconnected/OFF.
@@ -173,7 +173,7 @@ SYCOPHANCY shift = 0.18
 ```
 
 These numbers are examples of an output shape only. They are not produced by
-v9.6.1 and must not be interpreted as calibrated probabilities. Each quantity
+v9.6.2 and must not be interpreted as calibrated probabilities. Each quantity
 needs its own explicit reference/control condition and metric.
 
 For implementation work, keep detector breadth separate from magnitude
