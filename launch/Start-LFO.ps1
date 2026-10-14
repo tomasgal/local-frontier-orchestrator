@@ -1,9 +1,10 @@
 param(
     [ValidateSet('GPU','CPU')][string]$Profile = 'GPU',
-    [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'LFO'),
+    [string]$InstallRoot,
     [switch]$NoChat
 )
 
+if ([string]::IsNullOrWhiteSpace($InstallRoot)) { $InstallRoot = Split-Path -Parent $PSScriptRoot }
 $ErrorActionPreference = 'Stop'
 chcp 65001 > $null
 $utf8 = New-Object System.Text.UTF8Encoding($false)
