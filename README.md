@@ -1,6 +1,8 @@
 # Local Frontier Orchestrator
 
-**Current version: v9.6.2 (2026-10-14).** This packaging/runtime release preserves the accepted v9.6.1 L4 recording and `/analyze` semantics while incorporating the accepted Windows bootstrap, shared Ollama model-store binding, CPU/GPU launch profiles, and live installed-tree FRONTIER/CPU closure results. The immutable `v9.6.2` tag is the intended release boundary for this state.
+**Current version: [v9.6.2](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.2) (2026-10-14).** This packaging/runtime release preserves the accepted v9.6.1 L4 recording and `/analyze` semantics while incorporating the accepted Windows bootstrap, shared Ollama model-store binding, CPU/GPU launch profiles, and live installed-tree FRONTIER/CPU closure results. The immutable `v9.6.2` tag is the intended release boundary for this state.
+
+Release notes: [docs/RELEASE_V9.6.2.md](docs/RELEASE_V9.6.2.md).
 
 ## Windows bootstrap for v9.6.2
 

@@ -10,7 +10,7 @@ limitations and reopen criteria.
 
 ### v9.6.2 operational packaging/runtime release
 
-**v9.6.2 is the release target for the accepted operational packaging/runtime state.** It preserves the v9.6.1 conservative post-L0 T1 recording and explicit bounded `/analyze` A1/A2 reads, while promoting the accepted Windows bootstrap, shared Ollama model-store lifecycle, CPU/GPU launch profiles and live closure smokes into one immutable release boundary. D1 remains offline and P1/P2 response intervention remains OFF.
+**v9.6.2 is the accepted operational packaging/runtime release.** It preserves the v9.6.1 conservative post-L0 T1 recording and explicit bounded `/analyze` A1/A2 reads, while promoting the accepted Windows bootstrap, shared Ollama model-store lifecycle, CPU/GPU launch profiles and live closure smokes into one immutable release boundary. D1 remains offline and P1/P2 response intervention remains OFF.
 
 The Windows bootstrap promoted into v9.6.2 passed clean installed-tree acceptance on 2026-10-14 and is integrated into `main`. It reuses/provisions Ollama and SurrealDB, generates isolated L4 configuration/credentials, creates CPU/GPU launch profiles, and runs the deterministic 33-check recording suite. Packaging acceptance does not reopen frozen L0-L3 or frozen L4 research milestones.
 

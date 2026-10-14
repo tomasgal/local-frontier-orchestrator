@@ -3,8 +3,8 @@ message: "If you use this software, please cite it using the metadata below."
 title: "Local Frontier Orchestrator"
 type: software
 authors:
-  - family-names: "Gal"
-    given-names: "Tomas"
+  - family-names: "Gál"
+    given-names: "Tomáš"
 version: "9.6.2"
 date-released: "2026-10-14"
 repository-code: "https://github.com/tomasgal/local-frontier-orchestrator"
