@@ -70,3 +70,17 @@ The published v9.6.2 software release is archived on Zenodo with the version-spe
 `10.5281/zenodo.23373391`
 
 The immutable Git tag remains `v9.6.2`; this DOI documentation was added to `main` after Zenodo completed the archive ingest and does not rewrite the released tag.
+
+## Post-release validation
+
+On 2026-10-15 the maintainer reported a successful live end-to-end test of the
+operational L4 recording path on a separate Lenovo Windows notebook. A
+conservative T1 bias-triggering interaction produced a `CREATED` L4
+observation, providing additional cross-host evidence for the live
+user-turn -> local Qwen -> post-L0 detector -> observation-write path.
+
+This post-release evidence is documented only on moving `main`; the immutable
+`v9.6.2` tag and archived Zenodo release remain unchanged. The Lenovo result
+does not establish a full second-host bootstrap/FRONTIER/CPU-GPU acceptance
+matrix and does not change the existing no-detector-accuracy/no-debiasing-
+efficacy boundary.
