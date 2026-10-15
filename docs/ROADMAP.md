@@ -24,6 +24,8 @@ The CPU check validates the CPU profile on the accepted Windows installation; a 
 
 **Publication closure:** the immutable GitHub `v9.6.2` release was archived by Zenodo on 2026-10-14 as software, DOI `10.5281/zenodo.23373391`. The DOI was added to moving `main` after archival; the already-published tag remains unchanged.
 
+**Post-release cross-host validation — 2026-10-15:** the maintainer reported a successful live end-to-end L4 operational-path test on a separate Lenovo Windows notebook. A conservative T1 bias-triggering interaction produced a `CREATED` L4 observation, confirming the user-turn → local Qwen → post-L0 T1 detection → R1 observation-write path on a second physical host. This is additional cross-host evidence for the operational L4 recording path; it does **not** claim full Lenovo bootstrap/FRONTIER/CPU-GPU matrix validation, D1 promotion, P1/P2 intervention, detector accuracy, or debiasing efficacy.
+
 ### L3 closure
 
 Accepted L3 properties:
