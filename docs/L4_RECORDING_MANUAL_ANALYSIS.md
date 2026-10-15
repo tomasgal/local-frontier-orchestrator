@@ -162,6 +162,19 @@ Use the published v9.6.2 source for this procedure; its L4 recording semantics a
    The answer and L0 persistence must still work; status must not claim a
    confirmed write. Restore the service and verify a later turn succeeds.
 
+### Cross-host live validation
+
+On 2026-10-15 the maintainer reported a successful live end-to-end test of the
+operational L4 recording path on a separate Lenovo Windows notebook. A
+conservative T1 bias-triggering interaction produced a `CREATED` observation,
+confirming the live user-turn -> local Qwen -> post-L0 T1 detection -> R1 write
+path outside the original Ryzen host.
+
+This is intentionally a narrow cross-host claim. It does not by itself validate
+the complete Lenovo bootstrap lifecycle, the authenticated FRONTIER/Codex path,
+both CPU/GPU execution profiles, D1, P1/P2 response intervention, detector
+accuracy, or debiasing efficacy.
+
 Offline acceptance runs actual `Invoke-Qwen`, its startup/callback and slash
 command loop, with deterministic LOCAL transport and an isolated real R1 DB:
 
