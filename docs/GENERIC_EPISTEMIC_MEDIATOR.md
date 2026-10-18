@@ -7,6 +7,8 @@
 
 This document defines a narrower, non-personalized engineering research track within the broader Human–AI Bias Balancer program.
 
+A domain-specific possible application is the [Russian propaganda resilience audit](RUSSIAN_PROPAGANDA_RESILIENCE_RESEARCH.md). That proposal separates factual error, framing effects, manipulated source context, and FRONTIER-to-FINAL synthesis changes; its benchmark and evaluation layer are not yet implemented.
+
 The focus is not to diagnose stable psychological traits in users and not to assign a generic "bias risk score." The focus is to identify **observable interaction-level effects**, measure their magnitude relative to an explicit reference condition, apply auditable interventions, and evaluate whether those interventions improve the interaction.
 
 ## 1. Research aim

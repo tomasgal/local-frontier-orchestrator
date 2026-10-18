@@ -242,12 +242,14 @@ L4 uses `EpistemicObservation` as its core object and SurrealDB (`lfo / epistemi
 
 The L4 substrate is now documented through frozen R1/R2/A1/D1/A2/P1/P2 baselines. v9.6.1 operationally enables only conservative post-L0 recording and explicit `/analyze`; P1/P2 response intervention remains OFF. The consolidated research boundary and future bias-magnitude work are in [`docs/GENERIC_EPISTEMIC_MEDIATOR.md`](docs/GENERIC_EPISTEMIC_MEDIATOR.md), while runtime behavior is in [`docs/L4_RECORDING_MANUAL_ANALYSIS.md`](docs/L4_RECORDING_MANUAL_ANALYSIS.md). The historical pre-freeze L4 design notes are retained under `docs/archive/`.
 
+A separate possible research track, [auditing Russian propaganda susceptibility](docs/RUSSIAN_PROPAGANDA_RESILIENCE_RESEARCH.md), proposes a claim-level benchmark for factual accuracy, framing, manipulated source context, and changes between FRONTIER output and local synthesis. It specifies implementation steps, controls, scoring, and evidence limits above v9.6.2; it is not an implemented propaganda detector or a completed evaluation.
+
 ## Documentation map
 
 - **Install/runtime:** [Windows bootstrap](docs/WINDOWS_BOOTSTRAP_BUILD.md) · [host validation/tuning](docs/NOTEBOOK_SETUP.md) · [architecture](docs/ARCHITECTURE.md)
 - **Memory/provenance:** [runtime storage and logs](docs/MEMORY_AND_LOGGING.md) · [memory strategy](docs/MEMORY_STRATEGY.md) · [L2 frozen baseline](docs/L2_FROZEN_BASELINE.md) · [L3 frozen baseline](docs/L3_FROZEN_BASELINE.md)
 - **L4 runtime:** [recording and manual analysis](docs/L4_RECORDING_MANUAL_ANALYSIS.md) · [v9.6.1 gate](docs/L4_V961_GATE1.md) · frozen L4 baselines in `docs/L4_*_FROZEN_BASELINE.md`
-- **Research:** [Balancing the Loop](docs/HUMAN_AI_BIAS_BALANCER.md) · [Generic Epistemic Mediator](docs/GENERIC_EPISTEMIC_MEDIATOR.md) · [candidate solution designs](docs/CANDIDATE_SOLUTION_DESIGNS.md)
+- **Research:** [Balancing the Loop](docs/HUMAN_AI_BIAS_BALANCER.md) · [Generic Epistemic Mediator](docs/GENERIC_EPISTEMIC_MEDIATOR.md) · [Russian propaganda resilience proposal](docs/RUSSIAN_PROPAGANDA_RESILIENCE_RESEARCH.md) · [candidate solution designs](docs/CANDIDATE_SOLUTION_DESIGNS.md)
 - **Alternative Codex-first branch:** [Codex Router notes](docs/CODEX_ROUTER_NOTES.md)
 - **Historical records:** [docs/archive/](docs/archive/README.md)
 

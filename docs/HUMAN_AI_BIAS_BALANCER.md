@@ -10,6 +10,8 @@ For the narrowed **generic, non-personalized mediation** workstream focused on o
 
 This research track uses Local Frontier Orchestrator as an experimental platform for studying reciprocal bias in Human–LLM interaction.
 
+A separate possible model/system audit is specified in [Auditing Russian Propaganda Susceptibility with LFO](RUSSIAN_PROPAGANDA_RESILIENCE_RESEARCH.md). It applies the provenance and measurement framework to factual/source resilience without introducing political persuasion of human participants or claiming validated debiasing.
+
 The core problem is not only that humans can be biased, or that language models can be biased. The more interesting system-level problem is that the two can become **coupled**.
 
 A user may approach the system with an initial belief, framing, confidence level, or preference for confirming evidence. A conversational model may in turn exhibit sycophancy, agreement bias, sensitivity to framing, or fluent overconfidence. Repeated interaction can therefore create a feedback loop in which neither side is an independent correction of the other.

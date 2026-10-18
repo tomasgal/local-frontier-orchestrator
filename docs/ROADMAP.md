@@ -367,6 +367,7 @@ Research goals:
 
 ## Human–AI bias balancing
 
+- Possible domain-specific research: [Russian propaganda resilience audit](RUSSIAN_PROPAGANDA_RESILIENCE_RESEARCH.md), with an isolated claim benchmark, paired framing/source conditions, stage-level scoring, and a separately evaluated mediator. This is a protocol proposal, not a runtime feature or completed result.
 - define explicit mediator interventions;
 - add trace schema for reliance, verification, confidence, and disagreement;
 - distinguish generic from personalized policies;
