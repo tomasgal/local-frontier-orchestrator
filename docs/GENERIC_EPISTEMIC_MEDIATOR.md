@@ -2,238 +2,165 @@
 
 ## Interaction-level bias measurement and mitigation in Human–LLM systems
 
-**Status:** narrowed research/design workstream under [Balancing the Loop](HUMAN_AI_BIAS_BALANCER.md).  
-**Implementation status:** research/measurement layer still experimental, but the LFO substrate is now concrete: L2 and L3 are frozen, L4 R1/R2/A1/D1/A2/P1/P2 have frozen evidence boundaries, and v9.6.2 operationally preserves conservative T1 observations with explicit `/analyze`. P1/P2 response intervention remains OFF. The reference software boundary is archived on Zenodo as DOI [`10.5281/zenodo.23373391`](https://doi.org/10.5281/zenodo.23373391); this documents the platform state, not mediator efficacy.
+**Status:** first-stage research specification under [Balancing the Loop](HUMAN_AI_BIAS_BALANCER.md).
 
-This document defines a narrower, non-personalized engineering research track within the broader Human–AI Bias Balancer program.
+**Implementation boundary:** LFO v9.6.2 provides a reproducible L0–L4 substrate. The mediator policy and its efficacy remain experimental. P1/P2 intervention is not enabled in the normal runtime.
 
-A domain-specific possible application is the [Russian propaganda resilience audit](RUSSIAN_PROPAGANDA_RESILIENCE_RESEARCH.md). That proposal separates factual error, framing effects, manipulated source context, and FRONTIER-to-FINAL synthesis changes; its benchmark and evaluation layer are not yet implemented.
+## 1. Scope
 
-The focus is not to diagnose stable psychological traits in users and not to assign a generic "bias risk score." The focus is to identify **observable interaction-level effects**, measure their magnitude relative to an explicit reference condition, apply auditable interventions, and evaluate whether those interventions improve the interaction.
+The first mediation study should be **generic and non-personalized**.
 
-## 1. Research aim
+Its purpose is to determine whether observable interaction-level distortions can be measured against explicit controls and mitigated by an auditable local policy without introducing more error than it removes.
 
-The main research question is:
-
-> Can a generic, auditable mediation layer reduce measurable framing- and sycophancy-related distortions in Human–LLM interaction while preserving useful model assistance and appropriate human reliance?
-
-The mediator is intentionally **non-personalized** in the first implementation. It should operate on the current interaction and explicitly retrieved evidence rather than on a hidden profile of the user's beliefs.
-
-A minimal conceptual flow is:
+The first-stage mediator should not infer a permanent psychological profile of the user and should not optimize for agreement, satisfaction, or preservation of the user’s beliefs.
 
 ```text
 user request
     |
     v
-pre-response interaction analysis
+pre-response analysis / optional rewrite
     |
     v
-local/frontier LLM
+frontier advice or frozen response
     |
     v
-post-response interaction analysis
-    |
-    v
-optional intervention
+post-response analysis / optional intervention
     |
     v
 user-facing answer
 ```
 
-The broader longitudinal and personalized questions remain part of [Balancing the Loop](HUMAN_AI_BIAS_BALANCER.md), but are outside this narrowed workstream.
+## 2. Use the existing LFO substrate
 
-## Current LFO substrate and merged L4 research boundary
-
-The earlier `L4_RESEARCH_ANALYSIS.md` and
-`L4_EPISTEMIC_OBSERVATORY_DESIGN.md` design notes are superseded by the frozen
-L4 baselines and this research specification. Their enduring invariants are
-retained here.
-
-The authority chain is:
+The research layer should build on, not duplicate, the existing architecture:
 
 ```text
-L0  evidence of what happened
-L1  lossy conversational orientation
+L0  raw evidence and exact interaction provenance
+L1  conversational working memory
 L2  structured factual state
-L3  non-authoritative retrieval / resolution
-L4  derived epistemic observations and analytics
+L3  retrieval / resolution
+L4  event-scoped epistemic observations and bounded analytics
 ```
 
-L3 answers **what evidence/context should be considered**. L4 answers **what
-epistemic interpretation or interaction signal is being reported**. Retrieval
-relevance and analytical validity are separate questions.
+Important boundaries:
 
-The canonical L4 first-class record is `EpistemicObservation`, not a permanent
-`User HAS_BIAS ...` relation. The current store is SurrealDB
-`lfo / epistemic / observations`, with exact L0 source linkage, actor/stage,
-observation type, nullable detector confidence, detector/version and optional
-interaction linkage.
+- an L4 observation is not an L2 fact;
+- a bias-related signal is not a permanent user trait;
+- retrieved context is evidence/context, not itself a bias label;
+- ordinary conversational memory should not automatically contain derived bias labels;
+- study-specific participant/trial data can use an additional store when needed, but a second complete provenance system is unnecessary if LFO already records the required evidence.
 
-The research chain remains:
-
-```text
-event -> observation -> optional intervention -> outcome
-```
-
-Repeated observations may support a later conditional longitudinal hypothesis,
-but repetition does not create a stable psychological fact. Any such hypothesis
-must remain provenance-linked, revisable and able to represent contradicting
-evidence.
-
-The operational invariant is:
-
-> **L4 history is not continuously injected context. It is primarily a
-> write-mostly epistemic event record with bounded explicit analytics and,
-> only in separately authorized research modes, a possible policy signal.**
-
-v9.6.2 operationally preserves the conservative v9.6.1 online subset: post-L0 T1 recording of
-`FRAMING` / `ASYMMETRIC_EVIDENCE_REQUEST` and explicit `/analyze` reads.
-The broader D1 detector remains offline and P1/P2 response intervention remains
-disconnected/OFF.
-
-The frozen milestones provide the implementation evidence:
-
-- [L4_R1_FROZEN_BASELINE.md](L4_R1_FROZEN_BASELINE.md) — observation store/provenance;
-- [L4_R2_FROZEN_BASELINE.md](L4_R2_FROZEN_BASELINE.md) — explicit annotation workflow;
-- [L4_A1_FROZEN_BASELINE.md](L4_A1_FROZEN_BASELINE.md) — bounded Observatory;
-- [L4_D1_FROZEN_BASELINE.md](L4_D1_FROZEN_BASELINE.md) — detector experiment;
-- [L4_A2_FROZEN_BASELINE.md](L4_A2_FROZEN_BASELINE.md) — interaction analytics;
-- [L4_P1_FROZEN_BASELINE.md](L4_P1_FROZEN_BASELINE.md) — default-OFF policy capsule;
-- [L4_P2_FROZEN_BASELINE.md](L4_P2_FROZEN_BASELINE.md) — bounded intervention experiment;
-- [L4_RECORDING_MANUAL_ANALYSIS.md](L4_RECORDING_MANUAL_ANALYSIS.md) — current runtime wiring.
-
-## 2. Theoretical scope
-
-The theory section should concentrate on Human–AI / Human–LLM interaction rather than expanding into a broad catalogue of cognitive biases.
-
-The central concepts are:
-
-1. **confirmation / myside bias and framing** on the human side;
-2. **sycophancy / agreement bias** on the model side;
-3. **automation bias and appropriate reliance** as interaction outcomes;
-4. **mitigation strategies** that can intervene before or after an LLM response;
-5. **limits of automatic detection**, especially the difference between an observable interaction signal and a psychological interpretation.
-
-Authority-related effects and anthropomorphism remain relevant background topics, but they are secondary unless a defensible operational measure is defined.
+Current runtime details are documented in [L4_RECORDING_MANUAL_ANALYSIS.md](L4_RECORDING_MANUAL_ANALYSIS.md).
 
 ## 3. Observation before interpretation
 
-The mediator should distinguish direct evidence from a stronger research interpretation.
-
-Prefer an event-scoped record such as:
+Prefer event-scoped descriptions:
 
 ```text
 event_ref: turn_123
 observable_signal: leading_question
 evidence:
-  - explicit preferred conclusion in the user prompt
+  - explicit preferred conclusion in user prompt
 interpretation:
   compatible_with: confirmation_or_myside_bias
 status: hypothesis
 ```
 
-over:
+Avoid promoting this to:
 
 ```text
 user has confirmation bias
 ```
 
-Likewise, a model response can be described as agreement with a false premise, answer reversal under changed framing, or omission of counter-evidence without assuming a human-like psychological mechanism inside the model.
+Likewise, model behaviour can be described as agreement with a false premise, answer reversal under changed framing, or omission of counter-evidence without assuming a human-like psychological mechanism inside the model.
 
-This is consistent with the implemented L4 boundary: bias-related outputs are **derived, defeasible observations about events**, not permanent user attributes and not L2 factual state.
+## 4. Bias magnitude, not one universal “bias level”
 
-## 4. Bias strength, not generic risk
+The mediator should not produce one generic low/medium/high bias score.
 
-The first implementation should **not** output a generic low/medium/high "bias risk."
+For each selected phenomenon, the researcher should define a **phenomenon-specific magnitude** relative to an explicit reference or control.
 
-A more useful quantity is **bias magnitude / bias strength**: the measured deviation from an explicit reference or control condition.
-
-The reference must be defined for the specific phenomenon. Depending on the task, it may be:
+Possible references include:
 
 - independently verifiable ground truth;
 - a neutralized version of the same prompt;
 - a balanced evidence set;
-- an expert- or benchmark-defined reference answer;
-- a counterbalanced experimental condition;
+- a benchmark-defined reference answer;
+- a counterbalanced condition;
 - the response distribution before versus after a controlled framing manipulation.
 
-For example:
+Example:
 
 ```text
 neutral prompt  -> response distribution A
 framed prompt   -> response distribution B
 
-bias magnitude = measured shift attributable to the framing manipulation
+framing magnitude = measured shift attributable to the framing manipulation
 ```
 
-A future implementation may expose phenomenon-specific measurements such as:
+The existing L4/R1 `confidence` field is detector metadata. It must **not** be reused as a bias-magnitude score.
+
+There is no assumption that one scalar represents all forms of bias.
+
+## 5. Researcher-controlled mediator parameters
+
+The mediator configuration should expose the assumptions that materially determine behaviour.
+
+A useful experiment-level parameter set is:
 
 ```text
-FRAMING magnitude = 0.32
-ASYMMETRY magnitude = 0.71
-SYCOPHANCY shift = 0.18
+phenomenon
+reference_condition
+magnitude_metric
+detector_profile / detector_sensitivity
+intervention_threshold
+intervention_weight_or_intensity
+abstention_rule
+false_intervention_budget
+policy_version
 ```
 
-These numbers are examples of an output shape only. They are not produced by
-v9.6.2 and must not be interpreted as calibrated probabilities. Each quantity
-needs its own explicit reference/control condition and metric.
+Not every phenomenon needs every field, and the implementation names can differ. The important requirement is that the choices are explicit and auditable.
 
-For implementation work, keep detector breadth separate from magnitude
-measurement. A simple candidate detector-tuning interface may be
-`L4.DetectorProfile = 'conservative' | 'expanded'` (or, alternatively, an
-ordinal `DetectorSensitivity = 1 | 2`). The exact current code touchpoints are
-documented in `docs/L4_RECORDING_MANUAL_ANALYSIS.md`: configuration at
-`config/QwenChat.config.psd1:10`, detector rules in
-`src/LfoL4Runtime.ps1:74-90`, detector invocation/recording in
-`src/LfoL4Runtime.ps1:93-108`, and deterministic fixtures in
-`tests/Test-LfoL4Recording.ps1:12-28`. Magnitude storage or derivation would
-instead touch the R1 schema/store and/or A1/A2 analytics; it must not reuse the
-existing R1 `confidence` field as a surrogate magnitude.
+The researcher should:
 
-Possible measures include:
+1. choose and justify the operational definitions;
+2. tune only during development/pilot work;
+3. document failure cases;
+4. freeze the mediator configuration before confirmatory data collection.
 
-- change in agreement with a false prior;
-- change in factual correctness;
-- change in selected option or ranking;
-- change in expressed confidence;
-- change in inclusion of counter-evidence;
-- semantic movement toward the user's stated position;
-- effect size across repeated samples.
+This makes the **choice of bias magnitude, sensitivity, thresholds, weights, and abstention rules part of the scientific contribution**, rather than an opaque property of the LLM.
 
-There is no assumption that one universal scalar can represent all forms of bias.
+## 6. Candidate phenomena
 
-"Unbiased objectivity" should therefore be treated carefully. When ground truth exists, correctness can be the reference. When it does not, the experiment must define a defensible neutral, balanced, counterfactual, or counterbalanced condition rather than silently assuming a universal objective answer.
+### 6.1 User framing / confirmation-seeking signals
 
-## 5. Candidate phenomena
+Observable candidates:
 
-### 5.1 User framing / confirmation-seeking signals
-
-Observable candidates include:
-
-- explicit prior or preferred conclusion;
+- explicit preferred conclusion;
 - leading question;
 - assertion phrased as a request for confirmation;
 - selective request for supporting evidence;
 - asymmetric request that excludes counter-evidence.
 
-Possible interventions:
+Candidate interventions:
 
 - neutral rewrite;
 - convert assertion into an open question;
 - request counter-evidence;
 - request alternative hypotheses;
-- obtain an independent answer before exposing the model to the user's preferred conclusion.
+- obtain an independent answer before exposing the model to the user’s preferred conclusion.
 
-### 5.2 Model sycophancy / agreement bias
+### 6.2 Model sycophancy / agreement bias
 
-Observable candidates include:
+Observable candidates:
 
-- agreement with an incorrect or unsupported user premise;
-- answer reversal when the user's stated position changes while evidence remains fixed;
-- selective omission of counter-evidence after the user expresses a preference;
-- increased agreement under first-person or high-certainty framing.
+- agreement with an incorrect or unsupported premise;
+- answer reversal when the user’s stated position changes while evidence remains fixed;
+- selective omission of counter-evidence after a preference is expressed;
+- stronger agreement under first-person or high-certainty framing.
 
-Possible interventions:
+Candidate interventions:
 
 - neutralized re-query;
 - independent-answer first pass;
@@ -241,258 +168,214 @@ Possible interventions:
 - critique or contradiction check;
 - preserve the distinction between evidence and user preference.
 
-### 5.3 Automation bias / appropriate reliance
+### 6.3 Appropriate reliance
 
-Automation bias is less suitable as a one-turn text classification target because the relevant phenomenon is how the user acts on automated advice.
+Automation bias is best treated mainly as a behavioural outcome rather than a one-turn text label.
 
-It is better represented as an **outcome variable**, for example:
+Candidate measures:
 
 - uptake of correct AI advice;
 - resistance to incorrect AI advice;
-- verification when verification is useful;
+- verification when useful;
 - confidence change after AI exposure;
+- reliance discrimination;
 - persistence of AI-induced shifts on later unaided tasks.
 
-The goal is not maximal trust or maximal distrust. The target is **appropriate reliance**.
+### 6.4 Unsupported certainty / over-coherence
 
-### 5.4 Unsupported certainty and over-coherence
-
-A secondary model-side signal is the production of a stronger or more settled conclusion than the available evidence supports.
-
-Observable candidates include:
+Observable candidates:
 
 - categorical language without adequate support;
 - loss of explicit uncertainty;
 - omission of plausible alternatives;
 - rhetorical closure of a genuinely unresolved problem.
 
-The system should not display pseudo-calibrated numerical confidence unless the measurement method actually supports calibration.
+Do not display pseudo-calibrated numerical confidence unless the measurement method actually supports calibration.
 
-## 6. Candidate research questions
+## 7. P1/P2 as a reference intervention, not a requirement
 
-1. Which interaction-level signals can be operationalized reliably without inferring stable psychological traits?
-2. How strongly does controlled user framing shift model outputs relative to neutral or counterbalanced conditions?
-3. Can a generic mediator reduce sycophancy or false-prior agreement without suppressing justified agreement?
-4. Can the mediator improve appropriate reliance on AI advice in tasks with defensible ground truth?
-5. What false positives, false interventions, latency costs, and other trade-offs are introduced by the mediation layer?
+The existing LFO P1/P2 work provides a bounded intervention reference and evidence boundary. It is useful for research because it gives a concrete starting point without claiming efficacy.
 
-These questions intentionally precede implementation details. The exact detector and intervention design should follow from the operational definitions and benchmark.
+A study may:
 
-## 7. Experimental / benchmark design
+- validate the current P1/P2 mechanism;
+- change its thresholds or other parameters;
+- retain the same measurement contract but replace the intervention;
+- propose a better intervention policy and compare it against P1/P2.
 
-The first evaluation should prefer tasks with independent ground truth or defensible scoring criteria.
+A negative result is informative. If P1/P2 has no effect, distorts correct advice, or creates too many false interventions, that is a valid empirical result rather than a failed project.
 
-Useful paired or counterbalanced prompt conditions include:
+## 8. Diagnostic task and replay bank
+
+The first controlled study should use tasks with independent ground truth or a defensible scoring rule.
+
+Useful paired/counterbalanced manipulations include:
 
 ```text
-neutral prompt
-leading prompt
-
-correct prior
-incorrect prior
-
-question
-assertion / belief / conviction
-
-request for independent judgement
-request for affirmation
-
+neutral prompt        vs leading prompt
+correct prior         vs incorrect prior
+question              vs assertion / conviction
+independent judgement vs request for affirmation
 same evidence + different stated user position
 ```
 
-A direct comparison can then use:
+The preferred confirmatory design uses a **Frozen-Response / Replay Mode**.
+
+Frontier prompts and validated outputs are generated and archived in advance. During the human experiment, the same stored advice is delivered through the direct or mediated pipeline.
+
+Benefits:
+
+- participants receive comparable advice;
+- provider/model drift is removed from the primary manipulation;
+- the same responses can be re-evaluated under multiple mediator policies;
+- the experiment remains reproducible after a commercial model changes.
+
+A live-frontier run can be used later as an ecological-validity extension, not as the primary controlled condition.
+
+## 9. Pilot
+
+The pilot should answer practical and falsification questions, not merely demonstrate that the interface opens.
+
+Check at least:
+
+- task difficulty and ceiling/floor effects;
+- whether diagnostic traps work as intended;
+- pipeline and replay correctness;
+- provenance and study-specific logging;
+- participant burden and timing;
+- intervention frequency;
+- obvious false positives / false interventions;
+- whether the analysis variables can actually be reconstructed;
+- whether the generic mediator shows enough signal to justify a larger study.
+
+A very small pilot is suitable for these checks. It should not be treated as a precise standalone estimate of the main effect size.
+
+## 10. Confirmatory generic-mediator experiment
+
+The clean first comparison is:
+
+### A. Direct
 
 ```text
-A. direct LLM interaction
-B. framed interaction without mediator
-C. framed interaction with generic mediator
+User <-> frozen frontier advice
 ```
 
-Candidate measurements include:
+### B. Generic mediator
 
-- false-prior agreement rate;
-- sycophancy rate;
-- factual accuracy;
-- answer shift under controlled framing;
-- counter-evidence coverage;
-- unsupported-certainty frequency;
-- appropriate-reliance measures;
+```text
+User <-> generic LEB <-> frozen frontier advice
+```
+
+Candidate primary outcomes:
+
+- reliance discrimination;
+- uptake of correct advice;
+- resistance to incorrect advice;
+- calibration;
+- verification behaviour;
+- factual/task accuracy.
+
+Candidate mediator-quality outcomes:
+
 - false-intervention rate;
+- evidence preservation;
+- distortion of correct advice;
+- missed interventions;
 - latency;
-- token overhead;
-- extra local/frontier calls.
+- token/model-call overhead.
 
-The evaluation should preserve stochastic variation. A fixed seed can be useful diagnostically, but the research target is a comparable **distribution of behaviour**, not bitwise-identical output.
+Analysis should normally operate at the trial level and preserve repeated-measures structure where the design requires it.
 
-## 8. Candidate mediator contract
+## 11. Sample-size logic
 
-The LFO storage/analytics substrate is now frozen enough to host experiments, but the **mediator research contract should remain independently versioned and technology-light** so measurement definitions do not become accidental consequences of one runtime implementation.
+Do not choose an (N) and then use power analysis to justify it.
 
-Candidate inputs:
-
-```text
-user_prompt
-model_response
-optional_reference_condition
-optional_ground_truth_or_evidence
-optional_retrieved_context
-```
-
-Candidate outputs:
+The sequence should be:
 
 ```text
-observable_signals[]
-derived_observations[]
-bias_magnitude_measures[]
-intervention_applied
-intervention_rationale
-evaluation_metadata
+research question
+ -> smallest effect of interest / defensible effect assumption
+ -> variance / design assumptions
+ -> alpha and desired power
+ -> a priori power analysis
+ -> required N
+ -> feasibility and attrition allowance
 ```
 
-A structured observation should preserve:
+If the required (N) is infeasible for the available project window, narrow the hypothesis, redesign the study, or explicitly treat it as pilot/exploratory. Do not reverse-engineer assumptions solely to preserve a preferred sample size.
 
-- event reference;
-- actor;
-- phenomenon / signal type;
-- supporting evidence;
-- contradicting evidence where applicable;
-- measurement or confidence metadata;
-- method/version;
-- status such as observation or hypothesis.
+## 12. Protocol freeze
 
-The research schema should extend rather than blur the frozen R1 observation contract. New magnitude/intervention/outcome fields require an explicitly versioned schema or derived analytic contract; the existing R1 `confidence` field is not a bias-magnitude score.
+Before confirmatory data collection, freeze and version at least:
 
-## 9. Relationship to LFO layers
+- task/replay bank;
+- ground-truth/scoring rules;
+- mediator phenomenon definitions;
+- magnitude metrics;
+- detector sensitivity/profile;
+- intervention thresholds/weights;
+- abstention criteria;
+- outcome definitions;
+- exclusion rules;
+- analysis plan;
+- software/model/policy versions.
 
-The current intended hierarchy is:
+Changes after the freeze should be logged and separated from confirmatory analysis.
 
-```text
-L0  raw interaction evidence
-L1  semantic conversational working memory
-L2  structured factual state
-L3  retrieval & resolution fabric
-L4  research / epistemic analysis output
-```
+## 13. Gate before personalization
 
-The generic mediator fits conceptually as:
+Personalization is a second-stage experiment.
 
-```text
-L0 interaction event ----------------+
-                                     |
-L2 relevant factual state -----------+--> L3 selected evidence/context
-                                     |          |
-external knowledge adapters ---------+          v
-                                           mediator analysis
-                                                |
-                               +----------------+----------------+
-                               |                                 |
-                        L4 observation                    intervention
-                               |                                 |
-                               +---------------+-----------------+
-                                               |
-                                               v
-                                            outcome
-```
+Proceed only when the generic condition has:
 
-Important boundaries:
+- a defensible operational definition;
+- stable task and replay bank;
+- acceptable pipeline reliability;
+- measurable mediator behaviour;
+- an understood false-intervention profile;
+- pre-specified falsification criteria.
 
-- a bias observation is not an L2 fact;
-- an L4 hypothesis must not silently become an active user profile;
-- retrieved context is evidence/context, not itself a bias label;
-- ordinary conversational memory should not automatically contain derived bias labels;
-- L3 retrieval relevance and L4 analytical validity are separate problems.
+The first personalization model should adapt to **metacognitive behaviour**, not belief content.
 
-The current LFO substrate is sufficiently stable to host bounded research prototypes, but the mediator itself should still be versioned independently. Operationalization, benchmark design and falsification criteria should determine detector/intervention changes rather than retrofitting the frozen L0-L4 contracts around a desired result.
+Before a large human personalized study, run an offline/adversarial confirmation-machine stress test. A critical question is whether personalization increases agreement with the user independently of correctness or suppresses valid disagreement.
 
-## 10. Staged work plan
+## 14. Reproducibility and dissemination
 
-### Phase 1 — theory and operationalization
+Record the exact apparatus:
 
-For each selected phenomenon:
+- LFO commit/release;
+- local model/checkpoint and quantization;
+- runtime;
+- prompts/policies;
+- mediator configuration;
+- task-bank and replay-bank versions;
+- analysis code.
 
-- define the phenomenon from current Human–AI / LLM literature;
-- separate direct observation from interpretation;
-- identify the reference/control condition;
-- define a measurable bias magnitude;
-- identify known mitigation strategies;
-- identify confounds and false positives.
+A clean public code/protocol release is encouraged where appropriate, but it is not part of the causal evidence. A GitHub release can optionally be archived through Zenodo to obtain a persistent DOI.
 
-### Phase 2 — analytical specification and benchmark
-
-- select two or three phenomena for the first implementation;
-- define paired/counterbalanced test cases;
-- define structured detector output;
-- define intervention policies;
-- define evaluation metrics and falsification criteria.
-
-### Phase 3 — prototype
-
-- implement a bounded generic mediator;
-- integrate pre- and/or post-response hooks into LFO;
-- preserve provenance and research traces;
-- avoid hidden user profiling.
-
-### Phase 4 — evaluation and discussion
-
-- compare direct and mediated conditions;
-- quantify effect sizes and false interventions;
-- measure engineering overhead;
-- document limitations and cases where the mediator should abstain.
-
-## 11. Expected contribution
-
-A useful contribution from this workstream does not require discovering a new cognitive bias or inventing a new machine-learning algorithm.
-
-A defensible contribution can consist of:
-
-- a rigorous operationalization of selected Human–LLM interaction effects;
-- a generic mediator design;
-- a structured observation/intervention contract;
-- a working prototype integrated with LFO;
-- a reproducible benchmark;
-- an empirical comparison of direct versus mediated interaction;
-- evidence about where the mediator helps, fails, or introduces new distortions.
-
-## 12. Non-goals
+## 15. Non-goals
 
 The first generic mediator should not:
 
 - diagnose stable psychological traits;
-- assign a universal "bias risk score";
-- build a hidden profile of user beliefs;
-- personalize interventions from long-term user preferences;
+- learn or preserve the user’s political, moral, or factual beliefs as preferences;
+- assign a universal bias score;
 - claim universal debiasing;
 - treat model sycophancy as psychologically identical to human confirmation bias;
-- make political persuasion, clinical advice, or identity-sensitive persuasion the primary experimental domain;
-- treat the existence of the L3/L4 substrate as evidence that a detector, magnitude metric or intervention is valid.
+- optimize for user agreement or satisfaction;
+- make live-frontier variability part of the primary confirmatory manipulation when replay can provide a cleaner control;
+- treat the existence of LFO/L4 as evidence that the mediator is valid.
 
 ## Core reading
 
-1. **Glickman, M. & Sharot, T. (2025).** *How human–AI feedback loops alter human perceptual, emotional and social judgements.* Nature Human Behaviour, 9, 345–359.  
-   DOI: https://doi.org/10.1038/s41562-024-02077-2
+1. **Glickman, M. & Sharot, T. (2025).** *How human–AI feedback loops alter human perceptual, emotional and social judgements.* Nature Human Behaviour, 9, 345–359. DOI: https://doi.org/10.1038/s41562-024-02077-2
+2. **Sharma, M. et al. (2024).** *Towards Understanding Sycophancy in Language Models.* ICLR 2024.
+3. **Schemmer, M. et al. (2023).** *Appropriate Reliance on AI Advice: Conceptualization and the Effect of Explanations.* IUI 2023. DOI: https://doi.org/10.1145/3581641.3584066
+4. **Jain, S. et al. (2026).** *Interaction Context Often Increases Sycophancy in LLMs.* CHI 2026.
+5. **Dubois, M. et al. (2026).** *Ask don't tell: Reducing sycophancy in large language models.*
 
-2. **Sharma, M. et al. (2024).** *Towards Understanding Sycophancy in Language Models.* International Conference on Learning Representations (ICLR 2024).  
-   Proceedings: https://proceedings.iclr.cc/paper_files/paper/2024/hash/0105f7972202c1d4fb817da9f21a9663-Abstract-Conference.html
+## Related documents
 
-3. **Schemmer, M., Kühl, N., Benz, C., Bartos, A. & Satzger, G. (2023).** *Appropriate Reliance on AI Advice: Conceptualization and the Effect of Explanations.* IUI 2023.  
-   DOI: https://doi.org/10.1145/3581641.3584066
-
-4. **Jain, S., Park, C., Viana, M., Wilson, A. & Calacci, D. (2026).** *Interaction Context Often Increases Sycophancy in LLMs.* CHI 2026.  
-   DOI: https://doi.org/10.1145/3772318.3791915
-
-5. **Dubois, M., Ududec, C., Summerfield, C. & Luettgau, L. (2026).** *Ask don't tell: Reducing sycophancy in large language models.*  
-   arXiv: https://arxiv.org/abs/2602.23971
-
-## Relationship to the broader research program
-
-This workstream intentionally narrows [Balancing the Loop](HUMAN_AI_BIAS_BALANCER.md) to the **generic, non-personalized mediation problem**.
-
-The broader program still includes:
-
-- longitudinal Human–AI feedback loops;
-- adaptive/personalized mediation;
-- confidence calibration over time;
-- confirmation-machine failure modes;
-- human-subject appropriate-reliance studies.
-
-Those questions should be treated as separate layers rather than silently expanding the first generic mediator into the whole research agenda.
+- [Balancing the Loop](HUMAN_AI_BIAS_BALANCER.md)
+- [L4 recording and manual analysis](L4_RECORDING_MANUAL_ANALYSIS.md)
+- [LFO architecture](ARCHITECTURE.md)
