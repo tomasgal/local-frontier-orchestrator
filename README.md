@@ -6,6 +6,25 @@ Release notes: [docs/RELEASE_V9.6.2.md](docs/RELEASE_V9.6.2.md).
 
 **Zenodo archive (v9.6.2):** DOI [10.5281/zenodo.23373391](https://doi.org/10.5281/zenodo.23373391).
 
+
+## v9.6.3 candidate: controlled runtime and unattended experiments
+
+**v9.6.3 is currently in testing and is not the active release. v9.6.2 remains the current operational packaging/runtime release and immutable reference boundary.**
+
+The goal of v9.6.3 is to add a controlled execution envelope around the existing LFO runtime without reopening the accepted L0-L4 semantics. The candidate is intended to provide one Windows entrypoint for normal interactive use and an optional declarative experiment mode that can be prepared in advance and run unattended, including overnight student experiments. CPU/GPU selection and experiment selection are intended to remain orthogonal: device choice can be automatic or explicitly pinned, while an experiment definition fixes the workload and records the resolved runtime state for reproducibility.
+
+The immediate performance work is motivated in part by **Daniel Correa Villa's architecture-first optimisation work** on a four-node Raspberry Pi 5 inference cluster. His measurements showed that apparently secondary host activity, including monitoring agents, can measurably reduce autoregressive decode performance when inference is constrained by the memory subsystem. LFO therefore treats the host/runtime environment as a separate optimisation layer: after reducing unnecessary model work, measure how efficiently the remaining work executes under realistic orchestration and background load.
+
+Related sources:
+
+- Correa Villa's current distributed-llama project / reproducibility implementation: [danielcorrea-hellomatik/distributed-llama, `pi5-cluster`](https://github.com/danielcorrea-hellomatik/distributed-llama/tree/pi5-cluster)
+- Daniel Correa Villa, *Pushing Four Raspberry Pis to the Memory Wall: Bit-Exact 30B Mixture-of-Experts Inference, +16% over the Public Record*: DOI [10.5281/zenodo.20357376](https://doi.org/10.5281/zenodo.20357376)
+- Hellomatik project summary: [World-record LLM speed on Raspberry Pi 5](https://hellomatik.com/en/blog-articles/30b-llm-raspberry-pi-record-3)
+
+The first v9.6.3 experiment family is deliberately narrow. With the model, prompt/workload, device profile and other generation conditions fixed in advance, the runner is intended to vary only **process priority** and **L4/SurrealDB participation**. This supports both a practical LFO question — whether a dedicated high-priority inference mode is worthwhile — and a research question about how much of observed decode performance is attributable to the host environment rather than the model workload itself. A short Realtime-priority run may be used only as an experimental upper-bound control; it is not intended as a normal production default.
+
+The candidate design also targets reproducible unattended execution: predefined experiment files, warm-up and repeated runs, isolated experiment memory/state, machine-readable results, checkpoint/resume behavior, and concise single-console error reporting. These facilities are intended for both maintainer benchmarking and student work. Until the candidate passes Windows smoke and acceptance tests, all supported installation and runtime instructions below continue to describe **v9.6.2**.
+
 ## Windows bootstrap for v9.6.2
 
 The Windows bootstrap is part of the v9.6.2 runtime contract. v9.6.2 promotes the accepted installer/service packaging from `main` into the release boundary without changing the frozen L0–L3 baselines or the conservative v9.6.1 L4 observation semantics. Clean installed-tree Windows acceptance and release-closure smokes passed on 2026-10-14.
@@ -372,6 +391,8 @@ local model -> ask_codex -> native Codex frontier -> local model
 ```
 
 **v9.6.2 is the current operational packaging/runtime release.** LOCAL/FRONTIER routing, synthesis and persistent memory continue to operate independently of L4 availability. It preserves the v9.6.1 ordinary L4 recording/manual-analysis behavior, adds the accepted Windows bootstrap/model-store lifecycle, and leaves the L2/L3 immutable research baselines unchanged.
+
+**v9.6.3 is a development candidate under test, not a promoted release.** Its current scope is runtime encapsulation, device selection, controlled process-priority experiments, optional L4 participation, and reproducible unattended experiment execution. Promotion requires separate Windows smoke/acceptance evidence; until then, v9.6.2 remains the supported operational version.
 
 Further detector coverage, automatic analytics scheduling and response intervention require separate scope and validation. The accepted v9.6.2 behavior remains conservative recording plus manual `/analyze`.
 
