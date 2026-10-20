@@ -57,6 +57,39 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/l
 
 Both bootstrap paths install/reuse the same LFO runtime and prepare **both** CPU and GPU model aliases and launchers in one shared Ollama model store. CPU/GPU selection changes execution parameters only; it does not split model storage, LFO memory, logs, or L2–L4 state. `-Profile` selects the default profile recorded for the installation and the profile that is launched automatically at the end. Windows Explorer still opens the installed `launch` directory so the user can create shortcuts wherever desired; `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain explicit overrides. The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` only when you intentionally need a separate installation, such as an isolated acceptance tree. `-SkipLaunch` suppresses only the final automatic Qwen launch; `-SkipL4Acceptance` is for explicit troubleshooting only and is not part of the normal install path.
 
+## macOS users: AI-assisted porting guidance
+
+**macOS is not yet a supported v9.6.2/v9.6.3 runtime target.** PowerShell itself is available natively on macOS as **PowerShell 7 (`pwsh`)**, so the LFO PowerShell code can be ported, but the current bootstrap and candidate launcher contain Windows-specific process, path, service and priority handling and should not be expected to run unchanged.
+
+For a Mac user, the recommended workflow is to give this repository/README and the relevant launcher to a capable coding assistant and ask it to create a **macOS runtime adapter**, while preserving the LFO orchestration and experiment semantics. The port should keep the existing model/routing/memory behavior and declarative experiment format wherever possible, and replace only the operating-system-specific runtime layer.
+
+A coding assistant performing the port should follow these rules:
+
+- install/use native macOS **PowerShell 7 (`pwsh`)**, Ollama, SurrealDB and Codex CLI rather than attempting to emulate the Windows environment;
+- preserve the existing LFO `QwenChat`, L0-L4, routing, memory, trace and experiment semantics unless a platform incompatibility specifically requires a documented change;
+- preserve the JSON experiment definitions and result fields so that Windows and macOS runs remain comparable;
+- replace Windows-only path discovery such as `%LOCALAPPDATA%`, Windows bootstrap state assumptions and backslash-specific paths with macOS-safe paths and explicit install-state discovery;
+- replace Windows-only process APIs such as `Get-CimInstance Win32_Process`, `taskkill.exe`, Windows `ProcessPriorityClass` handling and `Start-Process -WindowStyle Hidden` with appropriate macOS process-tree, termination and priority mechanisms;
+- do **not** assume that Windows `Normal`/`High`/`Realtime` priority classes have direct semantic equivalents on macOS. If priority experiments are ported, map them explicitly to the chosen macOS mechanism (for example nice/renice or another documented mechanism), record the actual applied value, and treat cross-OS comparisons as separate experimental conditions;
+- on Apple Silicon, let the native Ollama/Metal runtime determine supported acceleration and verify actual model placement/runtime behavior rather than copying Windows/NVIDIA GPU-detection logic;
+- keep experiment memory and L4 datastores isolated from the user's normal LFO state;
+- retain LOCAL-only benchmark guards when running controlled performance experiments so a routing decision cannot silently introduce a FRONTIER/Codex call into a local inference benchmark;
+- run a macOS smoke test after conversion: one LOCAL interactive turn, one FRONTIER turn if Codex is configured, persistence across restart, and one short unattended experiment. A syntactically successful conversion is not evidence of runtime parity.
+
+For an AI coding assistant, the intended architectural boundary is therefore:
+
+```text
+portable LFO logic
+    QwenChat / routing / memory / L0-L4 / experiment schema
+                         |
+                         v
+platform runtime adapter
+    Windows: current bootstrap/launcher/process control
+    macOS:   pwsh + native process/path/priority/service control
+```
+
+A macOS port should be treated as a **new host/runtime validation target**, not as evidence that the existing Windows acceptance results automatically transfer to Apple hardware or macOS.
+
 ## v9.6.1: L4 recording and manual analysis
 
 - **Automatic recording:** deterministic T1 emits `FRAMING`, `ASYMMETRIC_EVIDENCE_REQUEST`, or ABSTAIN for short, explicit Slovak/English user instructions. Each observation links to its exact L0 turn/stage and content hash. Assistant text is outside this classifier's scope; observations are reported signals, not proven bias or user traits.
