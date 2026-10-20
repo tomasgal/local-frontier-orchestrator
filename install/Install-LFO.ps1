@@ -371,6 +371,12 @@ try {
 Step 'Resolve Ollama runtime: reuse compatible installation, otherwise provision pinned 0.34.4'
 $ollamaCandidates=New-Object Collections.Generic.List[string]
 if($env:LFO_OLLAMA_EXE){$ollamaCandidates.Add($env:LFO_OLLAMA_EXE)}
+if($oldState -and $oldState.Ollama -and $oldState.Ollama.Executable){$ollamaCandidates.Add([string]$oldState.Ollama.Executable)}
+try {
+    foreach($pid in @(Get-NetTCPConnection -State Listen -LocalPort 11434 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique)) {
+        try { $p=(Get-Process -Id $pid -ErrorAction Stop).Path; if($p){$ollamaCandidates.Insert(0,$p)} } catch {}
+    }
+} catch {}
 foreach($n in @('ollama.exe','ollama')){ $p=Resolve-CommandPath $n; if($p){$ollamaCandidates.Add($p)} }
 foreach($p in @(
     (Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'),
@@ -378,24 +384,25 @@ foreach($p in @(
     (Join-Path $env:ProgramFiles 'Ollama\ollama.exe'),
     (Join-Path $RuntimeRoot ('ollama-'+$OllamaPinnedVersion+'\ollama.exe'))
 )){ if($p){$ollamaCandidates.Add($p)} }
-# Generic bounded discovery for portable Ollama runtimes under LocalAppData.
-# This intentionally does not encode any host- or user-specific private path.
-foreach($pattern in @('*\ollama.exe','*\*\ollama.exe','*\*\*\ollama.exe')) {
-    try {
-        foreach($item in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -File -ErrorAction SilentlyContinue)) {
-            if($item.FullName){$ollamaCandidates.Add($item.FullName)}
-        }
-    } catch {}
-}
-try {
-    foreach($pid in @(Get-NetTCPConnection -State Listen -LocalPort 11434 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique)) {
-        try { $p=(Get-Process -Id $pid -ErrorAction Stop).Path; if($p){$ollamaCandidates.Insert(0,$p)} } catch {}
-    }
-} catch {}
+
 $ollamaExe=$null;$ollamaExeVersion=$null
 foreach($candidate in @($ollamaCandidates | Select-Object -Unique)) {
     $v=Get-OllamaExeVersion $candidate
     if($v -and $v -ge $OllamaMinVersion){$ollamaExe=[IO.Path]::GetFullPath($candidate);$ollamaExeVersion=$v;break}
+}
+if(-not $ollamaExe){
+    Info 'Known/persisted Ollama paths did not resolve; using bounded LocalAppData fallback discovery.'
+    foreach($pattern in @('*\ollama.exe','*\*\ollama.exe','*\*\*\ollama.exe')) {
+        try {
+            foreach($item in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -File -ErrorAction SilentlyContinue)) {
+                if($item.FullName){$ollamaCandidates.Add($item.FullName)}
+            }
+        } catch {}
+    }
+    foreach($candidate in @($ollamaCandidates | Select-Object -Unique)) {
+        $v=Get-OllamaExeVersion $candidate
+        if($v -and $v -ge $OllamaMinVersion){$ollamaExe=[IO.Path]::GetFullPath($candidate);$ollamaExeVersion=$v;break}
+    }
 }
 $ollamaManaged=$false
 if(-not $ollamaExe){
@@ -434,19 +441,23 @@ for($depth=0;$depth -lt 4 -and $probe;$depth++) {
     if($next -eq $probe){break}
     $probe=$next
 }
-foreach($pattern in @('*\models\manifests','*\*\models\manifests','*\*\*\models\manifests')) {
-    try {
-        foreach($manifestDir in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -Directory -ErrorAction SilentlyContinue)) {
-            $ollamaStoreCandidates.Add((Split-Path -Parent $manifestDir.FullName))
-        }
-    } catch {}
-}
 $preferredStores=@(
     $(if($oldState -and $oldState.Ollama){[string]$oldState.Ollama.ModelsDirectory}else{$null}),
     $env:LFO_OLLAMA_MODELS,
     $env:OLLAMA_MODELS
 )
 $preExistingAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates) -Preferred $preferredStores
+if(-not $preExistingAliasStore){
+    Info 'Known/persisted Ollama model stores did not contain both LFO aliases; using bounded LocalAppData fallback discovery.'
+    foreach($pattern in @('*\models\manifests','*\*\models\manifests','*\*\*\models\manifests')) {
+        try {
+            foreach($manifestDir in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -Directory -ErrorAction SilentlyContinue)) {
+                $ollamaStoreCandidates.Add((Split-Path -Parent $manifestDir.FullName))
+            }
+        } catch {}
+    }
+    $preExistingAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates) -Preferred $preferredStores
+}
 if($preExistingAliasStore){Info "Existing shared LFO Ollama model store: $preExistingAliasStore"}
 
 # Prefer a compatible already-running API only when it does not conflict with a
@@ -549,14 +560,18 @@ if(-not $SkipModelPull){
         # persisted once and shared by CPU/GPU launchers so a later Ollama
         # restart cannot silently fall back to another default store.
         if($ollamaModelsDir){$ollamaStoreCandidates.Add($ollamaModelsDir)}
-        foreach($pattern in @('*\models\manifests','*\*\models\manifests','*\*\*\models\manifests')) {
-            try {
-                foreach($manifestDir in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -Directory -ErrorAction SilentlyContinue)) {
-                    $ollamaStoreCandidates.Add((Split-Path -Parent $manifestDir.FullName))
-                }
-            } catch {}
-        }
         $resolvedAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates) -Preferred @($ollamaModelsDir,$preExistingAliasStore,$env:LFO_OLLAMA_MODELS,$env:OLLAMA_MODELS)
+        if(-not $resolvedAliasStore){
+            Info 'Alias store still unresolved after model creation; using bounded LocalAppData fallback discovery.'
+            foreach($pattern in @('*\models\manifests','*\*\models\manifests','*\*\*\models\manifests')) {
+                try {
+                    foreach($manifestDir in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -Directory -ErrorAction SilentlyContinue)) {
+                        $ollamaStoreCandidates.Add((Split-Path -Parent $manifestDir.FullName))
+                    }
+                } catch {}
+            }
+            $resolvedAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates) -Preferred @($ollamaModelsDir,$preExistingAliasStore,$env:LFO_OLLAMA_MODELS,$env:OLLAMA_MODELS)
+        }
         Assert-Lfo $resolvedAliasStore 'Both LFO aliases exist through the Ollama API, but their shared filesystem model store could not be resolved. Set LFO_OLLAMA_MODELS to the intended Ollama model directory and rerun the bootstrap.'
         $ollamaModelsDir=$resolvedAliasStore
         Info "Shared LFO Ollama model store: $ollamaModelsDir"
@@ -580,19 +595,23 @@ Step 'Resolve SurrealDB runtime: reuse compatible 3.3.0 binary, otherwise provis
 $surrealCandidates=New-Object Collections.Generic.List[string]
 if($env:LFO_SURREAL_EXE){$surrealCandidates.Add($env:LFO_SURREAL_EXE)}
 if($oldState -and $oldState.SurrealDB -and $oldState.SurrealDB.Executable){$surrealCandidates.Add([string]$oldState.SurrealDB.Executable)}
+try { foreach($p in @(Get-Process surreal -ErrorAction SilentlyContinue|ForEach-Object{$_.Path})){if($p){$surrealCandidates.Insert(0,$p)}} } catch {}
 foreach($n in @('surreal.exe','surreal')){$p=Resolve-CommandPath $n;if($p){$surrealCandidates.Add($p)}}
 $managedSurreal=Join-Path $RuntimeRoot ('surrealdb-'+$SurrealVersion+'\surreal.exe');$surrealCandidates.Add($managedSurreal)
-# Generic bounded discovery for portable SurrealDB runtimes under LocalAppData.
-foreach($pattern in @('*\surreal.exe','*\*\surreal.exe','*\*\*\surreal.exe','*\*\*\*\surreal.exe')) {
-    try {
-        foreach($item in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -File -ErrorAction SilentlyContinue)) {
-            if($item.FullName){$surrealCandidates.Add($item.FullName)}
-        }
-    } catch {}
-}
-try { foreach($p in @(Get-Process surreal -ErrorAction SilentlyContinue|ForEach-Object{$_.Path})){if($p){$surrealCandidates.Insert(0,$p)}} } catch {}
+
 $surrealExe=$null
 foreach($candidate in @($surrealCandidates|Select-Object -Unique)){if((Get-SurrealExeVersion $candidate) -eq [version]$SurrealVersion){$surrealExe=[IO.Path]::GetFullPath($candidate);break}}
+if(-not $surrealExe){
+    Info 'Known/persisted SurrealDB paths did not resolve; using bounded LocalAppData fallback discovery.'
+    foreach($pattern in @('*\surreal.exe','*\*\surreal.exe','*\*\*\surreal.exe','*\*\*\*\surreal.exe')) {
+        try {
+            foreach($item in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -File -ErrorAction SilentlyContinue)) {
+                if($item.FullName){$surrealCandidates.Add($item.FullName)}
+            }
+        } catch {}
+    }
+    foreach($candidate in @($surrealCandidates|Select-Object -Unique)){if((Get-SurrealExeVersion $candidate) -eq [version]$SurrealVersion){$surrealExe=[IO.Path]::GetFullPath($candidate);break}}
+}
 $surrealManaged=$false
 if(-not $surrealExe){
     $surrealManaged=$true
