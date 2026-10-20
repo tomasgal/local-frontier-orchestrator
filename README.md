@@ -34,7 +34,7 @@ Related sources:
 
 ## Windows bootstrap for v9.6.3
 
-The v9.6.3 bootstrap retains the accepted v9.6.2 installer, shared Ollama model-store and L4 provisioning semantics, updates the runtime contract to v9.6.3, records `DefaultPriority = High`, publishes the new `LFO.ps1` entrypoint into the installed `launch` directory, and keeps the CPU/GPU launchers as compatibility wrappers.
+The v9.6.3 bootstrap retains the accepted v9.6.2 installer, shared Ollama model-store and L4 provisioning semantics, updates the runtime contract to v9.6.3, records `DefaultPriority = High`, publishes the new `LFO.ps1` entrypoint into the installed `launch` directory, and keeps the CPU/GPU launchers as compatibility wrappers. **LFO-owned Ollama and SurrealDB services are started headless with stdout/stderr redirected under `runtime\logs\services`; they no longer depend on an interactive Windows console and therefore cannot be paused by console selection/QuickEdit state.**
 
 The installer:
 
@@ -106,7 +106,7 @@ A macOS port should be treated as a **new host/runtime validation target**, not 
 
 ### Enable recording
 
-Use an existing initialized R1 SurrealDB 3.3.0 service and its current-user runtime credential. Set `L4.Endpoint` and `L4.CredentialPath` in the chat config, or supply `LFO_L4_ENDPOINT` and `LFO_L4_RUNTIME_CREDENTIAL`. `LFO_L4_ENABLED=1` enables recording; `0` disables it. The shipped config enables L4 recording and L0 stage-source capture, but leaves connection details empty. Custom configs need `Memory.Enabled` and `Memory.L0StageSourcesEnabled` enabled explicitly. Missing configuration leaves L4 unavailable and chat functional. This release creates no service, database schema or credentials automatically.
+Outside the Windows bootstrap path, use an existing initialized R1 SurrealDB 3.3.0 service and its current-user runtime credential. Set `L4.Endpoint` and `L4.CredentialPath` in the chat config, or supply `LFO_L4_ENDPOINT` and `LFO_L4_RUNTIME_CREDENTIAL`. `LFO_L4_ENABLED=1` enables recording; `0` disables it. The Windows bootstrap provisions/reuses the LFO datastore, credentials and headless service; custom/manual deployments remain responsible for those components. Missing configuration leaves L4 unavailable and chat functional.
 
 Startup `CONFIGURED` confirms settings were loaded. Per-turn `CREATED` confirms an R1 write; `UNKNOWN` means the write could not be confirmed. ABSTAIN performs no R1 I/O. `/clear` starts a new conversation epoch and retains historical observations.
 
