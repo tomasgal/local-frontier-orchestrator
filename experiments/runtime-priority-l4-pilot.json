@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "name": "runtime-priority-l4-pilot",
+  "description": "Pilot runtime experiment comparing Normal/High Windows process priority and optional L4 participation under isolated LOCAL-only CPU inference.",
+  "device": "CPU",
+  "minimumGpuVramMiB": 6144,
+  "repetitions": 3,
+  "allowRealtime": false,
+  "allowAmbientServices": false,
+  "localOnly": true,
+  "warmup": {
+    "prompts": [
+      "Explain in ten short numbered sentences how virtual memory works in a modern operating system."
+    ]
+  },
+  "workload": {
+    "setupPrompts": [],
+    "prompts": [
+      "Explain in exactly twenty numbered sentences why sequential memory access is usually faster than random memory access. Keep each sentence concise.",
+      "Explain in exactly twenty numbered sentences how CPU caches reduce average memory-access latency. Keep each sentence concise.",
+      "Explain in exactly twenty numbered sentences why contiguous arrays often have good cache locality. Keep each sentence concise."
+    ]
+  },
+  "conditions": [
+    {
+      "name": "normal-l4",
+      "priority": "Normal",
+      "l4": true,
+      "enabled": true
+    },
+    {
+      "name": "normal-no-l4",
+      "priority": "Normal",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "high-no-l4",
+      "priority": "High",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "realtime-no-l4",
+      "priority": "Realtime",
+      "l4": false,
+      "enabled": false
+    }
+  ]
+}

@@ -1,33 +1,40 @@
 # Local Frontier Orchestrator
 
-**Current version: [v9.6.2](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.2) (2026-10-14).** This packaging/runtime release preserves the accepted v9.6.1 L4 recording and `/analyze` semantics while incorporating the accepted Windows bootstrap, shared Ollama model-store binding, CPU/GPU launch profiles, and live installed-tree FRONTIER/CPU closure results. The immutable `v9.6.2` tag is the intended release boundary for this state.
+**Current operational version: v9.6.3 (2026-10-20, `main`).** v9.6.3 promotes the controlled Windows runtime and unattended experiment runner, keeps the accepted L0-L4 semantics, and adopts **High Windows process priority as the default inference profile** based on the bounded counterbalanced host experiment documented below.
 
-Release notes: [docs/RELEASE_V9.6.2.md](docs/RELEASE_V9.6.2.md).
+Release notes: [docs/RELEASE_V9.6.3.md](docs/RELEASE_V9.6.3.md).
 
-**Zenodo archive (v9.6.2):** DOI [10.5281/zenodo.23373391](https://doi.org/10.5281/zenodo.23373391).
+**Previous immutable release:** [v9.6.2](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.2) (2026-10-14). Zenodo software archive DOI [10.5281/zenodo.23373391](https://doi.org/10.5281/zenodo.23373391).
 
+## v9.6.3: controlled runtime and unattended experiments
 
-## v9.6.3 candidate: controlled runtime and unattended experiments
+v9.6.3 provides one primary Windows entrypoint for ordinary interactive use and reproducible experiments:
 
-**v9.6.3 is currently in testing and is not the active release. v9.6.2 remains the current operational packaging/runtime release and immutable reference boundary.**
+~~~powershell
+.\LFO.ps1
+.\LFO.ps1 -Device CPU
+.\LFO.ps1 -Device GPU
+.\LFO.ps1 -Priority Normal
+.\LFO.ps1 -Experiment .\experiments\runtime-priority-counterbalanced.json
+~~~
 
-The goal of v9.6.3 is to add a controlled execution envelope around the existing LFO runtime without reopening the accepted L0-L4 semantics. The candidate is intended to provide one Windows entrypoint for normal interactive use and an optional declarative experiment mode that can be prepared in advance and run unattended, including overnight student experiments. CPU/GPU selection and experiment selection are intended to remain orthogonal: device choice can be automatic or explicitly pinned, while an experiment definition fixes the workload and records the resolved runtime state for reproducibility.
+Ordinary production launch defaults to **High** process priority for the inference runtime. `Normal` remains available as an explicit override/control; `Realtime` is not a production default. SurrealDB/L4 remains at Normal priority. The production launcher verifies/sets the configured Ollama process tree rather than assuming that priority on a wrapper process is sufficient.
 
-The immediate performance work is motivated in part by **Daniel Correa Villa's architecture-first optimisation work** on a four-node Raspberry Pi 5 inference cluster. His measurements showed that apparently secondary host activity, including monitoring agents, can measurably reduce autoregressive decode performance when inference is constrained by the memory subsystem. LFO therefore treats the host/runtime environment as a separate optimisation layer: after reducing unnecessary model work, measure how efficiently the remaining work executes under realistic orchestration and background load.
+Long silent waits use compact liveness output: one status line is opened and a dot is appended every five seconds until the next event. The unattended Qwen watchdog uses the same behavior, preserving console history while still making a live process visibly active.
+
+The experiment runner supports isolated prompt state, LOCAL-only guards, owned service envelopes, warm-up, repeated/counterbalanced conditions, checkpoint/resume, JSONL/JSON/CSV results, process-priority verification and Ollama placement capture. Shared experiment definitions are in [`experiments/`](experiments/).
+
+The runtime-priority work was motivated in part by **Daniel Correa Villa's architecture-first optimisation work** on a four-node Raspberry Pi 5 inference cluster. LFO transfers the general host-runtime question, not the Raspberry Pi measurements themselves. The accepted Windows experiment found a strong and counterbalanced High-priority prefill effect on the constrained CPU-only validation notebook; decode moved in the same direction but more noisily. See [the full v9.6.3 runtime-priority report](docs/RUNTIME_PRIORITY_EXPERIMENT_V963.md).
 
 Related sources:
 
-- Correa Villa's current distributed-llama project / reproducibility implementation: [danielcorrea-hellomatik/distributed-llama, `pi5-cluster`](https://github.com/danielcorrea-hellomatik/distributed-llama/tree/pi5-cluster)
+- Correa Villa's distributed-llama project / reproducibility implementation: [`danielcorrea-hellomatik/distributed-llama`, `pi5-cluster`](https://github.com/danielcorrea-hellomatik/distributed-llama/tree/pi5-cluster)
 - Daniel Correa Villa, *Pushing Four Raspberry Pis to the Memory Wall: Bit-Exact 30B Mixture-of-Experts Inference, +16% over the Public Record*: DOI [10.5281/zenodo.20357376](https://doi.org/10.5281/zenodo.20357376)
 - Hellomatik project summary: [World-record LLM speed on Raspberry Pi 5](https://hellomatik.com/en/blog-articles/30b-llm-raspberry-pi-record-3)
 
-The first v9.6.3 experiment family is deliberately narrow. With the model, prompt/workload, device profile and other generation conditions fixed in advance, the runner is intended to vary only **process priority** and **L4/SurrealDB participation**. This supports both a practical LFO question — whether a dedicated high-priority inference mode is worthwhile — and a research question about how much of observed decode performance is attributable to the host environment rather than the model workload itself. A short Realtime-priority run may be used only as an experimental upper-bound control; it is not intended as a normal production default.
+## Windows bootstrap for v9.6.3
 
-The candidate design also targets reproducible unattended execution: predefined experiment files, warm-up and repeated runs, isolated experiment memory/state, machine-readable results, checkpoint/resume behavior, and concise single-console error reporting. These facilities are intended for both maintainer benchmarking and student work. Until the candidate passes Windows smoke and acceptance tests, all supported installation and runtime instructions below continue to describe **v9.6.2**.
-
-## Windows bootstrap for v9.6.2
-
-The Windows bootstrap is part of the v9.6.2 runtime contract. v9.6.2 promotes the accepted installer/service packaging from `main` into the release boundary without changing the frozen L0–L3 baselines or the conservative v9.6.1 L4 observation semantics. Clean installed-tree Windows acceptance and release-closure smokes passed on 2026-10-14.
+The v9.6.3 bootstrap retains the accepted v9.6.2 installer, shared Ollama model-store and L4 provisioning semantics, updates the runtime contract to v9.6.3, records `DefaultPriority = High`, publishes the new `LFO.ps1` entrypoint into the installed `launch` directory, and keeps the CPU/GPU launchers as compatibility wrappers.
 
 The installer:
 
@@ -55,7 +62,7 @@ Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/l
 Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/main/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile GPU
 ~~~
 
-Both bootstrap paths install/reuse the same LFO runtime and prepare **both** CPU and GPU model aliases and launchers in one shared Ollama model store. CPU/GPU selection changes execution parameters only; it does not split model storage, LFO memory, logs, or L2–L4 state. `-Profile` selects the default profile recorded for the installation and the profile that is launched automatically at the end. Windows Explorer still opens the installed `launch` directory so the user can create shortcuts wherever desired; `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain explicit overrides. The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` only when you intentionally need a separate installation, such as an isolated acceptance tree. `-SkipLaunch` suppresses only the final automatic Qwen launch; `-SkipL4Acceptance` is for explicit troubleshooting only and is not part of the normal install path.
+Both bootstrap paths install/reuse the same LFO runtime and prepare **both** CPU and GPU model aliases and launchers in one shared Ollama model store. v9.6.3 also installs the primary `LFO.ps1` entrypoint and uses **High** inference priority by default; `-Priority Normal` remains an explicit override. CPU/GPU selection changes execution parameters only; it does not split model storage, LFO memory, logs, or L2–L4 state. `-Profile` selects the default profile recorded for the installation and the profile that is launched automatically at the end. Windows Explorer still opens the installed `launch` directory so the user can create shortcuts wherever desired; `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain explicit overrides. The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` only when you intentionally need a separate installation, such as an isolated acceptance tree. `-SkipLaunch` suppresses only the final automatic Qwen launch; `-SkipL4Acceptance` is for explicit troubleshooting only and is not part of the normal install path.
 
 ## macOS users: AI-assisted porting guidance
 
@@ -298,7 +305,7 @@ A separate possible research track, [auditing Russian propaganda susceptibility]
 
 ## Documentation map
 
-- **Install/runtime:** [Windows bootstrap](docs/WINDOWS_BOOTSTRAP_BUILD.md) · [host validation/tuning](docs/NOTEBOOK_SETUP.md) · [architecture](docs/ARCHITECTURE.md)
+- **Install/runtime:** [v9.6.3 release notes](docs/RELEASE_V9.6.3.md) · [runtime-priority experiment](docs/RUNTIME_PRIORITY_EXPERIMENT_V963.md) · [Windows bootstrap](docs/WINDOWS_BOOTSTRAP_BUILD.md) · [host validation/tuning](docs/NOTEBOOK_SETUP.md) · [architecture](docs/ARCHITECTURE.md)
 - **Memory/provenance:** [runtime storage and logs](docs/MEMORY_AND_LOGGING.md) · [memory strategy](docs/MEMORY_STRATEGY.md) · [L2 frozen baseline](docs/L2_FROZEN_BASELINE.md) · [L3 frozen baseline](docs/L3_FROZEN_BASELINE.md)
 - **L4 runtime:** [recording and manual analysis](docs/L4_RECORDING_MANUAL_ANALYSIS.md) · [v9.6.1 gate](docs/L4_V961_GATE1.md) · frozen L4 baselines in `docs/L4_*_FROZEN_BASELINE.md`
 - **Research:** [Balancing the Loop](docs/HUMAN_AI_BIAS_BALANCER.md) · [Generic Epistemic Mediator](docs/GENERIC_EPISTEMIC_MEDIATOR.md) · [Russian propaganda resilience proposal](docs/RUSSIAN_PROPAGANDA_RESILIENCE_RESEARCH.md) · [candidate solution designs](docs/CANDIDATE_SOLUTION_DESIGNS.md)
@@ -310,6 +317,10 @@ A separate possible research track, [auditing Russian propaganda susceptibility]
 ```text
 .
 |-- README.md
+|-- LFO.ps1
+|-- experiments/
+|   |-- runtime-priority-l4-pilot.json
+|   `-- runtime-priority-counterbalanced.json
 |-- install/
 |   `-- Install-LFO.ps1
 |-- launch/
@@ -386,15 +397,16 @@ bootstrap installs/reuses the supported runtime components, creates both CPU and
 GPU aliases/launchers, prepares the installation-local memory/L4 stores and runs
 the deterministic L4 acceptance gate.
 
-After installation, start the explicit profile you want:
+After installation, the primary entrypoint is:
+
+```powershell
+& "$env:LOCALAPPDATA\LFO\launch\LFO.ps1"
+```
+
+This uses automatic device selection and High inference priority by default. Explicit CPU/GPU compatibility launchers remain available:
 
 ```powershell
 & "$env:LOCALAPPDATA\LFO\launch\Start-LFO-GPU.ps1"
-```
-
-or:
-
-```powershell
 & "$env:LOCALAPPDATA\LFO\launch\Start-LFO-CPU.ps1"
 ```
 
@@ -423,11 +435,11 @@ The transport path is working:
 local model -> ask_codex -> native Codex frontier -> local model
 ```
 
-**v9.6.2 is the current operational packaging/runtime release.** LOCAL/FRONTIER routing, synthesis and persistent memory continue to operate independently of L4 availability. It preserves the v9.6.1 ordinary L4 recording/manual-analysis behavior, adds the accepted Windows bootstrap/model-store lifecycle, and leaves the L2/L3 immutable research baselines unchanged.
+**v9.6.3 is the current operational Windows runtime on `main`.** LOCAL/FRONTIER routing, synthesis, persistent memory and conservative L4 recording retain their accepted semantics. v9.6.3 adds the controlled runtime entrypoint, automatic/explicit device selection, unattended experiments, compact dotted wait/watchdog output, and High inference priority as the production default.
 
-**v9.6.3 is a development candidate under test, not a promoted release.** Its current scope is runtime encapsulation, device selection, controlled process-priority experiments, optional L4 participation, and reproducible unattended experiment execution. Promotion requires separate Windows smoke/acceptance evidence; until then, v9.6.2 remains the supported operational version.
+**v9.6.2 remains the previous immutable tagged and Zenodo-archived release boundary.** The v9.6.3 promotion does not reopen the frozen L2/L3 baselines or enable P1/P2 response intervention.
 
-Further detector coverage, automatic analytics scheduling and response intervention require separate scope and validation. The accepted v9.6.2 behavior remains conservative recording plus manual `/analyze`.
+Further detector coverage, automatic analytics scheduling and response intervention require separate scope and validation. The accepted operational L4 behavior remains conservative recording plus manual `/analyze`.
 
 ## License
 

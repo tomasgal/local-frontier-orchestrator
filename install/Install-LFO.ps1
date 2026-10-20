@@ -28,7 +28,7 @@ $SurrealUrl = 'https://github.com/surrealdb/surrealdb/releases/download/v3.3.0/s
 $SurrealSHA256 = '3e5e9d363a352be81f5a983d53f0bc0cd77a90e305f01e2fed929987cf79735c'
 $GpuModel = 'lfo-qwen3.5-4b-gpu8k:latest'
 $CpuModel = 'lfo-qwen3.5-4b-cpu5k:latest'
-$RuntimeContract = 'v9.6.2'
+$RuntimeContract = 'v9.6.3'
 
 function Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
 function Info([string]$Text) { Write-Host "    $Text" }
@@ -38,7 +38,29 @@ function Get-Sha256([string]$Path) { return (Get-FileHash -LiteralPath $Path -Al
 function Quote-PsSingle([string]$Text) { return $Text.Replace("'","''") }
 function Wait-Ready([scriptblock]$Probe,[string]$Name,[int]$Seconds=60) {
     $deadline=(Get-Date).AddSeconds($Seconds)
-    do { try { & $Probe | Out-Null; return } catch { Start-Sleep -Milliseconds 350 } } while ((Get-Date) -lt $deadline)
+    $sw=[Diagnostics.Stopwatch]::StartNew()
+    $nextProgress=5.0
+    $progressLineOpen=$false
+    do {
+        try {
+            & $Probe | Out-Null
+            if($progressLineOpen){Write-Host ''}
+            $sw.Stop()
+            return
+        } catch {}
+        if($sw.Elapsed.TotalSeconds -ge $nextProgress){
+            if(-not $progressLineOpen){
+                Write-Host ("Waiting for {0}." -f $Name) -NoNewline -ForegroundColor Cyan
+                $progressLineOpen=$true
+            } else {
+                Write-Host '.' -NoNewline -ForegroundColor DarkGray
+            }
+            $nextProgress += 5.0
+        }
+        Start-Sleep -Milliseconds 350
+    } while ((Get-Date) -lt $deadline)
+    if($progressLineOpen){Write-Host ''}
+    $sw.Stop()
     throw "$Name did not become ready within $Seconds seconds."
 }
 function Get-FreePort([int]$Preferred) {
@@ -318,6 +340,7 @@ if ($git) {
     } finally { Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\QwenChat.ps1')) 'LFO source checkout is incomplete.'
+Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'LFO.ps1')) 'LFO source does not contain the v9.6.3 production entrypoint.'
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\LfoL4Runtime.ps1')) 'LFO source does not contain the v9.6.1/v9.6.2 L4 runtime module.'
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'tests\Test-LfoL4Recording.ps1')) 'LFO source does not contain the v9.6.1/v9.6.2 L4 recording acceptance suite.'
 foreach($requiredLauncher in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1')){
@@ -726,7 +749,7 @@ $state=[ordered]@{
     Ollama=[ordered]@{Executable=$ollamaExe;ExecutableVersion=[string]$ollamaExeVersion;ApiVersion=$ollamaApiVersion;Managed=$ollamaManaged;BaseUri=$ollamaBase;HostAddress=$hostAddress;ModelsDirectory=$ollamaModelsDir;BaseModel=$BaseModel;GPUModel=$GpuModel;CPUModel=$CpuModel}
     SurrealDB=[ordered]@{Executable=$surrealExe;Version=$SurrealVersion;SHA256=$surrealHash;Managed=$surrealManaged;BaseUri=$surrealBase;Port=$surrealPort;DataDirectory=$surrealData;BootstrapCredentialPath=$bootstrapCredPath;RuntimeCredentialPath=$runtimeCredPath;Namespace='lfo';Database='epistemic'}
     Frontier=[ordered]@{CodexDetected=[bool]$codexPath;CodexExecutable=$codexPath;CodexVersion=$codexVersion;AdapterSelection='PENDING'}
-    LFO=[ordered]@{RuntimeContract=$RuntimeContract;DefaultProfile=$Profile;ConfigPath=$installConfigPath;MemoryDirectory=$memoryDir;L0StageSourcesEnabled=$true;L4RecordingEnabled=$true;L4Acceptance=$l4Acceptance}
+    LFO=[ordered]@{RuntimeContract=$RuntimeContract;DefaultProfile=$Profile;DefaultPriority='High';ConfigPath=$installConfigPath;MemoryDirectory=$memoryDir;L0StageSourcesEnabled=$true;L4RecordingEnabled=$true;L4Acceptance=$l4Acceptance}
 }
 $statePath=Join-Path $ConfigRoot 'install-state.json'
 [IO.File]::WriteAllText($statePath,($state|ConvertTo-Json -Depth 12),$utf8)
@@ -736,6 +759,7 @@ foreach($name in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Star
     $src=Join-Path $AppRoot ('launch\'+$name);Assert-Lfo (Test-Path -LiteralPath $src -PathType Leaf) "Required launcher missing from source: $name"
     Copy-Item -LiteralPath $src -Destination (Join-Path $LaunchRoot $name) -Force
 }
+Copy-Item -LiteralPath (Join-Path $AppRoot 'LFO.ps1') -Destination (Join-Path $LaunchRoot 'LFO.ps1') -Force
 # Add double-clickable BAT wrappers without changing the PowerShell launch contract.
 $cpuBat=Join-Path $LaunchRoot 'Start-LFO-CPU.bat'
 $gpuBat=Join-Path $LaunchRoot 'Start-LFO-GPU.bat'
@@ -750,6 +774,7 @@ Write-Host ('Install root:  '+$InstallRoot) -ForegroundColor Green
 Write-Host ('Source:        '+$SourceCommit) -ForegroundColor Green
 Write-Host ('Runtime:       '+$RuntimeContract) -ForegroundColor Green
 Write-Host ('Profile:       '+$Profile+' (default; CPU/GPU launchers both installed)') -ForegroundColor Green
+Write-Host 'Priority:      High (default production inference priority)' -ForegroundColor Green
 Write-Host ('SQLite:       PASS '+$sqliteVersion) -ForegroundColor Green
 Write-Host ('Ollama:       '+$ollamaApiVersion+' @ '+$ollamaBase) -ForegroundColor Green
 Write-Host ('Model store:  '+$(if($ollamaModelsDir){$ollamaModelsDir}else{'UNRESOLVED'})) -ForegroundColor Green
@@ -760,6 +785,7 @@ $installedLaunchDir=Join-Path $InstallRoot 'launch'
 Write-Host ('Launch dir:    '+$installedLaunchDir) -ForegroundColor Green
 Write-Host ''
 Write-Host 'Launch options:' -ForegroundColor Cyan
+Write-Host '  .\LFO.ps1           (primary v9.6.3 entrypoint; Auto device, High priority by default)'
 Write-Host '  Start-LFO-CPU.bat   (double-click or Command Prompt)'
 Write-Host '  Start-LFO-GPU.bat   (double-click or Command Prompt)'
 Write-Host '  .\Start-LFO-CPU.ps1 (PowerShell)'

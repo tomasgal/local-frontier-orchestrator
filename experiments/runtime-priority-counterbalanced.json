@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "name": "runtime-priority-counterbalanced",
+  "device": "CPU",
+  "minimumGpuVramMiB": 6144,
+  "repetitions": 1,
+  "allowRealtime": false,
+  "allowAmbientServices": false,
+  "localOnly": true,
+  "warmup": {
+    "prompts": [
+      "Explain in ten short numbered sentences how virtual memory works in a modern operating system."
+    ]
+  },
+  "workload": {
+    "setupPrompts": [],
+    "prompts": [
+      "Explain in exactly twenty numbered sentences why sequential memory access is usually faster than random memory access. Keep each sentence concise.",
+      "Explain in exactly twenty numbered sentences how CPU caches reduce average memory-access latency. Keep each sentence concise.",
+      "Explain in exactly twenty numbered sentences why contiguous arrays often have good cache locality. Keep each sentence concise."
+    ]
+  },
+  "conditions": [
+    {
+      "name": "b1-normal",
+      "priority": "Normal",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "b1-high",
+      "priority": "High",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "b2-high",
+      "priority": "High",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "b2-normal",
+      "priority": "Normal",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "b3-normal",
+      "priority": "Normal",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "b3-high",
+      "priority": "High",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "b4-high",
+      "priority": "High",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "b4-normal",
+      "priority": "Normal",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "b5-normal",
+      "priority": "Normal",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "b5-high",
+      "priority": "High",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "b6-high",
+      "priority": "High",
+      "l4": false,
+      "enabled": true
+    },
+    {
+      "name": "b6-normal",
+      "priority": "Normal",
+      "l4": false,
+      "enabled": true
+    }
+  ],
+  "description": "Counterbalanced confirmation experiment for Windows Normal versus High process priority. L4 is disabled in every condition; each measured prompt runs in a fresh isolated LOCAL-only state."
+}

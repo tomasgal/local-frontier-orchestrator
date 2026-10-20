@@ -27,7 +27,7 @@ and SurrealDB runtimes, prepares the reference Qwen model and both CPU/GPU model
 aliases, creates an installation-local data/configuration tree, initializes the
 L4 datastore and runs the deterministic L4 recording acceptance suite.
 
-The selected `-Profile` chooses both the **default** profile and the profile automatically launched after a successful bootstrap. Both `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` are installed. They share the same Ollama model store and all LFO state; CPU/GPU is an execution profile only. The bootstrap also opens the installed `launch` directory in Explorer so shortcuts can be created easily. Use `-SkipLaunch` only when the final automatic Qwen launch is not wanted.
+The selected `-Profile` chooses both the **default** device profile and the profile automatically launched after a successful bootstrap. v9.6.3 also installs `LFO.ps1` as the primary entrypoint and records **High** as the default inference priority. Both `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain installed as compatibility wrappers. They share the same Ollama model store and all LFO state; CPU/GPU is an execution profile only. The bootstrap also opens the installed `launch` directory in Explorer so shortcuts can be created easily. Use `-SkipLaunch` only when the final automatic Qwen launch is not wanted.
 
 The normal install root is:
 
@@ -77,7 +77,8 @@ After bootstrap completion, inspect:
 The bootstrap summary should report:
 
 - exact source commit;
-- runtime contract `v9.6.2`;
+- runtime contract `v9.6.3`;
+- default inference priority `High`;
 - SQLite PASS;
 - Ollama API/version;
 - SurrealDB 3.3.0 endpoint;

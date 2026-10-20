@@ -8,7 +8,15 @@ See [L2 frozen baseline](L2_FROZEN_BASELINE.md) and
 [L3 frozen baseline](L3_FROZEN_BASELINE.md) for the exact contracts, evidence,
 limitations and reopen criteria.
 
-### v9.6.2 operational packaging/runtime release
+### v9.6.3 operational controlled-runtime release
+
+**v9.6.3 is the current operational Windows runtime on `main` as of 2026-10-20.** It preserves the accepted L0-L4 behavior and v9.6.2 bootstrap/model-store baseline while promoting the controlled `LFO.ps1` runtime and unattended experiment runner.
+
+The promotion adds Auto/CPU/GPU device selection, isolated declarative experiments, checkpoint/resume, process-tree/placement verification, compact dotted waiting output, and **High Windows process priority as the default inference policy**. The priority choice is backed by the bounded counterbalanced CPU-only host experiment documented in [RUNTIME_PRIORITY_EXPERIMENT_V963.md](RUNTIME_PRIORITY_EXPERIMENT_V963.md): High improved mean prefill throughput by 17.7% and won all 18 matched prefill pairs; decode improved by 7.6% on average but remained materially noisier. SurrealDB/L4 stays at Normal priority and Realtime is not a production default.
+
+The experiment is a host-runtime validation result, not a universal cross-hardware benchmark or a claim that the Raspberry Pi memory-wall mechanism was reproduced.
+
+### v9.6.2 previous operational packaging/runtime release
 
 **v9.6.2 is the accepted operational packaging/runtime release.** It preserves the v9.6.1 conservative post-L0 T1 recording and explicit bounded `/analyze` A1/A2 reads, while promoting the accepted Windows bootstrap, shared Ollama model-store lifecycle, CPU/GPU launch profiles and live closure smokes into one immutable release boundary. D1 remains offline and P1/P2 response intervention remains OFF.
 

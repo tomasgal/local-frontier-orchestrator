@@ -1,8 +1,8 @@
-# Windows bootstrap build v1 — v9.6.2 runtime
+# Windows bootstrap build v2 — v9.6.3 runtime
 
-Status: **ACCEPTED WINDOWS BOOTSTRAP — CLEAN INSTALLED-TREE ACCEPTANCE PASSED 2026-10-14**
+Status: **v9.6.3 PRODUCTION RUNTIME — v9.6.2 BOOTSTRAP BASELINE RETAINED; RUNTIME-PRIORITY PROMOTION ACCEPTED 2026-10-20**
 
-This document describes the Windows bootstrap packaging promoted into the **LFO v9.6.2 runtime contract**. v9.6.2 preserves the v9.6.1 L4 recording/manual-analysis semantics and adds the accepted installer/service packaging and shared model-store lifecycle to the immutable release boundary.
+This document describes the Windows bootstrap packaging used by the **LFO v9.6.3 runtime contract**. v9.6.3 retains the accepted v9.6.2 installer/service packaging, shared model-store lifecycle and v9.6.1 L4 recording/manual-analysis semantics, while adding the production `LFO.ps1` runtime/experiment entrypoint and a default High inference-priority policy.
 
 ## Source selection
 
@@ -20,13 +20,13 @@ PowerShell window using the selected profile's installed-tree launcher:
 -Profile GPU -> Start-LFO-GPU.ps1
 ```
 
-The automatic chat launch occurs only after the bootstrap has reached its
+The bootstrap also publishes `LFO.ps1` directly into the installed `launch` directory. The CPU/GPU launchers are compatibility wrappers around that primary v9.6.3 entrypoint. The automatic chat launch occurs only after the bootstrap has reached its
 successful completion boundary. Failure to open the chat window does not undo a
 completed installation; the installed launcher path is printed for manual use.
 
 ## Runtime contract
 
-The installed runtime provides Qwen 3.5 4B via Ollama, OpenAI Codex CLI as the current reference frontier adapter, SQLite through `winsqlite3.dll`, SurrealDB 3.3.0, v9.6.1-compatible conservative post-L0 L4 recording, explicit `/analyze` bounded A1/A2 reads, and P1/P2 response intervention **OFF**. L4 remains fail-open with respect to ordinary chat.
+The installed runtime provides Qwen 3.5 4B via Ollama, OpenAI Codex CLI as the current reference frontier adapter, SQLite through `winsqlite3.dll`, SurrealDB 3.3.0, v9.6.1-compatible conservative post-L0 L4 recording, explicit `/analyze` bounded A1/A2 reads, and P1/P2 response intervention **OFF**. v9.6.3 records `DefaultPriority = High`; the production launcher applies High to the inference runtime while leaving SurrealDB at Normal. L4 remains fail-open with respect to ordinary chat.
 
 ## Reuse before provisioning
 
@@ -42,7 +42,7 @@ The installer reuses a compatible running/installed Ollama runtime and existing 
 
 If a compatible Ollama listener is already running but does not expose a uniquely discovered existing LFO CPU/GPU alias store, the bootstrap leaves that listener untouched and starts an LFO listener on a free local port against the shared LFO store. After alias creation the exact store is written to `install-state.json`. Runtime startup verifies that both aliases are visible before chat begins, so model-store drift fails early with a diagnostic instead of failing during LOCAL or post-FRONTIER synthesis.
 
-## v9.6.2 L4 wiring (semantics inherited from v9.6.1)
+## L4 wiring in v9.6.3 (semantics inherited from v9.6.1)
 
 The installer verifies `src/LfoL4Runtime.ps1` and the recording test, generates a local config with L4 enabled, the actual isolated SurrealDB endpoint and runtime credential, L0 stage-source provenance enabled, and an installation-local memory directory. The launcher also exports `LFO_L4_ENABLED=1`, `LFO_L4_ENDPOINT` and `LFO_L4_RUNTIME_CREDENTIAL`.
 
@@ -56,7 +56,7 @@ Unless `-SkipL4Acceptance` is explicitly supplied, installation runs:
 tests/Test-LfoL4Recording.ps1 -SurrealBinary <detected-or-provisioned-surreal.exe>
 ~~~
 
-The v9.6.2 release gate retains the published v9.6.1 suite and expects **33/33 PASS** and uses deterministic LOCAL fixtures with **zero model inference and zero FRONTIER calls**. It exercises real isolated R1 writes, exact L0 drill-back, idempotent replay, manual read-only analysis and fail-open behavior.
+The v9.6.3 bootstrap retains the published v9.6.1 suite and expects **33/33 PASS** and uses deterministic LOCAL fixtures with **zero model inference and zero FRONTIER calls**. It exercises real isolated R1 writes, exact L0 drill-back, idempotent replay, manual read-only analysis and fail-open behavior.
 
 ## Clean acceptance
 
