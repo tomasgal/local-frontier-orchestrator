@@ -48,6 +48,7 @@ try {
 
 $deadline=(Get-Date).AddSeconds(60)
 $lineOpen=$false
+$nextDot=(Get-Date).AddSeconds(5)
 do {
     try {
         $null=Invoke-RestMethod -Uri ($baseUri+'/ready') -TimeoutSec 2
@@ -57,8 +58,11 @@ do {
         Write-Host "stderr: $stderr"
         exit 0
     } catch {}
-    if(-not $lineOpen){Write-Host 'Waiting for SurrealDB.' -NoNewline -ForegroundColor Cyan;$lineOpen=$true}else{Write-Host '.' -NoNewline -ForegroundColor DarkGray}
-    Start-Sleep -Seconds 1
+    if((Get-Date) -ge $nextDot){
+        if(-not $lineOpen){Write-Host 'Waiting for SurrealDB.' -NoNewline -ForegroundColor Cyan;$lineOpen=$true}else{Write-Host '.' -NoNewline -ForegroundColor DarkGray}
+        $nextDot=(Get-Date).AddSeconds(5)
+    }
+    Start-Sleep -Milliseconds 250
 } while((Get-Date) -lt $deadline)
 if($lineOpen){Write-Host ''}
 try{Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue}catch{}
