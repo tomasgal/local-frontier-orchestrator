@@ -36,6 +36,7 @@ function Warn([string]$Text) { Write-Host "WARNING: $Text" -ForegroundColor Yell
 function Assert-Lfo($Value,[string]$Message) { if (-not [bool]$Value) { throw $Message } }
 function Get-Sha256([string]$Path) { return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
 function Quote-PsSingle([string]$Text) { return $Text.Replace("'","''") }
+function Quote-ProcessArgument([string]$Text) { return '"' + $Text.Replace('"','\"') + '"' }
 function Wait-Ready([scriptblock]$Probe,[string]$Name,[int]$Seconds=60) {
     $deadline=(Get-Date).AddSeconds($Seconds)
     $sw=[Diagnostics.Stopwatch]::StartNew()
@@ -72,7 +73,23 @@ function Get-FreePort([int]$Preferred) {
     $listener.Start(); try { return [int]$listener.LocalEndpoint.Port } finally { $listener.Stop() }
 }
 function Get-ApiVersion([string]$Uri) {
-    try { return [string](Invoke-RestMethod -Uri ($Uri.TrimEnd('/')+'/api/version') -TimeoutSec 2).version } catch { return $null }
+    $response=$null;$stream=$null;$reader=$null
+    try {
+        $request=[Net.HttpWebRequest]::Create($Uri.TrimEnd('/')+'/api/version')
+        $request.Method='GET'
+        $request.Timeout=2000
+        $request.ReadWriteTimeout=2000
+        $response=$request.GetResponse()
+        $stream=$response.GetResponseStream()
+        $reader=New-Object IO.StreamReader($stream,[Text.Encoding]::UTF8)
+        $payload=$reader.ReadToEnd() | ConvertFrom-Json
+        return [string]$payload.version
+    } catch { return $null }
+    finally {
+        if($reader){$reader.Dispose()}
+        if($stream){$stream.Dispose()}
+        if($response){$response.Dispose()}
+    }
 }
 function Parse-SemVer([string]$Text) {
     if ($Text -match '(\d+\.\d+\.\d+)') { try { return [version]$matches[1] } catch {} }
@@ -209,12 +226,6 @@ function Resolve-CodexPath {
     }
     return $null
 }
-function Open-EncodedWindow([string]$Title,[string]$Code) {
-    $full = '$Host.UI.RawUI.WindowTitle='''+(Quote-PsSingle $Title)+''';'+$Code
-    $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
-    Start-Process powershell.exe -WindowStyle Normal -ArgumentList @('-NoLogo','-NoProfile','-NoExit','-ExecutionPolicy','Bypass','-EncodedCommand',$encoded) | Out-Null
-}
-
 Write-Host ''
 Write-Host ('Local Frontier Orchestrator (LFO) - Windows bootstrap for '+$RuntimeContract) -ForegroundColor Cyan
 Write-Host 'Local-first AI orchestration with structured memory, provenance and bounded L4 epistemic tooling.'
@@ -368,6 +379,18 @@ try {
     Info "SQLite ABI PASS: winsqlite3.dll $sqliteVersion"
 } finally { if($conn){Close-LfoSqliteDatabase $conn}; Remove-Item -LiteralPath $sqliteTest -Force -ErrorAction SilentlyContinue }
 
+$serviceLogRoot=Join-Path $RuntimeRoot 'logs\services'
+New-Item -ItemType Directory -Path $serviceLogRoot -Force | Out-Null
+$serviceStamp=Get-Date -Format 'yyyyMMdd-HHmmss'
+$ollamaStartedHeadless=$false
+$ollamaServicePid=$null
+$ollamaStdoutLog=$(if($oldState -and $oldState.ServiceHosting -and $oldState.ServiceHosting.Ollama){[string]$oldState.ServiceHosting.Ollama.StdoutLog}else{$null})
+$ollamaStderrLog=$(if($oldState -and $oldState.ServiceHosting -and $oldState.ServiceHosting.Ollama){[string]$oldState.ServiceHosting.Ollama.StderrLog}else{$null})
+$surrealStartedHeadless=$false
+$surrealServicePid=$null
+$surrealStdoutLog=$(if($oldState -and $oldState.ServiceHosting -and $oldState.ServiceHosting.SurrealDB){[string]$oldState.ServiceHosting.SurrealDB.StdoutLog}else{$null})
+$surrealStderrLog=$(if($oldState -and $oldState.ServiceHosting -and $oldState.ServiceHosting.SurrealDB){[string]$oldState.ServiceHosting.SurrealDB.StderrLog}else{$null})
+
 Step 'Resolve Ollama runtime: reuse compatible installation, otherwise provision pinned 0.34.4'
 $ollamaCandidates=New-Object Collections.Generic.List[string]
 if($env:LFO_OLLAMA_EXE){$ollamaCandidates.Add($env:LFO_OLLAMA_EXE)}
@@ -478,6 +501,12 @@ try {
     $owner=@(Get-NetTCPConnection -State Listen -LocalPort 11434 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique)
     if($owner.Count -eq 1){try{$runningOllamaExe=(Get-Process -Id $owner[0] -ErrorAction Stop).Path}catch{}}
 } catch {}
+if($runningOllamaExe){
+    try {
+        $ownerPid=@(Get-NetTCPConnection -State Listen -LocalPort 11434 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | Select-Object -First 1)
+        if($ownerPid.Count -eq 1){$ollamaServicePid=[int]$ownerPid[0]}
+    } catch {}
+}
 if($ollamaApiVersion){
     $rv=Parse-SemVer $ollamaApiVersion
     if($rv -and $rv -ge $OllamaMinVersion){
@@ -515,10 +544,32 @@ if($ollamaModelsDir){Info "Ollama model store selected for LFO: $ollamaModelsDir
 if(-not $runningCompatible){
     if(@(Get-NetTCPConnection -State Listen -LocalPort 11434 -ErrorAction SilentlyContinue).Count -gt 0){$ollamaPort=Get-FreePort 11435;$ollamaBase='http://127.0.0.1:'+$ollamaPort}
     $hostAddress='127.0.0.1:'+$ollamaPort
-    $modelsCode=''
-    if($ollamaModelsDir){$modelsCode='$env:OLLAMA_MODELS='''+(Quote-PsSingle $ollamaModelsDir)+''';'}
-    $code='$ErrorActionPreference=''Continue'';chcp 65001 > $null;$env:OLLAMA_HOST='''+$hostAddress+''';'+$modelsCode+'$env:OLLAMA_NUM_PARALLEL=''1'';$env:OLLAMA_MAX_LOADED_MODELS=''1'';$env:OLLAMA_NO_CLOUD=''1'';$env:OLLAMA_DEBUG=''1'';Write-Host ''LFO Ollama foreground server. Live logs follow.'' -ForegroundColor Cyan;& '''+(Quote-PsSingle $ollamaExe)+''' serve;Write-Host (''Ollama exited: ''+$LASTEXITCODE) -ForegroundColor Yellow'
-    Open-EncodedWindow 'LFO | Ollama foreground logs' $code
+    $ollamaStdoutLog=Join-Path $serviceLogRoot ('ollama-'+$serviceStamp+'.stdout.log')
+    $ollamaStderrLog=Join-Path $serviceLogRoot ('ollama-'+$serviceStamp+'.stderr.log')
+    $oldOllamaEnv=@{
+        OLLAMA_HOST=$env:OLLAMA_HOST
+        OLLAMA_MODELS=$env:OLLAMA_MODELS
+        OLLAMA_CONTEXT_LENGTH=$env:OLLAMA_CONTEXT_LENGTH
+        OLLAMA_NUM_PARALLEL=$env:OLLAMA_NUM_PARALLEL
+        OLLAMA_MAX_LOADED_MODELS=$env:OLLAMA_MAX_LOADED_MODELS
+        OLLAMA_NO_CLOUD=$env:OLLAMA_NO_CLOUD
+        OLLAMA_DEBUG=$env:OLLAMA_DEBUG
+    }
+    try {
+        $env:OLLAMA_HOST=$hostAddress
+        if($ollamaModelsDir){$env:OLLAMA_MODELS=$ollamaModelsDir}else{Remove-Item Env:OLLAMA_MODELS -ErrorAction SilentlyContinue}
+        $env:OLLAMA_CONTEXT_LENGTH='8192'
+        $env:OLLAMA_NUM_PARALLEL='1'
+        $env:OLLAMA_MAX_LOADED_MODELS='1'
+        $env:OLLAMA_NO_CLOUD='1'
+        $env:OLLAMA_DEBUG='0'
+        $ollamaProcess=Start-Process -FilePath $ollamaExe -ArgumentList 'serve' -WindowStyle Hidden -PassThru -RedirectStandardOutput $ollamaStdoutLog -RedirectStandardError $ollamaStderrLog
+    } finally {
+        foreach($k in $oldOllamaEnv.Keys){[Environment]::SetEnvironmentVariable($k,$oldOllamaEnv[$k],'Process')}
+    }
+    $ollamaStartedHeadless=$true
+    $ollamaServicePid=[int]$ollamaProcess.Id
+    Info ("Started headless Ollama PID {0}; stdout={1}; stderr={2}" -f $ollamaServicePid,$ollamaStdoutLog,$ollamaStderrLog)
     Wait-Ready { $v=Get-ApiVersion $ollamaBase; if(-not $v){throw 'not ready'} } 'Ollama' 90
     $ollamaApiVersion=Get-ApiVersion $ollamaBase
 }
@@ -708,9 +759,22 @@ if(-not $existingLfoDb){
         throw "An existing SurrealDB process already owns the LFO datastore at $surrealData, but its declared --bind endpoint could not be authenticated with this installation's runtime credential. Stop that process or repair the stored runtime marker before retrying."
     }
     if(@(Get-NetTCPConnection -State Listen -LocalPort $surrealPort -ErrorAction SilentlyContinue).Count -gt 0){$surrealPort=Get-FreePort 18080;$surrealBase='http://127.0.0.1:'+$surrealPort}
-    $serverScript=Join-Path $AppRoot 'tools\Start-LfoEpistemicServer.ps1'
-    $code='$ErrorActionPreference=''Continue'';chcp 65001 > $null;$c=Import-Clixml -LiteralPath '''+(Quote-PsSingle $bootstrapCredPath)+''';$env:SURREAL_USER=$c.UserName;$env:SURREAL_PASS=$c.GetNetworkCredential().Password;Write-Host ''LFO SurrealDB foreground server. Live logs follow.'' -ForegroundColor Cyan;& '''+(Quote-PsSingle $serverScript)+''' -Binary '''+(Quote-PsSingle $surrealExe)+''' -DataDirectory '''+(Quote-PsSingle $surrealData)+''' -Port '+$surrealPort+' -LogLevel info;Write-Host (''SurrealDB exited: ''+$LASTEXITCODE) -ForegroundColor Yellow'
-    Open-EncodedWindow 'LFO | SurrealDB foreground logs' $code
+    $surrealStdoutLog=Join-Path $serviceLogRoot ('surrealdb-'+$serviceStamp+'.stdout.log')
+    $surrealStderrLog=Join-Path $serviceLogRoot ('surrealdb-'+$serviceStamp+'.stderr.log')
+    $dbPath='rocksdb://' + (Join-Path ([IO.Path]::GetFullPath($surrealData)) 'observations.db').Replace('\','/')
+    $surrealArgs=@('start','--bind',('127.0.0.1:'+$surrealPort),'--query-timeout','3s','--deny-guests','--deny-scripting','--deny-net','--log','info',$dbPath)
+    $surrealArgLine=(@($surrealArgs|ForEach-Object{Quote-ProcessArgument ([string]$_)}) -join ' ')
+    $oldSurrealUser=$env:SURREAL_USER;$oldSurrealPass=$env:SURREAL_PASS
+    try {
+        $env:SURREAL_USER=$bootstrapCred.UserName
+        $env:SURREAL_PASS=$bootstrapCred.GetNetworkCredential().Password
+        $surrealProcess=Start-Process -FilePath $surrealExe -ArgumentList $surrealArgLine -WindowStyle Hidden -PassThru -RedirectStandardOutput $surrealStdoutLog -RedirectStandardError $surrealStderrLog
+    } finally {
+        $env:SURREAL_USER=$oldSurrealUser;$env:SURREAL_PASS=$oldSurrealPass
+    }
+    $surrealStartedHeadless=$true
+    $surrealServicePid=[int]$surrealProcess.Id
+    Info ("Started headless SurrealDB PID {0}; stdout={1}; stderr={2}" -f $surrealServicePid,$surrealStdoutLog,$surrealStderrLog)
     Wait-Ready { Invoke-RestMethod -Uri ($surrealBase+'/ready') -TimeoutSec 2 } 'SurrealDB' 60
 }
 $sv=[string](Invoke-RestMethod -Uri ($surrealBase+'/version') -TimeoutSec 5)
@@ -726,6 +790,12 @@ if(-not $runtimeSchemaReady){
 }
 $c=New-LfoEpistemicConnection $surrealBase $runtimeCred;$null=Invoke-LfoEpistemicQuery $c 'RETURN 1;'
 [IO.File]::WriteAllText($surrealRuntimeMarker,(@{Version=$SurrealVersion;Port=$surrealPort;BaseUri=$surrealBase;DataDirectory=$surrealData;UpdatedAt=[DateTime]::UtcNow.ToString('o')}|ConvertTo-Json -Compress),$utf8)
+if(-not $surrealServicePid){
+    try {
+        $surrealServicePid=@(Get-NetTCPConnection -State Listen -LocalPort $surrealPort -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | Select-Object -First 1)
+        if($surrealServicePid.Count -eq 1){$surrealServicePid=[int]$surrealServicePid[0]}else{$surrealServicePid=$null}
+    } catch {$surrealServicePid=$null}
+}
 Info "SurrealDB LFO datastore PASS: $surrealBase"
 Info "SurrealDB runtime marker: $surrealRuntimeMarker"
 
@@ -758,11 +828,11 @@ if(-not $SkipL4Acceptance){
     Step 'Run deterministic L4 recording acceptance (accepted v9.6.1 semantics)'
     $acceptScript=Join-Path $AppRoot 'tests\Test-LfoL4Recording.ps1'
     $acceptProc=Start-Process powershell.exe -Wait -PassThru -NoNewWindow -ArgumentList @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',$acceptScript,'-SurrealBinary',$surrealExe)
-    Assert-Lfo ($acceptProc.ExitCode -eq 0) ("v9.6.2 L4 recording acceptance failed with exit code "+$acceptProc.ExitCode)
+    Assert-Lfo ($acceptProc.ExitCode -eq 0) ("L4 recording acceptance failed with exit code "+$acceptProc.ExitCode)
     $l4Acceptance='PASS'
     Info 'L4 recording acceptance: release suite PASS.'
 } else {
-    Warn 'v9.6.2 L4 recording acceptance skipped by request.'
+    Warn 'L4 recording acceptance skipped by request.'
 }
 
 $state=[ordered]@{
@@ -775,6 +845,11 @@ $state=[ordered]@{
     SQLite=[ordered]@{Provider='winsqlite3.dll';Path=$systemSqlite;Version=$sqliteVersion;SelfTest='PASS'}
     Ollama=[ordered]@{Executable=$ollamaExe;ExecutableVersion=[string]$ollamaExeVersion;ApiVersion=$ollamaApiVersion;Managed=$ollamaManaged;BaseUri=$ollamaBase;HostAddress=$hostAddress;ModelsDirectory=$ollamaModelsDir;BaseModel=$BaseModel;GPUModel=$GpuModel;CPUModel=$CpuModel}
     SurrealDB=[ordered]@{Executable=$surrealExe;Version=$SurrealVersion;SHA256=$surrealHash;Managed=$surrealManaged;BaseUri=$surrealBase;Port=$surrealPort;DataDirectory=$surrealData;BootstrapCredentialPath=$bootstrapCredPath;RuntimeCredentialPath=$runtimeCredPath;Namespace='lfo';Database='epistemic'}
+    ServiceHosting=[ordered]@{
+        Policy='headless-redirected-for-LFO-owned-services'
+        Ollama=[ordered]@{Pid=$ollamaServicePid;StartedHeadlessByThisBootstrap=$ollamaStartedHeadless;StdoutLog=$ollamaStdoutLog;StderrLog=$ollamaStderrLog}
+        SurrealDB=[ordered]@{Pid=$surrealServicePid;StartedHeadlessByThisBootstrap=$surrealStartedHeadless;StdoutLog=$surrealStdoutLog;StderrLog=$surrealStderrLog}
+    }
     Frontier=[ordered]@{CodexDetected=[bool]$codexPath;CodexExecutable=$codexPath;CodexVersion=$codexVersion;AdapterSelection='PENDING'}
     LFO=[ordered]@{RuntimeContract=$RuntimeContract;DefaultProfile=$Profile;DefaultPriority='High';ConfigPath=$installConfigPath;MemoryDirectory=$memoryDir;L0StageSourcesEnabled=$true;L4RecordingEnabled=$true;L4Acceptance=$l4Acceptance}
 }
