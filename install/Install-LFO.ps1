@@ -354,7 +354,7 @@ Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\QwenChat.ps1')) 'LFO
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'LFO.ps1')) 'LFO source does not contain the v9.6.3 production entrypoint.'
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\LfoL4Runtime.ps1')) 'LFO source does not contain the v9.6.1/v9.6.2 L4 runtime module.'
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'tests\Test-LfoL4Recording.ps1')) 'LFO source does not contain the v9.6.1/v9.6.2 L4 recording acceptance suite.'
-foreach($requiredLauncher in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1')){
+foreach($requiredLauncher in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-Ollama.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1')){
     Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot ('launch\'+$requiredLauncher))) ("Bootstrap source is missing launcher: "+$requiredLauncher)
 }
 Info "LFO source: $SourceCommit"
@@ -857,7 +857,7 @@ $statePath=Join-Path $ConfigRoot 'install-state.json'
 [IO.File]::WriteAllText($statePath,($state|ConvertTo-Json -Depth 12),$utf8)
 
 Step 'Publish easy launchers inside the install tree'
-foreach($name in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1','View-LFOConversationLog.ps1')){
+foreach($name in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-Ollama.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1','View-LFOConversationLog.ps1')){
     $src=Join-Path $AppRoot ('launch\'+$name);Assert-Lfo (Test-Path -LiteralPath $src -PathType Leaf) "Required launcher missing from source: $name"
     Copy-Item -LiteralPath $src -Destination (Join-Path $LaunchRoot $name) -Force
 }
