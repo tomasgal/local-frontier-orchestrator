@@ -15,7 +15,8 @@ v9.6.3 promotes the controlled runtime/experiment candidate without reopening th
 - leaves SurrealDB/L4 at Normal priority;
 - keeps `Realtime` available only as an explicit experimental condition, not a production default;
 - keeps the existing CPU/GPU launchers as compatibility wrappers around the new entrypoint;
-- publishes `LFO.ps1` into the installed `launch` directory.
+- publishes `LFO.ps1` into the installed `launch` directory;
+- starts LFO-owned Ollama and SurrealDB services headless with redirected stdout/stderr logs, removing the Windows console QuickEdit/selection stall failure mode.
 
 ## Waiting/progress behavior
 
