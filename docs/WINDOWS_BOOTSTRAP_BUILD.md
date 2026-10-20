@@ -40,7 +40,7 @@ Binary reuse never implies datastore reuse. Each installation owns its datastore
 
 The installer reuses a compatible running/installed Ollama runtime and existing model store when possible. Otherwise it provisions pinned Ollama 0.34.4 and verifies SHA-256. CPU and GPU aliases share the same base weights **and the same persisted model store**; profile selection is an execution policy, not a storage boundary.
 
-If a compatible Ollama listener is already running but does not expose a uniquely discovered existing LFO CPU/GPU alias store, the bootstrap leaves that listener untouched and starts an LFO listener on a free local port against the shared LFO store. After alias creation the exact store is written to `install-state.json`. Runtime startup verifies that both aliases are visible before chat begins, so model-store drift fails early with a diagnostic instead of failing during LOCAL or post-FRONTIER synthesis.
+If a compatible Ollama listener is already running but does not expose a uniquely discovered existing LFO CPU/GPU alias store, the bootstrap leaves that listener untouched and starts an LFO listener on a free local port against the shared LFO store. **Any service started by LFO is headless and has stdout/stderr redirected under `runtime\logs\services`; an interactive console is never the service's I/O sink.** This prevents Windows console selection/QuickEdit from suspending service output and indirectly stalling the API. After alias creation the exact store is written to `install-state.json`. Runtime startup verifies that both aliases are visible before chat begins, so model-store drift fails early with a diagnostic instead of failing during LOCAL or post-FRONTIER synthesis.
 
 ## L4 wiring in v9.6.3 (semantics inherited from v9.6.1)
 
@@ -60,7 +60,7 @@ The v9.6.3 bootstrap retains the published v9.6.1 suite and expects **33/33 PASS
 
 ## Clean acceptance
 
-Run the installer from Windows PowerShell 5.1 into a clean isolated root. Acceptance requires source acquisition, SQLite PASS, Ollama readiness/model aliases, SurrealDB 3.3.0 discovery or verified provisioning, isolated datastore/schema and credentials, generated v9.6.2 L4 config, deterministic recording-suite PASS, installed launchers, live L4 `CONFIGURED`, and a LOCAL recording plus explicit `/analyze` from the installed tree.
+Run the installer from Windows PowerShell 5.1 into a clean isolated root. Acceptance requires source acquisition, SQLite PASS, Ollama readiness/model aliases, SurrealDB 3.3.0 discovery or verified provisioning, isolated datastore/schema and credentials, generated v9.6.3 L4 config, deterministic recording-suite PASS, installed launchers, live L4 `CONFIGURED`, and a LOCAL recording plus explicit `/analyze` from the installed tree.
 
 Clean installed-tree acceptance was reviewed and passed on 2026-10-14, including bootstrap completion, deterministic 33-check L4 recording acceptance, installed-tree GPU launcher startup, live LOCAL routing, two live L4 `CREATED` writes, and `/analyze` readback with exact L0 references.
 
