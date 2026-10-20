@@ -16,6 +16,8 @@ The promotion adds Auto/CPU/GPU device selection, isolated declarative experimen
 
 The experiment is a host-runtime validation result, not a universal cross-hardware benchmark or a claim that the Raspberry Pi memory-wall mechanism was reproduced.
 
+**Release closure — 2026-10-20: PASS.** Installed source `e625e2f44187c23f9379fd9ef3e3c8cb74109972` completed the final Windows CPU smoke after the headless-service lifecycle and PowerShell 5.1 interactive-exit fixes. The bootstrap reused live Ollama 0.34.4 / SurrealDB 3.3.0 and the persisted shared model store; the installed `LFO.ps1 -Device CPU` verified Ollama at High priority, reported L4 `CONFIGURED`, started interactive QwenChat, and `/exit` returned cleanly to PowerShell. The final closure run skipped model pull and the deterministic L4 suite because those unchanged gates had already passed earlier in the same validation cycle.
+
 ### v9.6.2 previous operational packaging/runtime release
 
 **v9.6.2 is the accepted operational packaging/runtime release.** It preserves the v9.6.1 conservative post-L0 T1 recording and explicit bounded `/analyze` A1/A2 reads, while promoting the accepted Windows bootstrap, shared Ollama model-store lifecycle, CPU/GPU launch profiles and live closure smokes into one immutable release boundary. D1 remains offline and P1/P2 response intervention remains OFF.

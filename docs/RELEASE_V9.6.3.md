@@ -39,6 +39,24 @@ Shared definitions are under [`experiments/`](../experiments/). The accepted run
 
 These measurements justify the Windows runtime default on the validated host class; they are not a universal cross-hardware performance claim.
 
+## Release-closure acceptance — 2026-10-20
+
+The final installed-tree runtime smoke **PASSED** against source commit `e625e2f44187c23f9379fd9ef3e3c8cb74109972` on the Windows 10 CPU-only validation notebook.
+
+Verified in the final smoke:
+
+- bootstrap update/reuse path completed with already-running Ollama 0.34.4 and SurrealDB 3.3.0;
+- the persisted shared Ollama model store was resolved without reprovisioning;
+- the v9.6.3 installed launch tree was republished successfully;
+- `LFO.ps1 -Device CPU` selected `lfo-qwen3.5-4b-cpu5k:latest`;
+- the production launcher verified the running Ollama process at Windows priority class **High**;
+- ordinary startup reported L4 recording **CONFIGURED**;
+- interactive QwenChat started normally and explicit `/exit` returned directly to PowerShell with no spurious `LFO 9.6.3 FAILED` condition.
+
+The closure bootstrap used `-SkipModelPull -SkipL4Acceptance -SkipLaunch` to avoid repeating unchanged expensive gates. Model aliases/shared-store behavior and the inherited deterministic L4 recording suite (**33/33 PASS, zero inference/FRONTIER calls**) had already passed earlier in the v9.6.3 validation cycle. The final smoke therefore closes the later service-hosting, reuse, priority and interactive-exit regressions rather than re-benchmarking those earlier gates.
+
+The headless-service change removes the demonstrated Windows console-selection/QuickEdit failure mode from **LFO-owned** Ollama/SurrealDB processes by redirecting their stdout/stderr to runtime log files instead of an interactive console.
+
 ## Compatibility and unchanged scope
 
 - accepted L0/L1/L2/L3 semantics are unchanged;

@@ -96,3 +96,18 @@ A LOCAL arithmetic prompt completed correctly with `route=LOCAL`. The CPU alias 
 **Shared model-store lifecycle: PASS**
 
 The bootstrap resolved one persisted Ollama model store containing both CPU and GPU aliases. A cold runtime restart then found the selected GPU alias, completed FRONTIER handoff, and successfully re-entered local Qwen synthesis. The earlier failure mode — Codex returning successfully followed by `model ... not found` during synthesis — is therefore closed for the accepted installed-tree path.
+
+### v9.6.3 final runtime/service closure — 2026-10-20
+
+Final installed-tree smoke source: `e625e2f44187c23f9379fd9ef3e3c8cb74109972`.
+
+The final validation targeted the v9.6.3 changes added after the earlier packaging gates:
+
+- bootstrap update against an existing installation completed while **reusing running Ollama 0.34.4** and **SurrealDB 3.3.0**;
+- persisted Ollama executable/model-store state was resolved through the fast path;
+- service lifecycle no longer requires an interactive console for LFO-owned servers; stdout/stderr are redirected to `runtime\logs\services`;
+- installed `LFO.ps1 -Device CPU` selected the CPU alias and verified the running Ollama process at **High** priority;
+- startup reported L4 recording `CONFIGURED`;
+- explicit `/exit` returned cleanly to the calling PowerShell process, closing the Windows PowerShell 5.1 blank-`ExitCode` regression.
+
+The closure bootstrap deliberately used `-SkipModelPull -SkipL4Acceptance -SkipLaunch`. Those switches make this a focused runtime/service smoke, not a replacement for the earlier model-alias and deterministic L4 acceptance evidence. The inherited L4 suite had already passed **33/33** earlier in the v9.6.3 cycle, and model aliases/shared-store behavior had already been validated.

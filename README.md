@@ -36,6 +36,8 @@ Related sources:
 
 The v9.6.3 bootstrap retains the accepted v9.6.2 installer, shared Ollama model-store and L4 provisioning semantics, updates the runtime contract to v9.6.3, records `DefaultPriority = High`, publishes the new `LFO.ps1` entrypoint into the installed `launch` directory, and keeps the CPU/GPU launchers as compatibility wrappers. **LFO-owned Ollama and SurrealDB services are started headless with stdout/stderr redirected under `runtime\logs\services`; they no longer depend on an interactive Windows console and therefore cannot be paused by console selection/QuickEdit state.**
 
+**Release-closure smoke: PASS on 2026-10-20.** Installed source `e625e2f44187c23f9379fd9ef3e3c8cb74109972` was exercised on the Windows 10 CPU-only validation notebook after the headless-service fix. The bootstrap successfully reused live Ollama 0.34.4 and SurrealDB 3.3.0, republished the v9.6.3 launch tree, and the installed `LFO.ps1 -Device CPU` verified Ollama at **High** priority, reported L4 `CONFIGURED`, entered interactive QwenChat, and returned cleanly from `/exit` with no false failure. This final smoke intentionally used `-SkipModelPull -SkipL4Acceptance` because model aliases and the inherited deterministic 33-check L4 suite had already passed earlier in the same v9.6.3 validation cycle.
+
 The installer:
 
 - reuses a compatible existing Ollama runtime/model store where possible, but persists one **shared LFO model store** for both CPU/GPU aliases and refuses to reuse a listener that points at a conflicting store;
