@@ -747,7 +747,7 @@ Assert-Lfo ([string]$parsedInstallConfig.L4.CredentialPath -ceq $runtimeCredPath
 
 $l4Acceptance='SKIPPED'
 if(-not $SkipL4Acceptance){
-    Step 'Run v9.6.2 deterministic L4 recording acceptance'
+    Step 'Run deterministic L4 recording acceptance (accepted v9.6.1 semantics)'
     $acceptScript=Join-Path $AppRoot 'tests\Test-LfoL4Recording.ps1'
     $acceptProc=Start-Process powershell.exe -Wait -PassThru -NoNewWindow -ArgumentList @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',$acceptScript,'-SurrealBinary',$surrealExe)
     Assert-Lfo ($acceptProc.ExitCode -eq 0) ("v9.6.2 L4 recording acceptance failed with exit code "+$acceptProc.ExitCode)
