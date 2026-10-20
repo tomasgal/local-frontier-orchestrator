@@ -81,7 +81,7 @@ function Get-ApiVersion([string]$Uri) {
         $request.ReadWriteTimeout=2000
         $response=$request.GetResponse()
         $stream=$response.GetResponseStream()
-        $reader=New-Object IO.StreamReader($stream,[Text.Encoding]::UTF8)
+        $reader=New-Object IO.StreamReader -ArgumentList @($stream,[Text.Encoding]::UTF8)
         $payload=$reader.ReadToEnd() | ConvertFrom-Json
         return [string]$payload.version
     } catch { return $null }
