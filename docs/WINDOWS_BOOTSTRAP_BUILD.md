@@ -1,6 +1,6 @@
 # Windows bootstrap build v2 — v9.6.3 runtime
 
-Status: **v9.6.3 PRODUCTION RUNTIME — v9.6.2 BOOTSTRAP BASELINE RETAINED; RUNTIME-PRIORITY PROMOTION ACCEPTED 2026-10-20**
+Status: **v9.6.3 IMMUTABLE WINDOWS RELEASE — annotated tag `v9.6.3`; release closure accepted 2026-10-20**
 
 This document describes the Windows bootstrap packaging used by the **LFO v9.6.3 runtime contract**. v9.6.3 retains the accepted v9.6.2 installer/service packaging, shared model-store lifecycle and v9.6.1 L4 recording/manual-analysis semantics, while adding the production `LFO.ps1` runtime/experiment entrypoint and a default High inference-priority policy.
 
@@ -100,6 +100,8 @@ The bootstrap resolved one persisted Ollama model store containing both CPU and 
 ### v9.6.3 final runtime/service closure — 2026-10-20
 
 Final installed-tree smoke source: `e625e2f44187c23f9379fd9ef3e3c8cb74109972`.
+
+The immutable release boundary is annotated tag `v9.6.3` (tag object `bfd0e6b482a1c4819fca39c68f3a32bf62921709`) targeting release-closure commit `4f89badcd1a3f91ecdf32666566e9d81efff0cda`. The tag includes the closure documentation and must not be moved; the runtime evidence remains explicitly bound to the tested source commit above.
 
 The final validation targeted the v9.6.3 changes added after the earlier packaging gates:
 

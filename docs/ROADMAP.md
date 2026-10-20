@@ -10,11 +10,13 @@ limitations and reopen criteria.
 
 ### v9.6.3 operational controlled-runtime release
 
-**v9.6.3 is the current operational Windows runtime on `main` as of 2026-10-20.** It preserves the accepted L0-L4 behavior and v9.6.2 bootstrap/model-store baseline while promoting the controlled `LFO.ps1` runtime and unattended experiment runner.
+**v9.6.3 is the current operational Windows release and is frozen at immutable annotated tag `v9.6.3` as of 2026-10-20.** It preserves the accepted L0-L4 behavior and v9.6.2 bootstrap/model-store baseline while promoting the controlled `LFO.ps1` runtime and unattended experiment runner.
 
 The promotion adds Auto/CPU/GPU device selection, isolated declarative experiments, checkpoint/resume, process-tree/placement verification, compact dotted waiting output, and **High Windows process priority as the default inference policy**. The priority choice is backed by the bounded counterbalanced CPU-only host experiment documented in [RUNTIME_PRIORITY_EXPERIMENT_V963.md](RUNTIME_PRIORITY_EXPERIMENT_V963.md): High improved mean prefill throughput by 17.7% and won all 18 matched prefill pairs; decode improved by 7.6% on average but remained materially noisier. SurrealDB/L4 stays at Normal priority and Realtime is not a production default.
 
 The experiment is a host-runtime validation result, not a universal cross-hardware benchmark or a claim that the Raspberry Pi memory-wall mechanism was reproduced.
+
+**Immutable publication — 2026-10-20:** annotated tag `v9.6.3` (tag object `bfd0e6b482a1c4819fca39c68f3a32bf62921709`) resolves to release-closure commit `4f89badcd1a3f91ecdf32666566e9d81efff0cda`. This tag is frozen; later `main` commits do not modify the v9.6.3 release.
 
 **Release closure — 2026-10-20: PASS.** Installed source `e625e2f44187c23f9379fd9ef3e3c8cb74109972` completed the final Windows CPU smoke after the headless-service lifecycle and PowerShell 5.1 interactive-exit fixes. The bootstrap reused live Ollama 0.34.4 / SurrealDB 3.3.0 and the persisted shared model store; the installed `LFO.ps1 -Device CPU` verified Ollama at High priority, reported L4 `CONFIGURED`, started interactive QwenChat, and `/exit` returned cleanly to PowerShell. The final closure run skipped model pull and the deterministic L4 suite because those unchanged gates had already passed earlier in the same validation cycle.
 

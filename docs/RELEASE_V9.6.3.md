@@ -2,9 +2,20 @@
 
 Date: **2026-10-20**
 
-Status: **PROMOTED ON `main` AS THE CURRENT WINDOWS OPERATIONAL RUNTIME**
+Status: **IMMUTABLE RELEASE — annotated tag `v9.6.3` published 2026-10-20**
 
 v9.6.3 promotes the controlled runtime/experiment candidate without reopening the accepted L0-L4 semantics. v9.6.2 remains the previous immutable tagged/Zenodo release boundary.
+
+## Immutable release boundary
+
+Annotated Git tag **`v9.6.3`** is the immutable release boundary.
+
+- tag object: `bfd0e6b482a1c4819fca39c68f3a32bf62921709`
+- tagged release-closure commit: `4f89badcd1a3f91ecdf32666566e9d81efff0cda`
+- tested runtime commit recorded by the closure evidence: `e625e2f44187c23f9379fd9ef3e3c8cb74109972`
+- the only commit between tested runtime and tagged closure boundary is the documentation-only release-closure evidence commit.
+
+The tag must not move. Further work belongs on `main` or in a later version/tag.
 
 ## Production runtime changes
 
