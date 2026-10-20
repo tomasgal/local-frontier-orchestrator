@@ -372,11 +372,6 @@ Step 'Resolve Ollama runtime: reuse compatible installation, otherwise provision
 $ollamaCandidates=New-Object Collections.Generic.List[string]
 if($env:LFO_OLLAMA_EXE){$ollamaCandidates.Add($env:LFO_OLLAMA_EXE)}
 if($oldState -and $oldState.Ollama -and $oldState.Ollama.Executable){$ollamaCandidates.Add([string]$oldState.Ollama.Executable)}
-try {
-    foreach($pid in @(Get-NetTCPConnection -State Listen -LocalPort 11434 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique)) {
-        try { $p=(Get-Process -Id $pid -ErrorAction Stop).Path; if($p){$ollamaCandidates.Insert(0,$p)} } catch {}
-    }
-} catch {}
 foreach($n in @('ollama.exe','ollama')){ $p=Resolve-CommandPath $n; if($p){$ollamaCandidates.Add($p)} }
 foreach($p in @(
     (Join-Path $env:LOCALAPPDATA 'Programs\Ollama\ollama.exe'),
@@ -386,9 +381,22 @@ foreach($p in @(
 )){ if($p){$ollamaCandidates.Add($p)} }
 
 $ollamaExe=$null;$ollamaExeVersion=$null
-foreach($candidate in @($ollamaCandidates | Select-Object -Unique)) {
-    $v=Get-OllamaExeVersion $candidate
-    if($v -and $v -ge $OllamaMinVersion){$ollamaExe=[IO.Path]::GetFullPath($candidate);$ollamaExeVersion=$v;break}
+$liveOllamaBase='http://127.0.0.1:11434'
+$liveOllamaApiVersion=Get-ApiVersion $liveOllamaBase
+$liveOllamaVersion=Parse-SemVer $liveOllamaApiVersion
+if($liveOllamaVersion -and $liveOllamaVersion -ge $OllamaMinVersion){
+    $persistedOllamaExe=$(if($oldState -and $oldState.Ollama){[string]$oldState.Ollama.Executable}else{$null})
+    if(-not [string]::IsNullOrWhiteSpace($persistedOllamaExe) -and (Test-Path -LiteralPath $persistedOllamaExe -PathType Leaf)){
+        $ollamaExe=[IO.Path]::GetFullPath($persistedOllamaExe)
+        $ollamaExeVersion=$liveOllamaVersion
+        Info "Fast-path: reusing running Ollama API $liveOllamaApiVersion with persisted executable $ollamaExe"
+    }
+}
+if(-not $ollamaExe){
+    foreach($candidate in @($ollamaCandidates | Select-Object -Unique)) {
+        $v=Get-OllamaExeVersion $candidate
+        if($v -and $v -ge $OllamaMinVersion){$ollamaExe=[IO.Path]::GetFullPath($candidate);$ollamaExeVersion=$v;break}
+    }
 }
 if(-not $ollamaExe){
     Info 'Known/persisted Ollama paths did not resolve; using bounded LocalAppData fallback discovery.'
