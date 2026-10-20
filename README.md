@@ -66,7 +66,7 @@ Both bootstrap paths install/reuse the same LFO runtime and prepare **both** CPU
 
 ## macOS users: AI-assisted porting guidance
 
-**macOS is not yet a supported v9.6.2/v9.6.3 runtime target.** PowerShell itself is available natively on macOS as **PowerShell 7 (`pwsh`)**, so the LFO PowerShell code can be ported, but the current bootstrap and candidate launcher contain Windows-specific process, path, service and priority handling and should not be expected to run unchanged.
+**macOS is not yet a supported v9.6.3 runtime target.** PowerShell itself is available natively on macOS as **PowerShell 7 (`pwsh`)**, so the LFO PowerShell code can be ported, but the current Windows bootstrap and production launcher contain Windows-specific process, path, service and priority handling and should not be expected to run unchanged.
 
 For a Mac user, the recommended workflow is to give this repository/README and the relevant launcher to a capable coding assistant and ask it to create a **macOS runtime adapter**, while preserving the LFO orchestration and experiment semantics. The port should keep the existing model/routing/memory behavior and declarative experiment format wherever possible, and replace only the operating-system-specific runtime layer.
 
