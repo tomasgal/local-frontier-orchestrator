@@ -11,7 +11,7 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 $Host.UI.RawUI.WindowTitle = "LFO | $Service monitor"
 
 Write-Host "LFO $Service status monitor" -ForegroundColor Cyan
-Write-Host "Reusing an already-running $Service service; its original process owns raw stdout/stderr."
+Write-Host "Monitoring $Service API state. LFO-owned services run headless; raw stdout/stderr are redirected under the LFO runtime logs directory."
 Write-Host "Endpoint: $BaseUri"
 Write-Host "Status changes are shown immediately; unchanged state is shown at most once every $HeartbeatSeconds seconds."
 Write-Host 'Press Ctrl+C to close this monitor.'
