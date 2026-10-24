@@ -50,6 +50,12 @@ Shared definitions are under [`experiments/`](../experiments/). The accepted run
 
 These measurements justify the Windows runtime default on the validated host class; they are not a universal cross-hardware performance claim.
 
+## Post-release runtime-priority publication — 2026-10-24
+
+The accepted runtime-priority experiment is published as [*Windows Process Priority and Local LLM Inference: A Counterbalanced Host-Runtime Study*](https://zenodo.org/records/23610929), DOI [10.5281/zenodo.23610929](https://doi.org/10.5281/zenodo.23610929). The technical note quantifies the practical effect of Windows Normal versus High process priority on local-LLM prefill and decode throughput for the validated constrained CPU-only host and preserves the host-scoped evidence boundary. The Zenodo record includes the article, machine-readable research data and supplementary reproducibility materials.
+
+This publication is post-release documentation/research output. It does **not** move or modify the immutable `v9.6.3` tag or its release-closure evidence.
+
 ## Release-closure acceptance — 2026-10-20
 
 The final installed-tree runtime smoke **PASSED** against source commit `e625e2f44187c23f9379fd9ef3e3c8cb74109972` on the Windows 10 CPU-only validation notebook.
