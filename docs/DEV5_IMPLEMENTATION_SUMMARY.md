@@ -137,6 +137,7 @@ its reported numerical results.
 ## Related records
 
 - [Published DEV5 transferability technical note](https://doi.org/10.5281/zenodo.23318551): *Reducing Context and Generation Traffic in a Local-First LLM Orchestrator: A Transferability Case Study* (DOI 10.5281/zenodo.23318551)
+- [Published runtime-priority technical note](https://zenodo.org/records/23610929): *Windows Process Priority and Local LLM Inference: A Counterbalanced Host-Runtime Study* (DOI 10.5281/zenodo.23610929). This follow-up studies host-runtime priority rather than DEV5 context/work reduction.
 
 - [Frozen L2 contract and results](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_BASELINE.md)
 - [Frozen file manifest](https://github.com/tomasgal/local-frontier-orchestrator/blob/v9.4-l2-frozen/docs/L2_FROZEN_MANIFEST.json)
