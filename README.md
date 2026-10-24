@@ -28,6 +28,8 @@ The experiment runner supports isolated prompt state, LOCAL-only guards, owned s
 
 The runtime-priority work was motivated in part by **Daniel Correa Villa's architecture-first optimisation work** on a four-node Raspberry Pi 5 inference cluster. LFO transfers the general host-runtime question, not the Raspberry Pi measurements themselves. The accepted Windows experiment found a strong and counterbalanced High-priority prefill effect on the constrained CPU-only validation notebook; decode moved in the same direction but more noisily. See [the full v9.6.3 runtime-priority report](docs/RUNTIME_PRIORITY_EXPERIMENT_V963.md).
 
+**Runtime-priority technical note:** the experiment is published as [*Windows Process Priority and Local LLM Inference: A Counterbalanced Host-Runtime Study*](https://zenodo.org/records/23610929) on Zenodo, DOI [10.5281/zenodo.23610929](https://doi.org/10.5281/zenodo.23610929). The note quantifies how the standard Windows process-priority mechanism translated into local-LLM prefill and decode throughput on the validated constrained CPU host; it does not claim a novel Windows scheduling mechanism or a universal cross-host speedup. The Zenodo record also contains the machine-readable research data and supplementary reproducibility materials.
+
 Related sources:
 
 - Correa Villa's distributed-llama project / reproducibility implementation: [`danielcorrea-hellomatik/distributed-llama`, `pi5-cluster`](https://github.com/danielcorrea-hellomatik/distributed-llama/tree/pi5-cluster)
