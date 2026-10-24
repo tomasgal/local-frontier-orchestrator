@@ -4,6 +4,8 @@ Status: **ACCEPTED AS BOUNDED HOST-RUNTIME EVIDENCE — 2026-10-20**
 
 This document records the experiments used to decide the default Windows inference process priority for LFO v9.6.3. The result is a **host-scoped runtime decision**, not a universal benchmark claim.
 
+**Published technical note:** [*Windows Process Priority and Local LLM Inference: A Counterbalanced Host-Runtime Study*](https://zenodo.org/records/23610929), DOI [10.5281/zenodo.23610929](https://doi.org/10.5281/zenodo.23610929). The publication packages the counterbalanced result together with machine-readable research data, figures, the frozen statistical analysis contract and reproduction scripts. Its contribution is the empirical quantification of how the documented Windows process-priority mechanism translated into local-LLM throughput on this validated host, not a claim that the underlying Windows scheduling behavior is novel.
+
 ## Motivation
 
 The experiment was motivated by Daniel Correa Villa's architecture-first work on a Raspberry Pi 5 inference cluster, where apparently secondary host activity measurably affected bandwidth-limited autoregressive decode. LFO transfers the methodological question — whether host/runtime conditions materially affect local inference — without claiming that a Windows Skylake-U notebook reproduces the Raspberry Pi memory-wall mechanism.
