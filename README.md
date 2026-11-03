@@ -202,7 +202,59 @@ SurrealDB, Ollama and Codex are documented in
 [`docs/ARCHITECTURE.md#8-canonical-runtime-module-topology`](docs/ARCHITECTURE.md#8-canonical-runtime-module-topology).
 That section distinguishes ordinary chat edges from optional `/analyze`,
 post-L0 L4 recording and experimental P1/P2 intervention paths, and is the
-preferred source for architecture/diagram generators.
+preferred detailed source for architecture/diagram generators.
+
+For lightweight architecture parsers that prioritize README-level evidence, the
+current runtime edges are explicitly:
+
+```text
+User -> LFO.ps1
+LFO.ps1 -> src/QwenChat.ps1
+LFO.ps1 -> Ollama runtime
+LFO.ps1 -> experiments/*
+LFO.ps1 -> SurrealDB
+
+src/QwenChat.ps1 -> Ollama runtime
+src/QwenChat.ps1 -> Codex CLI
+Codex CLI -> src/QwenChat.ps1
+
+src/QwenChat.ps1 -> src/QwenMemory.ps1
+src/QwenChat.ps1 -> src/LfoStructuredMemory.ps1
+src/QwenChat.ps1 -> src/LfoMixedTurnEvidence.ps1
+src/QwenChat.ps1 -> src/LfoTurnTelemetry.ps1
+
+src/QwenMemory.ps1 -> L0 JSONL
+src/QwenMemory.ps1 -> L1 memory
+src/QwenMemory.ps1 -> src/LfoMemoryStore.ps1
+src/LfoMemoryStore.ps1 -> L2 SQLite
+src/QwenMemory.ps1 -> src/LfoStructuredRetrieval.ps1
+src/LfoStructuredRetrieval.ps1 -> L2 SQLite
+
+src/QwenMemory.ps1 -> src/LfoL3Runtime.ps1
+src/LfoL3Runtime.ps1 -> src/LfoL3Planner.ps1
+src/LfoL3Runtime.ps1 -> src/LfoL3Store.ps1
+src/LfoL3Runtime.ps1 -> L0 JSONL
+src/LfoL3Runtime.ps1 -> L2 SQLite
+src/QwenMemory.ps1 -> src/LfoL3Indexer.ps1
+src/LfoL3Indexer.ps1 -> src/LfoL3Store.ps1
+src/LfoL3Indexer.ps1 -> L2 SQLite
+src/LfoL3Store.ps1 -> L3 SQLite
+
+src/QwenChat.ps1 -> src/LfoL4Runtime.ps1
+src/QwenMemory.ps1 -> src/LfoL4Runtime.ps1 [optional post-L0 callback]
+src/LfoL4Runtime.ps1 -> src/LfoEpistemicStore.ps1
+src/LfoEpistemicStore.ps1 -> SurrealDB
+src/LfoL4Runtime.ps1 -> src/LfoEpistemicObservatory.ps1 [/analyze only]
+src/LfoL4Runtime.ps1 -> src/LfoEpistemicInteractionAnalytics.ps1 [/analyze only]
+src/LfoEpistemicInteractionAnalytics.ps1 -> src/LfoEpistemicObservatory.ps1
+
+src/LfoL4Runtime.ps1 -> src/LfoEpistemicPolicyCapsule.ps1 [explicit/experimental]
+src/LfoEpistemicPolicyCapsule.ps1 -> src/LfoEpistemicIntervention.ps1 [explicit/experimental]
+```
+
+Offline detector, annotation and pilot-analysis modules are intentionally omitted
+from the ordinary-turn edge map because they are auxiliary research capabilities,
+not implicit steps in every chat turn.
 
 ### Current design principles
 
