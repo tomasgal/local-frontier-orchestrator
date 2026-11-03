@@ -197,7 +197,216 @@ observable interaction signals from stronger interpretations, measures
 phenomenon-specific magnitude against explicit reference/control conditions and
 keeps experimental interventions separate from the current default runtime.
 
-## 8. Synthesis policy
+## 8. Canonical runtime module topology
+
+This section is the canonical module-to-module topology for architecture diagrams.
+It documents only relationships that are present in the current source or explicitly
+enabled by configuration. Optional and experimental paths are labelled as such.
+
+### 8.1 Launcher and conversational runtime
+
+```mermaid
+flowchart TD
+    U[User]
+    L[LFO.ps1]
+    Q[src/QwenChat.ps1]
+    O[Ollama runtime]
+    C[Codex CLI / frontier]
+    E[experiments/*.json]
+    S[(SurrealDB 3.3.0)]
+
+    U -->|starts| L
+    L -->|launches interactive runtime| Q
+    L -->|starts/verifies local inference service| O
+    L -->|runs unattended experiment plans| E
+    L -->|starts/provisions L4 datastore when enabled| S
+
+    Q -->|LOCAL generation: /api/chat| O
+    Q -->|FRONTIER: bounded read-only codex exec| C
+    C -->|frontier result| Q
+    Q -->|final answer| U
+```
+
+The launcher owns process/service orchestration, runtime profile selection, process
+priority and unattended experiment envelopes. `QwenChat.ps1` owns the interactive
+turn, LOCAL/FRONTIER routing, local generation, optional frontier handoff, synthesis
+and the final call into persistence.
+
+### 8.2 Memory and retrieval dataflow
+
+```mermaid
+flowchart LR
+    Q[src/QwenChat.ps1]
+    M[src/QwenMemory.ps1]
+    SM[src/LfoStructuredMemory.ps1]
+    MS[src/LfoMemoryStore.ps1]
+    SR[src/LfoStructuredRetrieval.ps1]
+    MX[src/LfoMixedTurnEvidence.ps1]
+    T[src/LfoTurnTelemetry.ps1]
+    L3R[src/LfoL3Runtime.ps1]
+    L3P[src/LfoL3Planner.ps1]
+    L3I[src/LfoL3Indexer.ps1]
+    L3S[src/LfoL3Store.ps1]
+
+    L0[(L0 monthly JSONL)]
+    L1[(L1 rolling/pending memory)]
+    L2[(L2 SQLite factual state)]
+    L3[(L3 SQLite index/facets)]
+
+    Q -->|turn context + persist| M
+    Q -->|parse structured memory ops| SM
+    Q -->|phase timing| T
+    Q -->|current-user mixed evidence guard| MX
+
+    M -->|append authoritative turn + stage provenance| L0
+    M -->|store bounded orientation| L1
+    M -->|apply typed facts/relations| MS
+    MS -->|read/write| L2
+    SR -->|read relevant current facts| L2
+    M -->|fallback L2 retrieval| SR
+
+    M -->|pre-turn context request when L3 read enabled| L3R
+    L3R -->|classify/select candidates| L3P
+    L3P -->|facet/rule queries| L3S
+    L3R -->|L0 locators| L3S
+    L3R -->|selected raw evidence| L0
+    L3R -->|selected factual evidence| L2
+    L3S -->|read| L3
+
+    M -->|post-turn index when L3 indexing enabled| L3I
+    L3I -->|read facts touched at turn| L2
+    L3I -->|write items/facets/locators| L3S
+    L3S -->|write| L3
+```
+
+The important ownership boundaries are:
+
+- `QwenChat.ps1` loads the memory/retrieval modules but does not give Qwen direct
+  filesystem or database access.
+- `QwenMemory.ps1` is the orchestration boundary for per-turn context assembly and
+  persistence.
+- `LfoMemoryStore.ps1` owns the SQLite interop and L2 factual-store mutations.
+- `LfoStructuredRetrieval.ps1` provides the bounded L2 read path.
+- `LfoL3Runtime.ps1` is the L3 read-side integration point; it uses the planner/store
+  and can retrieve selected evidence from both L0 and L2.
+- `LfoL3Indexer.ps1` is the L3 write-side post-turn indexer; it derives index metadata
+  from the persisted turn and L2 facts.
+- L3 narrows/selects evidence. It is not an authoritative factual store.
+
+### 8.3 L4 recording and manual analysis
+
+The ordinary chat path writes L0 first. Only after durable L0 persistence may the
+configured L4 callback record a conservative observation.
+
+```mermaid
+flowchart TD
+    Q[src/QwenChat.ps1]
+    M[src/QwenMemory.ps1]
+    L0[(L0 JSONL + stage provenance)]
+    R[src/LfoL4Runtime.ps1]
+    ES[src/LfoEpistemicStore.ps1]
+    A1[src/LfoEpistemicObservatory.ps1]
+    A2[src/LfoEpistemicInteractionAnalytics.ps1]
+    P1[src/LfoEpistemicPolicyCapsule.ps1]
+    P2[src/LfoEpistemicIntervention.ps1]
+    DB[(SurrealDB / lfo / epistemic)]
+
+    Q -->|Persist-TurnAndMemory| M
+    M -->|persist turn first| L0
+    M -.->|post-L0 callback, if L4 configured| R
+    R -->|canonicalize and write observation| ES
+    ES -->|RPC read/write| DB
+
+    Q -->|explicit /analyze| R
+    R -->|bounded observation window| A1
+    R -->|bounded interaction analytics| A2
+    A1 -->|read observations| ES
+    A2 -->|read via observatory/store| A1
+
+    R -.->|explicit runtime-cycle API only| P1
+    P1 -.->|policy capsule| P2
+```
+
+Runtime semantics:
+
+- **Ordinary turns:** L0 persistence may trigger the conservative post-L0 L4 recorder
+  when L4 is configured.
+- **`/analyze`:** explicit bounded A1/A2 read-only analysis of already recorded L4
+  observations.
+- **P1/P2:** loaded by `LfoL4Runtime.ps1`, but response intervention is **OFF in the
+  accepted ordinary chat runtime**. The P1/P2 path is available only through explicit
+  runtime-cycle / experimental use.
+- L4 observations remain derived, provenance-linked research objects. They do not
+  become L2 facts or hidden user attributes.
+
+### 8.4 Offline and auxiliary epistemic components
+
+The following modules are part of the repository but are **not implicit edges in the
+ordinary chat runtime**:
+
+```text
+src/LfoEpistemicDetectorBaseline.ps1   deterministic offline detector/benchmark
+src/LfoEpistemicDetectorModel.ps1      model-based offline detector/benchmark
+src/LfoEpistemicAnnotationWorkflow.ps1 explicit annotation import/workflow
+src/LfoEpistemicPilotAnalytics.ps1     read-only pilot analytics
+```
+
+They should therefore appear in architecture diagrams as auxiliary/offline epistemic
+capabilities rather than as automatic steps between every user prompt and response.
+
+### 8.5 Edge list for tooling and diagram generators
+
+For tools that infer architecture from prose, the current explicit edges are:
+
+```text
+User -> LFO.ps1
+LFO.ps1 -> src/QwenChat.ps1
+LFO.ps1 -> Ollama runtime
+LFO.ps1 -> experiments/*
+LFO.ps1 -> SurrealDB
+
+src/QwenChat.ps1 -> Ollama runtime
+src/QwenChat.ps1 -> Codex CLI
+Codex CLI -> src/QwenChat.ps1
+
+src/QwenChat.ps1 -> src/QwenMemory.ps1
+src/QwenChat.ps1 -> src/LfoStructuredMemory.ps1
+src/QwenChat.ps1 -> src/LfoMixedTurnEvidence.ps1
+src/QwenChat.ps1 -> src/LfoTurnTelemetry.ps1
+src/QwenChat.ps1 -> src/LfoL4Runtime.ps1
+
+src/QwenMemory.ps1 -> L0 JSONL
+src/QwenMemory.ps1 -> L1 memory
+src/QwenMemory.ps1 -> src/LfoMemoryStore.ps1
+src/LfoMemoryStore.ps1 -> L2 SQLite
+src/QwenMemory.ps1 -> src/LfoStructuredRetrieval.ps1
+src/LfoStructuredRetrieval.ps1 -> L2 SQLite
+
+src/QwenMemory.ps1 -> src/LfoL3Runtime.ps1
+src/LfoL3Runtime.ps1 -> src/LfoL3Planner.ps1
+src/LfoL3Runtime.ps1 -> src/LfoL3Store.ps1
+src/LfoL3Runtime.ps1 -> L0 JSONL
+src/LfoL3Runtime.ps1 -> L2 SQLite
+src/QwenMemory.ps1 -> src/LfoL3Indexer.ps1
+src/LfoL3Indexer.ps1 -> src/LfoL3Store.ps1
+src/LfoL3Indexer.ps1 -> L2 SQLite
+src/LfoL3Store.ps1 -> L3 SQLite
+
+src/QwenMemory.ps1 -> src/LfoL4Runtime.ps1   [post-L0 callback, optional]
+src/LfoL4Runtime.ps1 -> src/LfoEpistemicStore.ps1
+src/LfoEpistemicStore.ps1 -> SurrealDB
+src/LfoL4Runtime.ps1 -> src/LfoEpistemicObservatory.ps1   [/analyze]
+src/LfoL4Runtime.ps1 -> src/LfoEpistemicInteractionAnalytics.ps1   [/analyze]
+src/LfoEpistemicInteractionAnalytics.ps1 -> src/LfoEpistemicObservatory.ps1
+
+src/LfoL4Runtime.ps1 -> src/LfoEpistemicPolicyCapsule.ps1   [explicit/experimental]
+src/LfoEpistemicPolicyCapsule.ps1 -> src/LfoEpistemicIntervention.ps1   [explicit/experimental]
+```
+
+This list is descriptive documentation, not a separate executable configuration.
+Source code remains authoritative if documentation and implementation diverge.
+
+## 9. Synthesis policy
 
 The current prototype uses non-zero sampling during frontier synthesis because the local layer is intentionally allowed to act as an editor and critic rather than a byte-for-byte pipe.
 
@@ -213,7 +422,7 @@ Long-term evaluation should therefore track at least:
 - independent critique;
 - latency and token cost.
 
-## 9. Security boundary
+## 10. Security boundary
 
 The local model should not be trusted as a shell command generator.
 
@@ -229,7 +438,7 @@ A deterministic wrapper owns:
 
 Future write-capable modes should be separate capabilities rather than a silent expansion of `ask_codex`.
 
-## 10. Alternative Codex-first branch
+## 11. Alternative Codex-first branch
 
 Experiments with Codex Router demonstrate a complementary architecture:
 
