@@ -168,33 +168,40 @@ As of **2026-10-01**, QwenChat v9.3 has passed the defined memory-path validatio
 
 ## Core architecture
 
-```text
-User
-  |
-  v
-Local model / orchestrator
-  |
-  +-- LOCAL ---------------------------------> local answer
-  |
-  +-- FRONTIER
-         |
-         v
-      ask_codex
-         |
-         v
-   native codex exec
-         |
-         v
-   frontier model / live web when needed
-         |
-         v
-   local synthesis / critique
-         |
-         v
-        User
+GitHub renders this overview directly from Mermaid. It shows the accepted high-level
+runtime and persistence boundaries; the detailed module topology remains in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+```mermaid
+flowchart LR
+    U[User] --> L[LFO.ps1]
+    L --> Q[QwenChat.ps1]
+
+    Q -->|LOCAL| O[Ollama / local Qwen]
+    Q -->|FRONTIER| C[Codex CLI / frontier]
+    C -->|frontier result| Q
+    Q -->|final answer| U
+
+    Q -->|turn context + persistence| M[QwenMemory.ps1]
+    M --> L0[(L0 JSONL<br/>raw evidence + provenance)]
+    M --> L1[(L1<br/>bounded conversational memory)]
+    M --> L2[(L2 SQLite<br/>typed factual state)]
+    M --> L3[(L3<br/>retrieval / index metadata)]
+
+    M -.->|post-L0 callback when enabled| R[L4 runtime]
+    R --> ES[Epistemic store]
+    ES --> S[(SurrealDB)]
+    Q -.->|explicit /analyze| R
 ```
 
-The local model is therefore more than a router. It remains part of the conversation before and after frontier escalation.
+The local model is therefore more than a router. It remains part of the conversation
+before and after frontier escalation. L0-L3 support durable context and selective
+retrieval; L4 is a separate provenance-linked epistemic research layer. Ordinary
+response intervention through P1/P2 remains outside this overview because it is
+experimental and OFF in the accepted chat runtime.
+
+[Open the interactive repository map in GitDiagram](https://gitdiagram.com/tomasgal/local-frontier-orchestrator).
+
 
 **Canonical module topology:** the explicit source-level runtime/dataflow edges for
 `LFO.ps1`, `QwenChat.ps1`, L0-L3 memory/retrieval, L4 recording/analytics,
