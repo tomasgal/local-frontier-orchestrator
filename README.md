@@ -196,6 +196,14 @@ Local model / orchestrator
 
 The local model is therefore more than a router. It remains part of the conversation before and after frontier escalation.
 
+**Canonical module topology:** the explicit source-level runtime/dataflow edges for
+`LFO.ps1`, `QwenChat.ps1`, L0-L3 memory/retrieval, L4 recording/analytics,
+SurrealDB, Ollama and Codex are documented in
+[`docs/ARCHITECTURE.md#8-canonical-runtime-module-topology`](docs/ARCHITECTURE.md#8-canonical-runtime-module-topology).
+That section distinguishes ordinary chat edges from optional `/analyze`,
+post-L0 L4 recording and experimental P1/P2 intervention paths, and is the
+preferred source for architecture/diagram generators.
+
 ### Current design principles
 
 - **Local-first:** stable reasoning, writing, translation, summarization, and ordinary factual questions can remain local.
