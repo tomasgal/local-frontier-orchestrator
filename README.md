@@ -1,8 +1,10 @@
 # Local Frontier Orchestrator
 
-**Current operational version: v9.6.3 (2026-10-20, `main`).** v9.6.3 promotes the controlled Windows runtime and unattended experiment runner, keeps the accepted L0-L4 semantics, and adopts **High Windows process priority as the default inference profile** based on the bounded counterbalanced host experiment documented below.
+**Current accepted operational runtime: v9.6.3 (2026-10-20).** v9.6.3 promotes the controlled Windows runtime and unattended experiment runner, keeps the accepted L0-L4 semantics, and adopts **High Windows process priority as the default inference profile** based on the bounded counterbalanced host experiment documented below.
 
 Release notes: [docs/RELEASE_V9.6.3.md](docs/RELEASE_V9.6.3.md).
+
+**v9.6.4 security hardening candidate (not yet released):** [scope, intentional research-security exceptions and acceptance gates](docs/SECURITY_HARDENING_V964.md). The candidate changes installation integrity and GitHub Actions pinning, but keeps installed runtime semantics at v9.6.3. Existing working installations do not need a new bootstrap solely for these changes.
 
 **Related project:** [Codex Frontier Memory (CFM)](https://github.com/tomasgal/codex-frontier-memory) provides persistent MCP memory for standalone Codex sessions, whereas LFO orchestrates local Qwen and optional frontier escalation with its own L0–L4 memory; these projects are intentionally independent.
 
@@ -491,6 +493,14 @@ semantics, see
 [`docs/MEMORY_AND_LOGGING.md`](docs/MEMORY_AND_LOGGING.md).
 
 ## Security and privacy notes
+
+**Intentional research logging:** The default research profile retains raw conversations, traces and memory snapshots to support reproducibility and epistemic analysis. `/clear` resets active conversation state but does not securely delete historical L0/L2/L3/L4 data. Protect the local installation's data directory and do not treat this mode as privacy-minimizing.
+
+**LOCAL → FRONTIER disclosure:** The existing bounded, read-only Codex escalation is intentionally preserved for research; prompts and included context may be transmitted to an external frontier model. A read-only Codex sandbox limits execution privileges, not information disclosure. No extra redaction/consent gate is introduced in this security-only patch.
+
+**Installer integrity:** In the v9.6.4 candidate, if Codex CLI needs to be installed, the upstream Codex PowerShell installer is fetched from a specific upstream commit and SHA-256 checked before execution. This does not authenticate the subsequently downloaded Codex binary or the initial one-line LFO bootstrap download. For a reproducible installation, review and pin the LFO source commit. See [security hardening candidate](docs/SECURITY_HARDENING_V964.md).
+
+**Future optional security QA:** PowerShell static analysis, dependency checks and secret scanning are documented as a future manually triggered capability, not an automatic job on every CI run.
 
 The current frontier wrapper is intentionally constrained:
 
