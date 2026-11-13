@@ -2,6 +2,8 @@
 param(
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'LFO'),
     [string]$SourceRef = 'main',
+    [string]$ExpectedSourceCommit = '',
+    [string]$SourceArchiveSHA256 = '',
     [ValidateSet('CPU','GPU')][string]$Profile = 'GPU',
     [string]$BaseModel = 'qwen3.5:4b-q4_K_M',
     [switch]$SkipModelPull,
@@ -19,6 +21,10 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 $OutputEncoding = $utf8
 
 $RepoUrl = 'https://github.com/tomasgal/local-frontier-orchestrator.git'
+# v9.6.4: audited/pinned official Codex Windows installer; update commit and SHA-256 together.
+$CodexInstallerCommit = '69231e119bfca0b14453515e97d99688ce1c47c9'
+$CodexInstallerUrl = 'https://raw.githubusercontent.com/openai/codex/' + $CodexInstallerCommit + '/scripts/install/install.ps1'
+$CodexInstallerSHA256 = '9c7ec5ecb7c90718808d3ab1fc8b285f51f8c28f90c1505aadf333f96645c706'
 $OllamaMinVersion = [version]'0.34.4'
 $OllamaPinnedVersion = '0.34.4'
 $OllamaUrl = 'https://github.com/ollama/ollama/releases/download/v0.34.4/ollama-windows-amd64.zip'
@@ -270,8 +276,8 @@ if(-not $codexPath){
     Step 'Install OpenAI Codex CLI'
     $codexInstaller=Join-Path $env:TEMP ('codex-install-'+[guid]::NewGuid().ToString('N')+'.ps1')
     try {
-        Info 'Downloading the official OpenAI Codex Windows installer...'
-        Invoke-WebRequest -UseBasicParsing 'https://chatgpt.com/codex/install.ps1' -OutFile $codexInstaller
+        Info 'Downloading the pinned OpenAI Codex installer; SHA-256 will be verified before execution...'
+        Download-Verified $CodexInstallerUrl $codexInstaller $CodexInstallerSHA256
         Assert-Lfo (Test-Path -LiteralPath $codexInstaller -PathType Leaf) 'Codex installer download failed.'
         $installProc=Start-Process powershell.exe -Wait -PassThru -NoNewWindow -ArgumentList @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',$codexInstaller)
         Assert-Lfo ($installProc.ExitCode -eq 0) "OpenAI Codex installer exited with code $($installProc.ExitCode)."
@@ -311,6 +317,16 @@ $oldState=$null
 if(Test-Path -LiteralPath $oldStatePath -PathType Leaf) { try { $oldState=Get-Content -LiteralPath $oldStatePath -Raw -Encoding UTF8 | ConvertFrom-Json } catch {} }
 
 Step 'Obtain canonical LFO source'
+if ($ExpectedSourceCommit -and $ExpectedSourceCommit -cnotmatch '^[0-9a-fA-F]{40}$') { throw '-ExpectedSourceCommit requires a full Git SHA.' }
+if ($SourceArchiveSHA256 -and $SourceArchiveSHA256 -cnotmatch '^[0-9a-fA-F]{64}$') { throw '-SourceArchiveSHA256 requires a SHA-256 hex digest.' }
+if ($SourceRef -match '^[0-9a-fA-F]{40}$') {
+    if ($ExpectedSourceCommit -and $ExpectedSourceCommit.ToLowerInvariant() -cne $SourceRef.ToLowerInvariant()) {
+        throw '-SourceRef and -ExpectedSourceCommit do not match.'
+    }
+    $ExpectedSourceCommit = $SourceRef
+} elseif (-not $ExpectedSourceCommit) {
+    Warn 'Mutable source ref selected. Production installers should use a reviewed -SourceRef commit SHA.'
+}
 $git=Resolve-CommandPath 'git.exe'; if(-not $git){$git=Resolve-CommandPath 'git'}
 if ($git) {
     Info "Using Git: $git"
@@ -330,24 +346,33 @@ if ($git) {
     if ($LASTEXITCODE -ne 0) { throw "Unable to fetch source ref $SourceRef." }
     $targetCommit=(& $git -C $AppRoot rev-parse FETCH_HEAD 2>&1 | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or $targetCommit -notmatch '^[0-9a-f]{40}$') { throw "Unable to resolve fetched source ref $SourceRef to an exact commit." }
+    if ($ExpectedSourceCommit -and $targetCommit.ToLowerInvariant() -cne $ExpectedSourceCommit.ToLowerInvariant()) {
+        throw "Fetched source commit $targetCommit differs from approved commit $ExpectedSourceCommit."
+    }
     & $git -C $AppRoot checkout --detach --force $targetCommit | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "Unable to checkout fetched source commit $targetCommit." }
     $SourceCommit=(& $git -C $AppRoot rev-parse HEAD 2>&1 | Out-String).Trim()
     Assert-Lfo ($SourceCommit -ceq $targetCommit) 'Installed LFO checkout does not match the fetched source commit.'
 } else {
-    Info 'Git not found; using GitHub source archive fallback.'
+    Info 'Git not found; using integrity-verified GitHub source archive fallback.'
+    if ($SourceRef -cnotmatch '^[0-9a-fA-F]{40}$') {
+        throw 'Without Git, source ZIP fallback requires -SourceRef with an immutable 40-character commit SHA.'
+    }
+    if (-not $SourceArchiveSHA256) {
+        throw 'Without Git, source ZIP fallback requires a trusted -SourceArchiveSHA256 digest. Refusing unverified source.'
+    }
     $tmpRoot=Join-Path ([IO.Path]::GetTempPath()) ('LFO-source-'+[guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tmpRoot | Out-Null
     $zip=Join-Path $tmpRoot 'source.zip'
     if($SourceRef -match '^[0-9a-fA-F]{40}$'){$archiveUrl='https://codeload.github.com/tomasgal/local-frontier-orchestrator/zip/'+$SourceRef}else{$archiveUrl='https://codeload.github.com/tomasgal/local-frontier-orchestrator/zip/refs/heads/'+$SourceRef}
     try {
-        Invoke-WebRequest -UseBasicParsing -Uri $archiveUrl -OutFile $zip -TimeoutSec 600
+        Download-Verified $archiveUrl $zip $SourceArchiveSHA256
         $expanded=Join-Path $tmpRoot 'expanded'; Expand-Archive -LiteralPath $zip -DestinationPath $expanded -Force
         $dirs=@(Get-ChildItem -LiteralPath $expanded -Directory)
         Assert-Lfo ($dirs.Count -eq 1) 'Unexpected GitHub archive layout.'
         if(Test-Path -LiteralPath $AppRoot){Remove-Item -LiteralPath $AppRoot -Recurse -Force}
         Move-Item -LiteralPath $dirs[0].FullName -Destination $AppRoot
-        $SourceCommit=$SourceRef
+        $SourceCommit=$SourceRef.ToLowerInvariant()
     } finally { Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue }
 }
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\QwenChat.ps1')) 'LFO source checkout is incomplete.'
