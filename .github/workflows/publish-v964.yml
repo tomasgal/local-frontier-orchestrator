@@ -1,9 +1,15 @@
 name: Publish immutable LFO v9.6.4
 
-# Intentional one-off manual release job. Never runs on regular CI pushes.
-# Before dispatch: GitHub repository Settings > General > Releases >
+# One-off release via explicit publication commit; also supports manual retry.
+# Regular CI/source pushes do not publish releases.
+# Before publishing: GitHub repository Settings > General > Releases >
 # Enable release immutability. A normal annotated Git tag alone is mutable.
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/publish-v964.yml'
   workflow_dispatch:
 
 permissions:
@@ -15,7 +21,7 @@ concurrency:
 
 jobs:
   security-acceptance:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'release-v9.6.4-publish')
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3 pinned
@@ -79,7 +85,12 @@ jobs:
             --title "LFO v9.6.4 - Security hardening" \
             --notes-file "docs/RELEASE_V9.6.4.md" --latest
           # Publication must be truly immutable, not merely an annotated tag.
-          immutable=$(gh release view "v9.6.4" --json isImmutable --jq '.isImmutable')
+          immutable="false"
+          for attempt in 1 2 3 4 5; do
+            immutable=$(gh release view "v9.6.4" --json isImmutable --jq '.isImmutable') || immutable="unknown"
+            [[ "$immutable" == "true" ]] && break
+            sleep 2
+          done
           if [[ "$immutable" != "true" ]]; then
             echo "::error::Release was published without GitHub immutability; deleting mutable release and tag"
             gh release delete "v9.6.4" --yes --cleanup-tag || true
