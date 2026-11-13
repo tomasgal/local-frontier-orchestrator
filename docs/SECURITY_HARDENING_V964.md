@@ -74,6 +74,6 @@ The test does not install, uninstall, update or execute Codex; nor does it run t
 6. **NOT RUN:** Complete fresh Windows installation with Codex absent; this is an explicit release limitation, not an implied pass.
 7. **UNCHANGED BY DECISION:** Research log policy and LOCAL → FRONTIER policy, with added in-source comments.
 
-The one-off manually dispatched [v9.6.4 release workflow](../.github/workflows/publish-v964.yml) repeats Windows parse and isolated security tests, then creates an annotated tag on the exact `main` commit and publishes a release. **GitHub Settings → General → Releases → Enable release immutability must be enabled before publishing.** The workflow checks the resulting release's `isImmutable` status; on a mutable publication it attempts to delete the release and tag and fails. Normal CI runs do not invoke it.
+The one-off [v9.6.4 release workflow](../.github/workflows/publish-v964.yml), invoked by its explicit publication commit or manual dispatch, repeats Windows parse and isolated security tests, then creates an annotated tag on the exact `main` commit and publishes a release. **GitHub Settings → General → Releases → Enable release immutability must be enabled before publishing.** The workflow checks the resulting release's `isImmutable` status; on a mutable publication it attempts to delete the release and tag and fails. Normal CI runs do not invoke it.
 
 Do not claim a full clean-install acceptance: it was not performed. Historical v9.6.3 tags/releases are not modified.
