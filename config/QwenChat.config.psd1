@@ -48,6 +48,8 @@
         StructuredReadMaxChars = 800
     }
 
+    # v9.6.4 research policy: keep full traces and memory snapshots by design.
+    # /clear resets conversation epoch, not historical storage. See README.md.
     ResearchLogging = @{
         Enabled = $true
         IncludeRawText = $true
