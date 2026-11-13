@@ -1,12 +1,14 @@
 # Local Frontier Orchestrator
 
-**Current operational version: v9.6.3 (2026-10-20, `main`).** v9.6.3 promotes the controlled Windows runtime and unattended experiment runner, keeps the accepted L0-L4 semantics, and adopts **High Windows process priority as the default inference profile** based on the bounded counterbalanced host experiment documented below.
+**Current source version: v9.6.4 (2026-11-13) — security maintenance.** v9.6.4 retains the accepted v9.6.3 Windows runtime, L0–L4 memory semantics and High-priority inference profile. The patch hardens the Codex bootstrap installer and GitHub Actions dependency integrity; no existing installation needs migration to keep functioning.
 
-Release notes: [docs/RELEASE_V9.6.3.md](docs/RELEASE_V9.6.3.md).
+Release notes: [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 baseline](docs/RELEASE_V9.6.3.md).
+
+**v9.6.4 security hardening:** [technical decisions and acceptance evidence](docs/SECURITY_HARDENING_V964.md). The one-off [release publication workflow](.github/workflows/publish-v964.yml) creates an annotated tag and GitHub Release only after an explicit manual dispatch; enable GitHub release immutability before publishing. The workflow verifies the published release reports `isImmutable=true`.
 
 **Related project:** [Codex Frontier Memory (CFM)](https://github.com/tomasgal/codex-frontier-memory) provides persistent MCP memory for standalone Codex sessions, whereas LFO orchestrates local Qwen and optional frontier escalation with its own L0–L4 memory; these projects are intentionally independent.
 
-**Immutable release:** [`v9.6.3`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.3), published 2026-10-20 as an annotated Git tag. Tag object `bfd0e6b482a1c4819fca39c68f3a32bf62921709` resolves to release-closure commit `4f89badcd1a3f91ecdf32666566e9d81efff0cda`. The tag is the immutable v9.6.3 boundary; subsequent documentation or development on `main` does not alter that release.
+**Previous baseline release:** [`v9.6.3`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.3), published 2026-10-20 with annotated tag object `bfd0e6b482a1c4819fca39c68f3a32bf62921709` resolving to commit `4f89badcd1a3f91ecdf32666566e9d81efff0cda`. Its accepted runtime behavior is retained in v9.6.4. GitHub's separate immutable-release protection is required for cryptographic release/tag immutability guarantees.
 
 **Previous immutable release:** [v9.6.2](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.2) (2026-10-14). Zenodo software archive DOI [10.5281/zenodo.23373391](https://doi.org/10.5281/zenodo.23373391).
 
@@ -492,6 +494,14 @@ semantics, see
 
 ## Security and privacy notes
 
+**Intentional research logging:** The default research profile retains raw conversations, traces and memory snapshots to support reproducibility and epistemic analysis. `/clear` resets active conversation state but does not securely delete historical L0/L2/L3/L4 data. Protect the local installation's data directory and do not treat this mode as privacy-minimizing.
+
+**LOCAL → FRONTIER disclosure:** The existing bounded, read-only Codex escalation is intentionally preserved for research; prompts and included context may be transmitted to an external frontier model. A read-only Codex sandbox limits execution privileges, not information disclosure. No extra redaction/consent gate is introduced in this security-only patch.
+
+**Installer integrity:** In v9.6.4, if Codex CLI needs to be installed, the upstream Codex PowerShell installer is fetched from a specific upstream commit and SHA-256 checked before execution. This does not authenticate the subsequently downloaded Codex binary or the initial one-line LFO bootstrap download. For a reproducible installation, review and pin the LFO source commit. See [security hardening notes](docs/SECURITY_HARDENING_V964.md).
+
+**Future optional security QA:** PowerShell static analysis, dependency checks and secret scanning are documented as a future manually triggered capability, not an automatic job on every CI run.
+
 The current frontier wrapper is intentionally constrained:
 
 - frontier execution is read-only;
@@ -510,9 +520,9 @@ The transport path is working:
 local model -> ask_codex -> native Codex frontier -> local model
 ```
 
-**v9.6.3 is the current operational Windows runtime on `main`.** LOCAL/FRONTIER routing, synthesis, persistent memory and conservative L4 recording retain their accepted semantics. v9.6.3 adds the controlled runtime entrypoint, automatic/explicit device selection, unattended experiments, compact dotted wait/watchdog output, and High inference priority as the production default.
+**v9.6.4 is the security-maintenance source on `main`.** LOCAL/FRONTIER routing, synthesis, persistent memory and conservative L4 recording retain their accepted v9.6.3 semantics. Newly bootstrapped sources report v9.6.4; existing v9.6.3 installations continue working without reinstall.
 
-**v9.6.2 remains the previous immutable tagged and Zenodo-archived release boundary.** The v9.6.3 promotion does not reopen the frozen L2/L3 baselines or enable P1/P2 response intervention.
+**v9.6.2 remains a historical tagged and Zenodo-archived release boundary.** The v9.6.3 promotion does not reopen the frozen L2/L3 baselines or enable P1/P2 response intervention.
 
 Further detector coverage, automatic analytics scheduling and response intervention require separate scope and validation. The accepted operational L4 behavior remains conservative recording plus manual `/analyze`.
 

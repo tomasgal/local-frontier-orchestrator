@@ -1,0 +1,88 @@
+name: Publish immutable LFO v9.6.4
+
+# Intentional one-off manual release job. Never runs on regular CI pushes.
+# Before dispatch: GitHub repository Settings > General > Releases >
+# Enable release immutability. A normal annotated Git tag alone is mutable.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-lfo-v9-6-4
+  cancel-in-progress: false
+
+jobs:
+  security-acceptance:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3 pinned
+        with:
+          persist-credentials: false
+      - name: Parse patched PowerShell files
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $targets = @('install\Install-LFO.ps1','LFO.ps1','src\QwenChat.ps1','tests\Test-LfoCodexInstallerGuard.ps1')
+          foreach ($target in $targets) {
+            $tokens = $null; $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $target),[ref]$tokens,[ref]$errors)
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Host $_ }
+              throw "PowerShell parser rejected $target"
+            }
+            Write-Host "PARSE PASS: $target"
+          }
+      - name: Verify actual installer guard with isolated mocks
+        shell: powershell
+        run: |
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-LfoCodexInstallerGuard.ps1 -BootstrapPath .\install\Install-LFO.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Codex installer guard test failed: $LASTEXITCODE" }
+
+  publish:
+    needs: security-acceptance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3 pinned
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Create annotated v9.6.4 tag and GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -s docs/RELEASE_V9.6.4.md
+          if gh api "repos/$GH_REPO/git/ref/tags/v9.6.4" >/dev/null 2>&1; then
+            echo "::error::v9.6.4 tag exists already; refusing to overwrite or move it"
+            exit 1
+          fi
+          if gh release view v9.6.4 >/dev/null 2>&1; then
+            echo "::error::v9.6.4 release exists already; refusing duplicate publication"
+            exit 1
+          fi
+          echo "Creating annotated tag on main commit $GITHUB_SHA"
+          tag_object=$(gh api --method POST "repos/$GH_REPO/git/tags" \
+            -f tag="v9.6.4" \
+            -f message="Local Frontier Orchestrator v9.6.4 - security hardening release" \
+            -f object="$GITHUB_SHA" -f type="commit" --jq '.sha')
+          gh api --method POST "repos/$GH_REPO/git/refs" \
+            -f ref="refs/tags/v9.6.4" -f sha="$tag_object" >/dev/null
+          echo "Annotated tag object: $tag_object"
+          gh release create "v9.6.4" --verify-tag \
+            --title "LFO v9.6.4 - Security hardening" \
+            --notes-file "docs/RELEASE_V9.6.4.md" --latest
+          # Publication must be truly immutable, not merely an annotated tag.
+          immutable=$(gh release view "v9.6.4" --json isImmutable --jq '.isImmutable')
+          if [[ "$immutable" != "true" ]]; then
+            echo "::error::Release was published without GitHub immutability; deleting mutable release and tag"
+            gh release delete "v9.6.4" --yes --cleanup-tag || true
+            exit 1
+          fi
+          echo "PASS: v9.6.4 published as immutable GitHub Release, tag object $tag_object"

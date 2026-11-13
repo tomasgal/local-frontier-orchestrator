@@ -219,6 +219,9 @@ function Get-CodexProcessSpec {
         throw 'The codex command could not be located.'
     }
 
+    # Intentional v9.6.4 research boundary: FRONTIER is read-only and bounded,
+    # but the delegated prompt may leave the machine for cloud processing.
+    # The existing LOCAL -> FRONTIER policy is preserved without an added consent gate.
     # Send prompts over stdin; never interpolate them into a shell command line.
     $fixedArgs = '--ask-for-approval never --sandbox read-only --search exec --json --ephemeral --ignore-user-config --skip-git-repo-check --cd "{0}" -' -f $env:TEMP
     $ext = [IO.Path]::GetExtension($path).ToLowerInvariant()

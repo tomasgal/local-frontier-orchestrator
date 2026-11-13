@@ -19,6 +19,11 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 $OutputEncoding = $utf8
 
 $RepoUrl = 'https://github.com/tomasgal/local-frontier-orchestrator.git'
+# v9.6.4 supply-chain hardening: pin the exact reviewed upstream Codex installer source.
+# Update BOTH the upstream commit and expected SHA-256 after reviewing upstream changes.
+# This guards the installer script, not the CLI binary fetched by that installer.
+$CodexInstallerUrl = 'https://raw.githubusercontent.com/openai/codex/69231e119bfca0b14453515e97d99688ce1c47c9/scripts/install/install.ps1'
+$CodexInstallerSHA256 = '9c7ec5ecb7c90718808d3ab1fc8b285f51f8c28f90c1505aadf333f96645c706'
 $OllamaMinVersion = [version]'0.34.4'
 $OllamaPinnedVersion = '0.34.4'
 $OllamaUrl = 'https://github.com/ollama/ollama/releases/download/v0.34.4/ollama-windows-amd64.zip'
@@ -28,7 +33,7 @@ $SurrealUrl = 'https://github.com/surrealdb/surrealdb/releases/download/v3.3.0/s
 $SurrealSHA256 = '3e5e9d363a352be81f5a983d53f0bc0cd77a90e305f01e2fed929987cf79735c'
 $GpuModel = 'lfo-qwen3.5-4b-gpu8k:latest'
 $CpuModel = 'lfo-qwen3.5-4b-cpu5k:latest'
-$RuntimeContract = 'v9.6.3'
+$RuntimeContract = 'v9.6.4'
 
 function Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
 function Info([string]$Text) { Write-Host "    $Text" }
@@ -270,9 +275,11 @@ if(-not $codexPath){
     Step 'Install OpenAI Codex CLI'
     $codexInstaller=Join-Path $env:TEMP ('codex-install-'+[guid]::NewGuid().ToString('N')+'.ps1')
     try {
-        Info 'Downloading the official OpenAI Codex Windows installer...'
-        Invoke-WebRequest -UseBasicParsing 'https://chatgpt.com/codex/install.ps1' -OutFile $codexInstaller
+        Info 'Downloading the reviewed, commit-pinned OpenAI Codex Windows installer...'
+        Invoke-WebRequest -UseBasicParsing -Uri $CodexInstallerUrl -OutFile $codexInstaller
         Assert-Lfo (Test-Path -LiteralPath $codexInstaller -PathType Leaf) 'Codex installer download failed.'
+        $actualCodexInstallerSHA256 = Get-Sha256 $codexInstaller
+        Assert-Lfo ($actualCodexInstallerSHA256 -ceq $CodexInstallerSHA256) 'Codex installer SHA-256 mismatch: refusing to execute unverified installer.'
         $installProc=Start-Process powershell.exe -Wait -PassThru -NoNewWindow -ArgumentList @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',$codexInstaller)
         Assert-Lfo ($installProc.ExitCode -eq 0) "OpenAI Codex installer exited with code $($installProc.ExitCode)."
     } finally {
@@ -887,7 +894,7 @@ $installedLaunchDir=Join-Path $InstallRoot 'launch'
 Write-Host ('Launch dir:    '+$installedLaunchDir) -ForegroundColor Green
 Write-Host ''
 Write-Host 'Launch options:' -ForegroundColor Cyan
-Write-Host '  .\LFO.ps1           (primary v9.6.3 entrypoint; Auto device, High priority by default)'
+Write-Host '  .\LFO.ps1           (primary v9.6.4 entrypoint; Auto device, High priority by default)'
 Write-Host '  Start-LFO-CPU.bat   (double-click or Command Prompt)'
 Write-Host '  Start-LFO-GPU.bat   (double-click or Command Prompt)'
 Write-Host '  .\Start-LFO-CPU.ps1 (PowerShell)'
