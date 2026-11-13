@@ -4,6 +4,8 @@
 
 Release notes: [docs/RELEASE_V9.6.3.md](docs/RELEASE_V9.6.3.md).
 
+**v9.6.4 security maintenance candidate (not yet released):** verifies the pinned Codex installer, hardens source archive integrity, and pins GitHub Actions checkout. Research logging, FRONTIER escalation and the v9.6.3 operational runtime are preserved. See [docs/RELEASE_V9.6.4.md](docs/RELEASE_V9.6.4.md).
+
 **Related project:** [Codex Frontier Memory (CFM)](https://github.com/tomasgal/codex-frontier-memory) provides persistent MCP memory for standalone Codex sessions, whereas LFO orchestrates local Qwen and optional frontier escalation with its own L0–L4 memory; these projects are intentionally independent.
 
 **Immutable release:** [`v9.6.3`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.3), published 2026-10-20 as an annotated Git tag. Tag object `bfd0e6b482a1c4819fca39c68f3a32bf62921709` resolves to release-closure commit `4f89badcd1a3f91ecdf32666566e9d81efff0cda`. The tag is the immutable v9.6.3 boundary; subsequent documentation or development on `main` does not alter that release.
