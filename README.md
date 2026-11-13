@@ -502,6 +502,8 @@ semantics, see
 
 **Future optional security QA:** PowerShell static analysis, dependency checks and secret scanning are documented as a future manually triggered capability, not an automatic job on every CI run.
 
+**Third-party source scan (AI Scan, historical):** An [AI Scan code report](https://aiscan.visionedge.sk/#/scan/AX404FZj3xwJlvmNh7yl4UNP) returned **A · 98/100** for the repository (196 files; 72 checks: 15 pass, 56 not applicable, 1 fail; 0 critical/high/medium, 9 low and 1 informational finding). Manual triage established that the nine low-severity "hardcoded secrets" were cross-references within synthetic test fixtures, not leaked credentials; the informational `actions/checkout` version-tag finding was addressed in v9.6.4 with a commit-SHA pin. **This score refers to the earlier scanned repository state, not a verified re-scan of the immutable v9.6.4 release.** AI Scan is a limited automated check, not a penetration test or independent assurance of overall security. See [v9.6.4 security hardening notes](docs/SECURITY_HARDENING_V964.md).
+
 The current frontier wrapper is intentionally constrained:
 
 - frontier execution is read-only;
