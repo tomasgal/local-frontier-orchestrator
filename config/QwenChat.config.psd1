@@ -48,6 +48,9 @@
         StructuredReadMaxChars = 800
     }
 
+    # Research exception (v9.6.4): full-text traces and memory snapshots are retained
+    # intentionally for reproducibility and epistemic analysis. /clear is NOT erasure.
+    # Protect the local data directory and use a separate deployment policy if needed.
     ResearchLogging = @{
         Enabled = $true
         IncludeRawText = $true
