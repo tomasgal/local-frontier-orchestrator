@@ -54,6 +54,16 @@ AI Scan's nine alleged secrets are `related_key` references to existing `key` en
 
 A fresh bootstrap or reinstall is required **only if you intend to run the revised installation workflow or deploy on a new machine**. To distribute the candidate safely, review and promote a pinned commit/tag and verify the entrypoint itself before running it. Do not relabel existing installed runtime binaries as independently validated v9.6.4.
 
+## Isolated bootstrap integrity regression test
+
+`tests/Test-LfoCodexInstallerGuard.ps1` extracts the actual Codex installer `try/finally` block from `install/Install-LFO.ps1` using the PowerShell AST and runs it with mocked network download and `Start-Process` commands. It verifies:
+
+- an intentionally incorrect digest raises the integrity mismatch error **before** process execution;
+- a matching digest reaches the **mocked** process call exactly once;
+- the temporary synthetic installer is cleaned in both cases.
+
+The test does not install, uninstall, update or execute Codex; nor does it run the complete LFO bootstrap. Run manually with `powershell.exe -NoProfile -File tests/Test-LfoCodexInstallerGuard.ps1 -BootstrapPath install/Install-LFO.ps1` after reviewing the test. This is a targeted regression test, not a substitute for a Windows install acceptance test.
+
 ## Acceptance criteria before release/tag
 
 1. Review the upstream commit and recompute the expected hash from exact downloaded bytes.
