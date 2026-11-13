@@ -4,6 +4,8 @@
 
 Release notes: [docs/RELEASE_V9.6.3.md](docs/RELEASE_V9.6.3.md).
 
+**v9.6.4 security maintenance candidate (not yet released):** verifies the pinned Codex installer, hardens source archive integrity, and pins GitHub Actions checkout. Research logging, FRONTIER escalation and the v9.6.3 operational runtime are preserved. See [docs/RELEASE_V9.6.4.md](docs/RELEASE_V9.6.4.md).
+
 **Related project:** [Codex Frontier Memory (CFM)](https://github.com/tomasgal/codex-frontier-memory) provides persistent MCP memory for standalone Codex sessions, whereas LFO orchestrates local Qwen and optional frontier escalation with its own L0–L4 memory; these projects are intentionally independent.
 
 **Immutable release:** [`v9.6.3`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.3), published 2026-10-20 as an annotated Git tag. Tag object `bfd0e6b482a1c4819fca39c68f3a32bf62921709` resolves to release-closure commit `4f89badcd1a3f91ecdf32666566e9d81efff0cda`. The tag is the immutable v9.6.3 boundary; subsequent documentation or development on `main` does not alter that release.
@@ -491,6 +493,41 @@ semantics, see
 [`docs/MEMORY_AND_LOGGING.md`](docs/MEMORY_AND_LOGGING.md).
 
 ## Security and privacy notes
+
+**Intentional research logging and retention.** The defaults
+`ResearchLogging.Enabled = true`, `IncludeRawText = true`, and
+`IncludeMemorySnapshots = true` preserve a full record of experimental
+conversation text, intermediate decisions, and memory snapshots. Historical
+conversation/provenance logs and structured memory persist across `/clear`,
+which resets the active conversation epoch, not the historical research record.
+This is retained deliberately for reproducibility. Deployments must protect
+local data, consider retention, and avoid sensitive production datasets
+without an appropriate policy. v9.6.4 does not change these settings.
+
+**LOCAL -> FRONTIER boundary is intentional.** Hard gates or local Qwen routing
+may forward a bounded prompt to Codex without new per-turn confirmation.
+Read-only sandboxing limits writes but does **not** prevent disclosure of the
+prompt to the external service. No new consent or content-redaction mechanism
+is introduced in this security-maintenance candidate.
+
+**Supply-chain integrity (v9.6.4 candidate).** The optional Codex CLI bootstrap
+uses a pinned upstream installer script with SHA-256 verification before
+execution. Existing Ollama/SurrealDB SHA-256 validation is retained.
+For reproducible LFO installs, use
+`-SourceRef <reviewed-40-character-commit-SHA>` or additionally
+`-ExpectedSourceCommit <reviewed-40-character-commit-SHA>`. The default
+`main` is intentionally mutable for development and now warns.
+When Git is unavailable, source ZIP fallback fails closed unless
+`-SourceRef` is an immutable 40-character Git SHA and an *independently
+trusted* `-SourceArchiveSHA256` is provided. Never derive the expected
+hash from the unverified payload itself. Updating the upstream Codex
+installer requires reviewing and updating the pinned commit and hash together.
+
+**CI security feature (planned, not enabled).** Optional manually invoked
+PSScriptAnalyzer rules, secrets checks, and adversarial security regression
+tests could be run for release candidates. This candidate does not add an
+always-on security pipeline or change any workflow trigger. The current
+`actions/checkout` dependency is commit-SHA pinned.
 
 The current frontier wrapper is intentionally constrained:
 

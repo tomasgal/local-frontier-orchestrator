@@ -219,6 +219,10 @@ function Get-CodexProcessSpec {
         throw 'The codex command could not be located.'
     }
 
+    # v9.6.4: automatic LOCAL -> FRONTIER escalation is intentional for research.
+    # Read-only Codex limits writes, but cannot prevent prompt disclosure to
+    # the external service. No extra consent/redaction gate is added.
+    # See README.md (Security and privacy notes).
     # Send prompts over stdin; never interpolate them into a shell command line.
     $fixedArgs = '--ask-for-approval never --sandbox read-only --search exec --json --ephemeral --ignore-user-config --skip-git-repo-check --cd "{0}" -' -f $env:TEMP
     $ext = [IO.Path]::GetExtension($path).ToLowerInvariant()
