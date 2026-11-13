@@ -33,7 +33,7 @@ $SurrealUrl = 'https://github.com/surrealdb/surrealdb/releases/download/v3.3.0/s
 $SurrealSHA256 = '3e5e9d363a352be81f5a983d53f0bc0cd77a90e305f01e2fed929987cf79735c'
 $GpuModel = 'lfo-qwen3.5-4b-gpu8k:latest'
 $CpuModel = 'lfo-qwen3.5-4b-cpu5k:latest'
-$RuntimeContract = 'v9.6.3'
+$RuntimeContract = 'v9.6.4'
 
 function Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
 function Info([string]$Text) { Write-Host "    $Text" }
@@ -894,7 +894,7 @@ $installedLaunchDir=Join-Path $InstallRoot 'launch'
 Write-Host ('Launch dir:    '+$installedLaunchDir) -ForegroundColor Green
 Write-Host ''
 Write-Host 'Launch options:' -ForegroundColor Cyan
-Write-Host '  .\LFO.ps1           (primary v9.6.3 entrypoint; Auto device, High priority by default)'
+Write-Host '  .\LFO.ps1           (primary v9.6.4 entrypoint; Auto device, High priority by default)'
 Write-Host '  Start-LFO-CPU.bat   (double-click or Command Prompt)'
 Write-Host '  Start-LFO-GPU.bat   (double-click or Command Prompt)'
 Write-Host '  .\Start-LFO-CPU.ps1 (PowerShell)'
