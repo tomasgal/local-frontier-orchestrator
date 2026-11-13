@@ -4,7 +4,7 @@
 
 Release notes: [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 baseline](docs/RELEASE_V9.6.3.md).
 
-**v9.6.4 security hardening:** [technical decisions and acceptance evidence](docs/SECURITY_HARDENING_V964.md). The one-off [release publication workflow](.github/workflows/publish-v964.yml) creates an annotated tag and GitHub Release only after an explicit manual dispatch; enable GitHub release immutability before publishing. The workflow verifies the published release reports `isImmutable=true`.
+**v9.6.4 security hardening:** [technical decisions and acceptance evidence](docs/SECURITY_HARDENING_V964.md). The one-off [release publication workflow](.github/workflows/publish-v964.yml) supports its explicit publication commit and manual dispatch; normal source pushes do not trigger publication. GitHub release immutability must be enabled before publishing. The workflow verifies the published release reports `isImmutable=true`.
 
 **Related project:** [Codex Frontier Memory (CFM)](https://github.com/tomasgal/codex-frontier-memory) provides persistent MCP memory for standalone Codex sessions, whereas LFO orchestrates local Qwen and optional frontier escalation with its own L0–L4 memory; these projects are intentionally independent.
 
