@@ -504,6 +504,10 @@ semantics, see
 
 **Independent security scans (AI Scan v1.7.8, 2026-11-13):** The repository received **grade A, 98/100 both before and after the v9.6.4 security release**. The [original AI Scan report](https://aiscan.visionedge.sk/#/scan/AX404FZj3xwJlvmNh7yl4UNP) covered 196 files and reported 9 low-priority test-fixture findings plus 1 informational GitHub Actions version-tag finding. A **new scan after v9.6.4 publication** (2026-11-13 11:41 UTC; AI Scan report ID `96d4175e7c08`) covered **200 files** and again scored **A, 98/100**, now with **9 low findings and 0 informational findings**. In the newer scan, **GitHub Actions pinned to commit SHA passed**; all nine remaining low findings are the previously manually verified `related_key` references in synthetic test fixtures, rather than credentials. **Scope caveat:** 72 checks comprised 15 pass, 56 not applicable and 1 fail (the false-positive secret rule); the scanner assessed the GitHub repository, without recording a specific scanned Git commit/tag, so this is post-release repository-scan evidence rather than a version-attested scan of the immutable `v9.6.4` tag. This automated score is not a penetration test or a general security certification. See [security hardening and scan follow-up](docs/SECURITY_HARDENING_V964.md).
 
+[![AI Scan security report: grade A, 98/100 (initial scan, 196 files and 10 findings)](docs/assets/aiscan-initial-98-2026-11-13.webp)](https://aiscan.visionedge.sk/#/scan/AX404FZj3xwJlvmNh7yl4UNP)
+
+*Screenshot of the **initial** AI Scan report (196 files; 9 low and 1 informational finding). The post-v9.6.4 re-scan scored the same 98/100 but covered 200 files and reported no informational findings, as documented above.*
+
 The current frontier wrapper is intentionally constrained:
 
 - frontier execution is read-only;
