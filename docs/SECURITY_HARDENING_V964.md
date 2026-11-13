@@ -1,8 +1,8 @@
-# LFO v9.6.4 — security hardening candidate
+# LFO v9.6.4 — security hardening
 
 Date: 2026-11-13
 
-Status: **PRE-RELEASE CANDIDATE** on `security/v9.6.4-prep`. Do not treat as an accepted or immutable `v9.6.4` release until review, tests, merge and release/tag closure. The latest accepted operational runtime remains v9.6.3.
+Status: **Security maintenance source v9.6.4**, preserving accepted v9.6.3 behavior. The v9.6.4 release is genuinely immutable only after GitHub release immutability has been enabled and the published release is verified as `isImmutable=true`. See [release notes](RELEASE_V9.6.4.md).
 
 ## Scope and decisions
 
@@ -52,7 +52,7 @@ AI Scan's nine alleged secrets are `related_key` references to existing `key` en
 
 **No fresh bootstrap is required for an existing, working v9.6.3 installation to keep functioning.** The functional LFO runtime remains v9.6.3. The new Codex installer-integrity check applies only when the patched bootstrap is executed and the installer needs to provision Codex. It cannot retroactively secure a previously completed installation.
 
-A fresh bootstrap or reinstall is required **only if you intend to run the revised installation workflow or deploy on a new machine**. To distribute the candidate safely, review and promote a pinned commit/tag and verify the entrypoint itself before running it. Do not relabel existing installed runtime binaries as independently validated v9.6.4.
+A fresh bootstrap or reinstall is required **only if you intend to run the revised installation workflow or deploy on a new machine**. Newly bootstrapped source reports v9.6.4, while existing v9.6.3 installations remain valid without migration. For reproducibility, verify the exact pinned release and downloaded bootstrap entrypoint.
 
 ## Isolated bootstrap integrity regression test
 
@@ -64,14 +64,16 @@ A fresh bootstrap or reinstall is required **only if you intend to run the revis
 
 The test does not install, uninstall, update or execute Codex; nor does it run the complete LFO bootstrap. Run manually with `powershell.exe -NoProfile -File tests/Test-LfoCodexInstallerGuard.ps1 -BootstrapPath install/Install-LFO.ps1` after reviewing the test. This is a targeted regression test, not a substitute for a Windows install acceptance test.
 
-## Acceptance criteria before release/tag
+## Acceptance evidence and publication
 
-1. Review the upstream commit and recompute the expected hash from exact downloaded bytes.
-2. On a Windows host with Codex absent, verify the checked script is accepted and the install proceeds.
-3. Force a checksum mismatch in an isolated test and confirm the script is never executed.
-4. Confirm an existing Codex installation bypasses the installer download without regression.
-5. Manually dispatch the existing Windows parse workflow on the branch and confirm it passes.
-6. Confirm no functional changes to default research logging or FRONTIER delegation.
-7. Merge only after acceptance; then close release notes and create the **immutable** v9.6.4 tag from the accepted commit, without changing v9.6.3.
+1. **PASS (2026-11-13):** Manual Windows PowerShell syntax workflow succeeded.
+2. **PASS:** Independent Windows download matched the pinned upstream installer SHA-256.
+3. **PASS:** Deliberately incorrect hash was rejected in a standalone dry run.
+4. **PASS (3/3):** Isolated regression using the actual bootstrap guard with mocked network and process execution (reject, accept, cleanup).
+5. **CONFIRMED:** Existing Codex CLI was present on the validation host, but **a full LFO bootstrap on that host was not executed**.
+6. **NOT RUN:** Complete fresh Windows installation with Codex absent; this is an explicit release limitation, not an implied pass.
+7. **UNCHANGED BY DECISION:** Research log policy and LOCAL → FRONTIER policy, with added in-source comments.
 
-No Windows integration tests were claimed as performed by this documentation-only change.
+The one-off manually dispatched [v9.6.4 release workflow](../.github/workflows/publish-v964.yml) repeats Windows parse and isolated security tests, then creates an annotated tag on the exact `main` commit and publishes a release. **GitHub Settings → General → Releases → Enable release immutability must be enabled before publishing.** The workflow checks the resulting release's `isImmutable` status; on a mutable publication it attempts to delete the release and tag and fails. Normal CI runs do not invoke it.
+
+Do not claim a full clean-install acceptance: it was not performed. Historical v9.6.3 tags/releases are not modified.
