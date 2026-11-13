@@ -4,6 +4,7 @@ name: Publish immutable LFO v9.6.4
 # Regular CI/source pushes do not publish releases.
 # Before publishing: GitHub repository Settings > General > Releases >
 # Enable release immutability. A normal annotated Git tag alone is mutable.
+# One-time publication retry following explicit confirmation that immutability is enabled.
 on:
   push:
     branches:
