@@ -1,0 +1,31 @@
+name: UMA Windows source contract
+
+on:
+  push:
+    branches:
+      - feat/uma-bootstrap-20261123
+  pull_request:
+    paths:
+      - 'install/Install-LFO.ps1'
+      - 'LFO.ps1'
+      - 'launch/Start-LFO.ps1'
+      - 'launch/Start-LFO-UMA.ps1'
+      - 'tests/Test-LfoUmaBootstrapContract.ps1'
+      - '.github/workflows/uma-bootstrap-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-uma-bootstrap:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3, pinned SHA
+        with:
+          persist-credentials: false
+      - name: Parse changed PowerShell scripts and validate UMA/legacy contracts
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\Test-LfoUmaBootstrapContract.ps1
