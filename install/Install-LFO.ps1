@@ -2,7 +2,7 @@
 param(
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'LFO'),
     [string]$SourceRef = 'main',
-    [ValidateSet('CPU','GPU')][string]$Profile = 'GPU',
+    [ValidateSet('CPU','GPU','UMA')][string]$Profile = 'GPU',
     [string]$BaseModel = 'qwen3.5:4b-q4_K_M',
     [switch]$SkipModelPull,
     [switch]$SkipL4Acceptance,
@@ -33,6 +33,10 @@ $SurrealUrl = 'https://github.com/surrealdb/surrealdb/releases/download/v3.3.0/s
 $SurrealSHA256 = '3e5e9d363a352be81f5a983d53f0bc0cd77a90e305f01e2fed929987cf79735c'
 $GpuModel = 'lfo-qwen3.5-4b-gpu8k:latest'
 $CpuModel = 'lfo-qwen3.5-4b-cpu5k:latest'
+# UMA uses the already-installed 35B model on AMD Strix Halo; Ollama aliases share blobs.
+$UmaBaseModel = 'qwen3.5:35b-a3b-q8_0'
+$UmaModel = 'lfo-qwen3.5-35b-uma16k:latest'
+$UmaContext = 16384
 $RuntimeContract = 'v9.6.4'
 
 function Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
@@ -126,7 +130,12 @@ function Resolve-LfoAliasModelStore([string[]]$Candidates,[string[]]$Preferred=@
     $matches=New-Object Collections.Generic.List[string]
     foreach($candidate in @($Candidates | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)){
         try{$full=[IO.Path]::GetFullPath([string]$candidate)}catch{continue}
-        if((Test-OllamaStoreHasModel $full $GpuModel) -and (Test-OllamaStoreHasModel $full $CpuModel)){
+        $hasProfileModels = if($Profile -eq 'UMA') {
+            (Test-OllamaStoreHasModel $full $UmaBaseModel) -or (Test-OllamaStoreHasModel $full $UmaModel)
+        } else {
+            (Test-OllamaStoreHasModel $full $GpuModel) -and (Test-OllamaStoreHasModel $full $CpuModel)
+        }
+        if($hasProfileModels){
             if(-not $matches.Contains($full)){$matches.Add($full)}
         }
     }
@@ -135,7 +144,7 @@ function Resolve-LfoAliasModelStore([string[]]$Candidates,[string[]]$Preferred=@
         foreach($match in $matches){if($match -ieq $fullPreferred){return $match}}
     }
     if($matches.Count -eq 1){return [string]$matches[0]}
-    if($matches.Count -gt 1){throw ('Multiple Ollama model stores contain both LFO aliases: '+(($matches|ForEach-Object{[string]$_}) -join '; ')+'. Set LFO_OLLAMA_MODELS or preserve the intended store in install-state.json before rerunning.')}
+    if($matches.Count -gt 1){throw ('Multiple Ollama model stores contain the selected LFO profile model(s): '+(($matches|ForEach-Object{[string]$_}) -join '; ')+'. Set LFO_OLLAMA_MODELS or preserve the intended store in install-state.json before rerunning.')}
     return $null
 }
 function Get-OllamaApiModelNames([string]$Uri) {
@@ -237,7 +246,7 @@ Write-Host 'Local-first AI orchestration with structured memory, provenance and 
 Write-Host 'Project: https://github.com/tomasgal/local-frontier-orchestrator'
 Write-Host 'Created by Tomas Gal; bootstrap and integration tooling developed with OpenAI ChatGPT/Codex assistance.'
 Write-Host 'This installer will verify Windows/PowerShell/SQLite, reuse or provision Ollama and SurrealDB,'
-Write-Host 'obtain the selected LFO source, prepare local runtime/data/configuration, and create CPU/GPU launchers.'
+Write-Host 'obtain the selected LFO source, prepare local runtime/data/configuration, and create CPU/GPU/UMA launchers.'
 Write-Host 'Existing compatible components are reused where safe; unrelated data stores and running services are not overwritten.'
 Write-Host ''
 Step 'Windows / PowerShell preflight'
@@ -361,7 +370,7 @@ Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\QwenChat.ps1')) 'LFO
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'LFO.ps1')) 'LFO source does not contain the v9.6.3 production entrypoint.'
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'src\LfoL4Runtime.ps1')) 'LFO source does not contain the v9.6.1/v9.6.2 L4 runtime module.'
 Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot 'tests\Test-LfoL4Recording.ps1')) 'LFO source does not contain the v9.6.1/v9.6.2 L4 recording acceptance suite.'
-foreach($requiredLauncher in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-Ollama.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1')){
+foreach($requiredLauncher in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-LFO-UMA.ps1','Start-Ollama.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1')){
     Assert-Lfo (Test-Path -LiteralPath (Join-Path $AppRoot ('launch\'+$requiredLauncher))) ("Bootstrap source is missing launcher: "+$requiredLauncher)
 }
 Info "LFO source: $SourceCommit"
@@ -443,6 +452,11 @@ if(-not $ollamaExe){
     }
 }
 $ollamaManaged=$false
+if($Profile -eq 'UMA') {
+    Assert-Lfo ($liveOllamaVersion -and $liveOllamaVersion -ge $OllamaMinVersion) 'UMA requires an already-running compatible Ollama API on 127.0.0.1:11434. Start the known-working AMD Ollama first.'
+    Assert-Lfo ((Get-OllamaApiModelNames $liveOllamaBase) -contains $UmaBaseModel) ("UMA requires the existing local model $UmaBaseModel on the running Ollama; no automatic 35B download is performed.")
+    Assert-Lfo $ollamaExe 'UMA requires an existing compatible ollama.exe. No separate Ollama runtime will be installed.'
+}
 if(-not $ollamaExe){
     $ollamaManaged=$true
     $ollamaDir=Join-Path $RuntimeRoot ('ollama-'+$OllamaPinnedVersion)
@@ -518,9 +532,9 @@ if($ollamaApiVersion){
     $rv=Parse-SemVer $ollamaApiVersion
     if($rv -and $rv -ge $OllamaMinVersion){
         $apiModels=@(Get-OllamaApiModelNames $ollamaBase)
-        $apiHasLfoAliases=($apiModels -contains $GpuModel) -and ($apiModels -contains $CpuModel)
+        $apiHasLfoAliases=if($Profile -eq 'UMA'){ $apiModels -contains $UmaBaseModel } else { ($apiModels -contains $GpuModel) -and ($apiModels -contains $CpuModel) }
         if($preExistingAliasStore -and -not $apiHasLfoAliases){
-            Warn ("Compatible Ollama is already listening on 127.0.0.1:11434, but it does not expose the existing LFO CPU/GPU aliases from "+$preExistingAliasStore+". It will be left untouched; LFO will start its own listener on a free port using that shared store.")
+            Warn ("Compatible Ollama is already listening on 127.0.0.1:11434, but it does not expose the selected LFO model(s) from "+$preExistingAliasStore+". It will be left untouched; LFO will start its own listener on a free port using that shared store.")
         } else {
             $runningCompatible=$true
             Info "Reusing compatible Ollama API already listening on 127.0.0.1:11434 (version=$ollamaApiVersion)."
@@ -548,6 +562,7 @@ if(-not $ollamaModelsDir -and $ollamaManaged){
 }
 if($ollamaModelsDir){Info "Ollama model store selected for LFO: $ollamaModelsDir"}
 
+if($Profile -eq 'UMA') { Assert-Lfo $runningCompatible 'UMA refuses to start a second Ollama listener. Restore the existing 11434 model store/endpoint first.' }
 if(-not $runningCompatible){
     if(@(Get-NetTCPConnection -State Listen -LocalPort 11434 -ErrorAction SilentlyContinue).Count -gt 0){$ollamaPort=Get-FreePort 11435;$ollamaBase='http://127.0.0.1:'+$ollamaPort}
     $hostAddress='127.0.0.1:'+$ollamaPort
@@ -585,6 +600,31 @@ $hostAddress='127.0.0.1:'+$ollamaPort
 Info "Ollama API: $ollamaBase version=$ollamaApiVersion"
 
 if(-not $SkipModelPull){
+    if($Profile -eq 'UMA'){
+        Step "Configure UMA model alias from existing $UmaBaseModel (no model pull)"
+        $oldHost=$env:OLLAMA_HOST;$oldModels=$env:OLLAMA_MODELS
+        try {
+            $env:OLLAMA_HOST=$hostAddress
+            if($ollamaModelsDir){$env:OLLAMA_MODELS=$ollamaModelsDir}else{Remove-Item Env:OLLAMA_MODELS -ErrorAction SilentlyContinue}
+            Assert-Lfo ((Get-OllamaApiModelNames $ollamaBase) -contains $UmaBaseModel) "UMA source model $UmaBaseModel is not visible through the selected Ollama API."
+            $modRoot=Join-Path $ConfigRoot 'modelfiles'
+            New-Item -ItemType Directory -Path $modRoot -Force | Out-Null
+            $umaFile=Join-Path $modRoot 'Modelfile.UMA'
+            [IO.File]::WriteAllText($umaFile,"FROM $UmaBaseModel`nPARAMETER num_ctx $UmaContext`nPARAMETER num_gpu 99`nPARAMETER temperature 0.1`n",$utf8)
+            & $ollamaExe create $UmaModel -f $umaFile | Out-Host
+            if($LASTEXITCODE -ne 0){throw "Failed to create UMA model alias $UmaModel."}
+            Assert-Lfo ((Get-OllamaApiModelNames $ollamaBase) -contains $UmaModel) 'UMA alias missing from Ollama after create.'
+            if($ollamaModelsDir){$ollamaStoreCandidates.Add($ollamaModelsDir)}
+            $resolvedAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates) -Preferred @($ollamaModelsDir,$preExistingAliasStore,$env:LFO_OLLAMA_MODELS,$env:OLLAMA_MODELS)
+            Assert-Lfo $resolvedAliasStore 'UMA alias was created, but its filesystem model store could not be resolved. Set LFO_OLLAMA_MODELS to the active Ollama model store and rerun; no second daemon will be started.'
+            Assert-Lfo (Test-OllamaStoreHasModel $resolvedAliasStore $UmaModel) 'Resolved UMA model store does not contain the new alias.'
+            $ollamaModelsDir=$resolvedAliasStore
+            Info "UMA model alias: $UmaModel; context=$UmaContext; store=$ollamaModelsDir"
+        } finally {
+            if($null -eq $oldHost){Remove-Item Env:OLLAMA_HOST -ErrorAction SilentlyContinue}else{$env:OLLAMA_HOST=$oldHost}
+            if($null -eq $oldModels){Remove-Item Env:OLLAMA_MODELS -ErrorAction SilentlyContinue}else{$env:OLLAMA_MODELS=$oldModels}
+        }
+    } else {
     Step "Ensure base model and CPU/GPU runtime aliases: $BaseModel"
     $oldHost=$env:OLLAMA_HOST;$oldModels=$env:OLLAMA_MODELS
     try {
@@ -647,8 +687,14 @@ if(-not $SkipModelPull){
         if($null -eq $oldHost){Remove-Item Env:OLLAMA_HOST -ErrorAction SilentlyContinue}else{$env:OLLAMA_HOST=$oldHost}
         if($null -eq $oldModels){Remove-Item Env:OLLAMA_MODELS -ErrorAction SilentlyContinue}else{$env:OLLAMA_MODELS=$oldModels}
     }
+    }
 } else {
     Warn 'Model pull/alias creation skipped by request.'
+    if($Profile -eq 'UMA') {
+        Assert-Lfo ((Get-OllamaApiModelNames $ollamaBase) -contains $UmaModel) ("-SkipModelPull requires an existing UMA alias: "+$UmaModel)
+        Assert-Lfo $preExistingAliasStore '-SkipModelPull UMA requires a resolvable existing model store; set LFO_OLLAMA_MODELS.'
+        Assert-Lfo (Test-OllamaStoreHasModel $preExistingAliasStore $UmaModel) 'Existing UMA alias not found in selected filesystem model store.'
+    }
     if($preExistingAliasStore){
         $ollamaModelsDir=$preExistingAliasStore
         Info "Shared LFO Ollama model store: $ollamaModelsDir"
@@ -810,7 +856,8 @@ Step 'Generate installed LFO configuration'
 $baseConfigPath=Join-Path $AppRoot 'config\QwenChat.config.psd1'
 $configText=Get-Content -LiteralPath $baseConfigPath -Raw -Encoding UTF8
 $memoryDir=Join-Path $DataRoot 'memory';New-Item -ItemType Directory -Path $memoryDir -Force|Out-Null
-$configText=[regex]::Replace($configText,"(?m)^\s*Model\s*=\s*'[^']*'","    Model = '"+(Quote-PsSingle $GpuModel)+"'",1)
+$defaultModel=if($Profile -eq 'UMA'){$UmaModel}else{$GpuModel}
+$configText=[regex]::Replace($configText,"(?m)^\s*Model\s*=\s*'[^']*'","    Model = '"+(Quote-PsSingle $defaultModel)+"'",1)
 $configText=[regex]::Replace($configText,"(?m)^\s*BaseUri\s*=\s*'[^']*'","    BaseUri = '"+(Quote-PsSingle $ollamaBase)+"'",1)
 $configText=[regex]::Replace($configText,'(?m)^\s*L0StageSourcesEnabled\s*=\s*\$false','        L0StageSourcesEnabled = $true',1)
 $configText=[regex]::Replace($configText,"(?m)^\s*DataDirectory\s*=\s*'[^']*'","        DataDirectory = '"+(Quote-PsSingle $memoryDir)+"'",1)
@@ -850,7 +897,7 @@ $state=[ordered]@{
     SourceRef=$SourceRef
     SourceCommit=$SourceCommit
     SQLite=[ordered]@{Provider='winsqlite3.dll';Path=$systemSqlite;Version=$sqliteVersion;SelfTest='PASS'}
-    Ollama=[ordered]@{Executable=$ollamaExe;ExecutableVersion=[string]$ollamaExeVersion;ApiVersion=$ollamaApiVersion;Managed=$ollamaManaged;BaseUri=$ollamaBase;HostAddress=$hostAddress;ModelsDirectory=$ollamaModelsDir;BaseModel=$BaseModel;GPUModel=$GpuModel;CPUModel=$CpuModel}
+    Ollama=[ordered]@{Executable=$ollamaExe;ExecutableVersion=[string]$ollamaExeVersion;ApiVersion=$ollamaApiVersion;Managed=$ollamaManaged;BaseUri=$ollamaBase;HostAddress=$hostAddress;ModelsDirectory=$ollamaModelsDir;BaseModel=$BaseModel;GPUModel=$GpuModel;CPUModel=$CpuModel;UMABaseModel=$UmaBaseModel;UMAModel=$UmaModel;UMAContext=$UmaContext}
     SurrealDB=[ordered]@{Executable=$surrealExe;Version=$SurrealVersion;SHA256=$surrealHash;Managed=$surrealManaged;BaseUri=$surrealBase;Port=$surrealPort;DataDirectory=$surrealData;BootstrapCredentialPath=$bootstrapCredPath;RuntimeCredentialPath=$runtimeCredPath;Namespace='lfo';Database='epistemic'}
     ServiceHosting=[ordered]@{
         Policy='headless-redirected-for-LFO-owned-services'
@@ -864,7 +911,7 @@ $statePath=Join-Path $ConfigRoot 'install-state.json'
 [IO.File]::WriteAllText($statePath,($state|ConvertTo-Json -Depth 12),$utf8)
 
 Step 'Publish easy launchers inside the install tree'
-foreach($name in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-Ollama.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1','View-LFOConversationLog.ps1')){
+foreach($name in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Start-LFO-UMA.ps1','Start-Ollama.ps1','Start-SurrealDB.ps1','Watch-LFOService.ps1','View-LFOConversationLog.ps1')){
     $src=Join-Path $AppRoot ('launch\'+$name);Assert-Lfo (Test-Path -LiteralPath $src -PathType Leaf) "Required launcher missing from source: $name"
     Copy-Item -LiteralPath $src -Destination (Join-Path $LaunchRoot $name) -Force
 }
@@ -872,17 +919,20 @@ Copy-Item -LiteralPath (Join-Path $AppRoot 'LFO.ps1') -Destination (Join-Path $L
 # Add double-clickable BAT wrappers without changing the PowerShell launch contract.
 $cpuBat=Join-Path $LaunchRoot 'Start-LFO-CPU.bat'
 $gpuBat=Join-Path $LaunchRoot 'Start-LFO-GPU.bat'
+$umaBat=Join-Path $LaunchRoot 'Start-LFO-UMA.bat'
 $cpuBatText="@echo off`r`npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"%~dp0Start-LFO-CPU.ps1`"`r`nexit /b %ERRORLEVEL%`r`n"
 $gpuBatText="@echo off`r`npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"%~dp0Start-LFO-GPU.ps1`"`r`nexit /b %ERRORLEVEL%`r`n"
+$umaBatText="@echo off`r`npowershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"%~dp0Start-LFO-UMA.ps1`"`r`nexit /b %ERRORLEVEL%`r`n"
 [IO.File]::WriteAllText($cpuBat,$cpuBatText,[Text.Encoding]::ASCII)
 [IO.File]::WriteAllText($gpuBat,$gpuBatText,[Text.Encoding]::ASCII)
+[IO.File]::WriteAllText($umaBat,$umaBatText,[Text.Encoding]::ASCII)
 # Launcher copies use their own PSScriptRoot for wrappers, while Start-LFO resolves service scripts from AppRoot via install-state.
 
 Step 'Bootstrap complete'
 Write-Host ('Install root:  '+$InstallRoot) -ForegroundColor Green
 Write-Host ('Source:        '+$SourceCommit) -ForegroundColor Green
 Write-Host ('Runtime:       '+$RuntimeContract) -ForegroundColor Green
-Write-Host ('Profile:       '+$Profile+' (default; CPU/GPU launchers both installed)') -ForegroundColor Green
+Write-Host ('Profile:       '+$Profile+' (default; CPU/GPU/UMA launchers installed; models provisioned per profile)') -ForegroundColor Green
 Write-Host 'Priority:      High (default production inference priority)' -ForegroundColor Green
 Write-Host ('SQLite:       PASS '+$sqliteVersion) -ForegroundColor Green
 Write-Host ('Ollama:       '+$ollamaApiVersion+' @ '+$ollamaBase) -ForegroundColor Green
@@ -897,8 +947,10 @@ Write-Host 'Launch options:' -ForegroundColor Cyan
 Write-Host '  .\LFO.ps1           (primary v9.6.4 entrypoint; Auto device, High priority by default)'
 Write-Host '  Start-LFO-CPU.bat   (double-click or Command Prompt)'
 Write-Host '  Start-LFO-GPU.bat   (double-click or Command Prompt)'
+Write-Host '  Start-LFO-UMA.bat   (double-click or Command Prompt)'
 Write-Host '  .\Start-LFO-CPU.ps1 (PowerShell)'
 Write-Host '  .\Start-LFO-GPU.ps1 (PowerShell)'
+Write-Host '  .\Start-LFO-UMA.ps1 (PowerShell)'
 Write-Host '  .\View-LFOConversationLog.ps1 (current-month turn log viewer)'
 Write-Host ''
 Write-Host 'No shortcuts are created outside the LFO install tree; create any Windows shortcuts where you prefer.'
@@ -908,7 +960,7 @@ try { Start-Process explorer.exe -ArgumentList ('"'+$installedLaunchDir+'"') | O
 if($SkipLaunch){
     Write-Host 'Automatic Qwen/LFO launch skipped (-SkipLaunch).' -ForegroundColor Yellow
 } else {
-    $selectedLauncherName = if($Profile -eq 'CPU') { 'Start-LFO-CPU.ps1' } else { 'Start-LFO-GPU.ps1' }
+    $selectedLauncherName = switch($Profile) { 'CPU' { 'Start-LFO-CPU.ps1' } 'UMA' { 'Start-LFO-UMA.ps1' } default { 'Start-LFO-GPU.ps1' } }
     $selectedLauncher = Join-Path $installedLaunchDir $selectedLauncherName
     Write-Host ("Starting LFO/Qwen with the selected {0} profile..." -f $Profile) -ForegroundColor Cyan
     try {
