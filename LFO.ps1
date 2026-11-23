@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Auto','CPU','GPU')][string]$Device,
+    [ValidateSet('Auto','CPU','GPU','UMA')][string]$Device,
     [string]$Experiment,
     [string]$InstallRoot,
     [switch]$Resume,
@@ -295,9 +295,11 @@ function Resolve-LfoDevice {
         [int]$MinimumGpuVramMiB = 6144
     )
     $requested = if ([string]::IsNullOrWhiteSpace($RequestedDevice)) { 'Auto' } else { $RequestedDevice }
-    if ($requested -notin @('Auto','CPU','GPU')) { throw "Invalid device '$requested'." }
+    if ($requested -notin @('Auto','CPU','GPU','UMA')) { throw "Invalid device '$requested'." }
     if ($requested -ne 'Auto') { return $requested }
 
+    # Preserve legacy NVIDIA Auto behavior; an explicitly installed UMA host defaults to UMA.
+    if ($State.LFO -and [string]$State.LFO.DefaultProfile -eq 'UMA') { return 'UMA' }
     if ([string]::IsNullOrWhiteSpace([string]$State.Ollama.GPUModel)) { return 'CPU' }
     $gpus = @(Get-LfoNvidiaGpuInfo)
     if (@($gpus | Where-Object { [int]$_.memory_mib -ge $MinimumGpuVramMiB }).Count -gt 0) {
@@ -309,10 +311,15 @@ function Resolve-LfoDevice {
 function Get-LfoModelSpec {
     param(
         [Parameter(Mandatory=$true)]$State,
-        [Parameter(Mandatory=$true)][ValidateSet('CPU','GPU')][string]$Device
+        [Parameter(Mandatory=$true)][ValidateSet('CPU','GPU','UMA')][string]$Device
     )
     if ($Device -eq 'CPU') {
         return [pscustomobject]@{ Model = [string]$State.Ollama.CPUModel; Context = 5120 }
+    }
+    if ($Device -eq 'UMA') {
+        $context = if ($State.Ollama.UMAContext) { [int]$State.Ollama.UMAContext } else { 16384 }
+        if ($context -lt 1024 -or $context -gt 131072) { throw 'Invalid UMA context in install-state.json.' }
+        return [pscustomobject]@{ Model = [string]$State.Ollama.UMAModel; Context = $context }
     }
     return [pscustomobject]@{ Model = [string]$State.Ollama.GPUModel; Context = 8192 }
 }
@@ -350,7 +357,7 @@ function Start-LfoOwnedOllama {
         if (-not [string]::IsNullOrWhiteSpace([string]$State.Ollama.ModelsDirectory)) {
             $env:OLLAMA_MODELS = [string]$State.Ollama.ModelsDirectory
         }
-        $env:OLLAMA_CONTEXT_LENGTH = '8192'
+        $env:OLLAMA_CONTEXT_LENGTH = $(if ($State.LFO -and [string]$State.LFO.DefaultProfile -eq 'UMA' -and $State.Ollama.UMAContext) { [string]$State.Ollama.UMAContext } else { '8192' })
         $env:OLLAMA_NUM_PARALLEL = '1'
         $env:OLLAMA_MAX_LOADED_MODELS = '1'
         $env:OLLAMA_NO_CLOUD = '1'
@@ -1140,8 +1147,8 @@ function Invoke-LfoExperiment {
                     Write-LfoExperimentProgress ("priority verified: PID {0} {1} = {2}" -f $priorityRow.pid,$priorityRow.name,$priorityRow.priority) 'OK'
                 }
                 $placement = Get-LfoOllamaPlacement $ollamaUri ([string]$modelSpec.Model)
-                if ($device -eq 'GPU' -and ($null -eq $placement -or [int64]$placement.size_vram_bytes -le 0)) {
-                    throw 'GPU was requested/resolved, but Ollama reports no VRAM residency after warm-up.'
+                if ($device -in @('GPU','UMA') -and ($null -eq $placement -or [int64]$placement.size_vram_bytes -le 0)) {
+                    throw 'GPU/UMA acceleration was requested/resolved, but Ollama reports no GPU residency after warm-up.'
                 }
                 if ($device -eq 'CPU' -and $null -ne $placement -and [int64]$placement.size_vram_bytes -gt 0) {
                     throw 'CPU was requested/resolved, but Ollama reports GPU VRAM residency after warm-up.'
