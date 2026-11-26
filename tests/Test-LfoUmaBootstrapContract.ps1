@@ -83,7 +83,7 @@ try{
     if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
     Remove-Item -LiteralPath $old
     if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
-    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Read-LfoChatNdjson','Write-LfoStreamThinkingChunk','Show-QwenThinking','Wait-LfoCodexExit','Get-LfoSlashCommands','Get-LfoSlashCommandState','Show-LfoSlashHelp','Add-LfoLocalEvidencePolicy','Expand-RuntimePolicy','Get-OrchestratorSystemPrompt','Get-QwenLocalOutputFormat')){
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Write-LfoStreamProgress','Close-LfoStreamProgress','Write-LfoStreamPreview','Read-LfoChatNdjson','Write-LfoStreamThinkingChunk','Show-QwenThinking','Wait-LfoCodexExit','Get-LfoSlashCommands','Get-LfoSlashCommandState','Show-LfoSlashHelp','Add-LfoLocalEvidencePolicy','Expand-RuntimePolicy','Get-OrchestratorSystemPrompt','Get-QwenLocalOutputFormat')){
         $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
         if($fn.Count -ne 1){throw "Missing helper $name"}
         . ([scriptblock]::Create($fn[0].Extent.Text))
@@ -170,10 +170,57 @@ try{
     $reader=New-Object IO.StringReader($chunks[0]);$rejected=$false
     try{Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $false 'AUTO' $false|Out-Null}catch{$rejected=$true}finally{$reader.Dispose()}
     if(-not $rejected){throw 'Missing final stream chunk accepted'}
+    # CR overwrite and exact one-newline cleanup, no wait needed.
+    $statusState=@{Open=$false;Width=0}
+    $statusRecords=@(& {
+        Write-LfoStreamProgress $statusState 5
+        Write-LfoStreamProgress $statusState 10
+        Close-LfoStreamProgress $statusState
+        Close-LfoStreamProgress $statusState
+    } 6>&1)
+    if($statusRecords.Count -ne 3){throw 'Stream heartbeat cleanup count incorrect'}
+    foreach($record in $statusRecords[0..1]){
+        if($record -isnot [Management.Automation.InformationRecord] -or -not $record.MessageData.NoNewLine -or -not ([string]$record.MessageData).StartsWith([string][char]13)){throw 'Stream heartbeat did not overwrite current line'}
+    }
+    if(([string]$statusRecords[0].MessageData) -notmatch '5s;' -or ([string]$statusRecords[1].MessageData) -notmatch '10s;' -or $statusRecords[2].MessageData.NoNewLine -or $statusState.Open){throw 'Stream heartbeat timing or close incorrect'}
+    # Verify the real preview closes an open progress line before rendering.
+    . (Join-Path $root 'src/LfoEvidenceProvenance.ps1')
+    function Write-LfoMarkdown([string]$Text){Write-Host $Text}
+    $script:LfoStreamShownPrefix=''
+    $statusState=@{Open=$true;Width=50}
+    $previewRecords=@(Write-LfoStreamPreview ('First'+$nl+$nl+'Next') $statusState 6>&1)
+    $info=@($previewRecords|Where-Object {$_ -is [Management.Automation.InformationRecord]})
+    if($statusState.Open -or $info.Count -lt 3 -or ([string]$info[0].MessageData) -ne '' -or ([string]$info[1].MessageData) -notmatch 'provisional answer'){throw 'Preview did not close heartbeat before rendering'}
+    $script:LfoStreamShownPrefix=''
+    # Use one pre-aged stopwatch for success, failure and thinking cleanup.
+    # No model or network call, and only one five-second wait.
+    $aged=[Diagnostics.Stopwatch]::StartNew()
+    Start-Sleep -Milliseconds 5100
+    $aged.Stop()
+    $reader=New-Object IO.StringReader(($chunks -join $nl))
+    try{$captured=@(Read-LfoChatNdjson $reader $aged 'local_generation' $false 'AUTO' $true 6>&1)}finally{$reader.Dispose()}
+    $info=@($captured|Where-Object {$_ -is [Management.Automation.InformationRecord]})
+    if($info.Count -ne 2 -or -not $info[0].MessageData.NoNewLine -or $info[1].MessageData.NoNewLine){throw 'Done chunk did not close heartbeat'}
+    $reader=New-Object IO.StringReader($chunks[0])
+    try{
+        $captured=@(& {try{Read-LfoChatNdjson $reader $aged 'local_generation' $false 'AUTO' $true}catch{Write-Host 'caught-stream-error'}} 6>&1)
+    }finally{$reader.Dispose()}
+    $info=@($captured|Where-Object {$_ -is [Management.Automation.InformationRecord]})
+    if($info.Count -ne 3 -or -not $info[0].MessageData.NoNewLine -or $info[1].MessageData.NoNewLine -or ([string]$info[2].MessageData) -ne 'caught-stream-error'){throw 'Interrupted stream left heartbeat open'}
+    $lateThinking=@(
+        (@{message=@{content='';thinking=''};done=$false}|ConvertTo-Json -Depth 8 -Compress),
+        (@{message=@{content='{"answer":"Done","route":"LOCAL"}';thinking='Late reasoning'};done=$true;done_reason='stop'}|ConvertTo-Json -Depth 8 -Compress)
+    )
+    $reader=New-Object IO.StringReader(($lateThinking -join $nl))
+    try{$captured=@(Read-LfoChatNdjson $reader $aged 'local_generation' $false 'AUTO' $true $true 6>&1)}finally{$reader.Dispose()}
+    $info=@($captured|Where-Object {$_ -is [Management.Automation.InformationRecord]})
+    if($info.Count -lt 5 -or -not $info[0].MessageData.NoNewLine -or $info[1].MessageData.NoNewLine -or ([string]$info[1].MessageData) -ne ''){throw 'Thinking did not close heartbeat before rendering'}
+    Write-Host 'PASS: stream heartbeat overwrites one line and closes before preview, thinking, completion or failure.'
     # AUTO may display the answer before the route field arrives, even if
     # the final route is FRONTIER. No memory side channel is displayed.
     $script:previewCalls=New-Object 'System.Collections.Generic.List[string]'
-    function Write-LfoStreamPreview([string]$Answer){
+    function Write-LfoStreamPreview([string]$Answer,$ProgressState=$null){
+        Close-LfoStreamProgress $ProgressState
         [void]$script:previewCalls.Add($Answer)
         return $true
     }

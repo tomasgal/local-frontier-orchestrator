@@ -797,12 +797,27 @@ function Get-LfoStreamBlockBoundary([string]$Text){
     }
     return $boundary
 }
-function Write-LfoStreamPreview([string]$Answer){
+# Single-line progress uses CR, without terminal-specific cursor APIs.
+function Write-LfoStreamProgress($State,[double]$Elapsed){
+    $status=("[stream: {0:0}s; awaiting complete answer block]" -f $Elapsed)
+    $State.Width=[Math]::Max([int]$State.Width,$status.Length)
+    Write-Host (([string][char]13)+$status.PadRight($State.Width)) -ForegroundColor DarkGray -NoNewline
+    $State.Open=$true
+}
+function Close-LfoStreamProgress($State){
+    if($null -ne $State -and $State.Open){
+        Write-Host ''
+        $State.Open=$false
+        $State.Width=0
+    }
+}
+function Write-LfoStreamPreview([string]$Answer,$ProgressState=$null){
     $prior=[string]$script:LfoStreamShownPrefix
     if(-not $Answer.StartsWith($prior,[StringComparison]::Ordinal)){return $false}
     $previewLimit=Get-LfoAnnotationPreviewLimit $Answer
     $boundary=Get-LfoStreamBlockBoundary ($Answer.Substring(0,$previewLimit))
     if($boundary -le $prior.Length){return $false}
+    Close-LfoStreamProgress $ProgressState
     if(-not $prior){Write-Host '[stream: provisional answer; final JSON validation pending]' -ForegroundColor DarkGray}
     $delta=$Answer.Substring($prior.Length,$boundary-$prior.Length)
     Write-LfoMarkdown $delta.TrimEnd([char[]]@([char]13,[char]10))
@@ -835,6 +850,8 @@ function Read-LfoChatNdjson([IO.TextReader]$Reader,[Diagnostics.Stopwatch]$Clock
     $final=$null;$firstChunk=$null;$firstAnswer=$null;$firstVisible=$null
     $nextInspect=0.0;$nextProgress=5.0
     $thinkingPrinted=0;$thinkingOpen=$false;$firstThinking=$null
+    $progressState=@{Open=$false;Width=0}
+    try{
     while($null -ne ($line=$Reader.ReadLine())){
         if([string]::IsNullOrWhiteSpace($line)){continue}
         $chunk=$line|ConvertFrom-Json -ErrorAction Stop
@@ -854,6 +871,7 @@ function Read-LfoChatNdjson([IO.TextReader]$Reader,[Diagnostics.Stopwatch]$Clock
             # Flush it before the answer preview and before the final done.
             if($ShowThinking -and $thinking.Length -gt $thinkingPrinted){
                 if(-not $thinkingOpen){
+                    Close-LfoStreamProgress $progressState
                     $label=if($thinkingPrinted -gt 0){'--- thinking (continued) ---'}else{'--- thinking ---'}
                     Write-Host ''
                     Write-Host $label -ForegroundColor DarkGray
@@ -869,16 +887,17 @@ function Read-LfoChatNdjson([IO.TextReader]$Reader,[Diagnostics.Stopwatch]$Clock
                 $thinkingOpen=$false
             }
             # Preview is explicitly provisional; routing may follow the answer.
-            if($Preview -and $answer -and (Write-LfoStreamPreview $answer)){
+            if($Preview -and $answer -and (Write-LfoStreamPreview $answer $progressState)){
                 if($null -eq $firstVisible){$firstVisible=$Clock.Elapsed.TotalSeconds}
             }
             if($Progress -and $elapsed -ge $nextProgress -and $null -eq $firstVisible -and -not $thinkingOpen -and $chunk.done -ne $true){
-                Write-Host ("[stream: {0:n0}s; awaiting complete answer block]" -f $elapsed) -ForegroundColor DarkGray
+                Write-LfoStreamProgress $progressState $elapsed
                 $nextProgress=$elapsed+5
             }
         }
         if($chunk.done -eq $true){$final=$chunk;break}
     }
+    }finally{Close-LfoStreamProgress $progressState}
     if($null -eq $final){throw 'Ollama stream ended without a final done chunk; preview was not committed.'}
     $final | Add-Member -NotePropertyName message -NotePropertyValue ([pscustomobject]@{role='assistant';content=$content.ToString();thinking=$thinking.ToString()}) -Force
     $final | Add-Member -NotePropertyName lfo_streamed -NotePropertyValue $true -Force
