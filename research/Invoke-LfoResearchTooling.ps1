@@ -90,7 +90,7 @@ function Invoke-LfoResearchExpandParameterSweep {
     $abstentions = Get-LfoResearchArray $parameters 'abstentionThreshold' 'Parameter sweep parameters'
     $budgets = Get-LfoResearchArray $parameters 'falseInterventionBudget' 'Parameter sweep parameters' -Optional
     if ($budgets.Count -eq 0) { $budgets = @($null) }
-    $rows = New-Object 'System.Collections.Generic.List[object]'
+    $rows = @()
     foreach ($s in $sensitivities) { foreach ($t in $thresholds) { foreach ($w in $weights) { foreach ($a in $abstentions) { foreach ($b in $budgets) {
         $canonical = [ordered]@{sweep=$name;phenomenon=$phenomenon;referenceCondition=$reference;detectorSensitivity=$s;interventionThreshold=$t;interventionWeight=$w;abstentionThreshold=$a;falseInterventionBudget=$b} | ConvertTo-Json -Compress
         $rows += [pscustomobject][ordered]@{schema='lfo-mediator-parameter-config-v1';sweepName=$name;configId=('cfg-' + (Get-LfoResearchSha256 $canonical).Substring(0,12));phenomenon=$phenomenon;referenceCondition=$reference;detectorSensitivity=$s;interventionThreshold=$t;interventionWeight=$w;abstentionThreshold=$a;falseInterventionBudget=$b;status='pilot_candidate'}
@@ -134,7 +134,7 @@ function Invoke-LfoResearchBuildModelAuditManifest {
     if([string](Assert-LfoResearchProperty $doc 'schema' 'Model audit plan') -ne 'lfo-model-audit-plan-v1'){throw "Model audit schema must be 'lfo-model-audit-plan-v1'."}
     $auditId=[string](Assert-LfoResearchProperty $doc 'auditId' 'Model audit plan');$repetitions=[int](Assert-LfoResearchProperty $doc 'repetitions' 'Model audit plan');if($repetitions -lt 1){throw 'Model audit repetitions must be at least 1.'}
     $tasks=@(Assert-LfoResearchProperty $doc 'tasks' 'Model audit plan');if($tasks.Count -eq 0){throw 'Model audit plan must contain at least one task.'}
-    $rows=New-Object 'System.Collections.Generic.List[object]'
+    $rows=@()
     foreach($task in $tasks){
         $taskId=[string](Assert-LfoResearchProperty $task 'taskId' 'Model audit task');$groundTruth=[string](Assert-LfoResearchProperty $task 'groundTruth' "Model audit task '$taskId'");$neutral=[string](Assert-LfoResearchProperty $task 'neutralPrompt' "Model audit task '$taskId'");$leading=[string](Assert-LfoResearchProperty $task 'leadingPrompt' "Model audit task '$taskId'")
         for($rep=1;$rep -le $repetitions;$rep++){
