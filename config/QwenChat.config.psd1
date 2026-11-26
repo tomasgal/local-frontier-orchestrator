@@ -60,6 +60,8 @@
     LocalGeneration = @{
         NumPredictNormal = 1024
         NumPredictThink  = 2048
+        UmaNumPredictNormal = 4096
+        UmaNumPredictThink  = 8192
         Temperature      = 0.10
 
         # Dev5 candidate A: omit memory_note/memory_ops from the local output
@@ -88,6 +90,8 @@
     SynthesisGeneration = @{
         NumPredictNormal = 1536
         NumPredictThink  = 3072
+        UmaNumPredictNormal = 4096
+        UmaNumPredictThink  = 8192
         Temperature      = 0.25
         PresencePenalty  = 0.15
         UnfinishedEvalThreshold = 1500

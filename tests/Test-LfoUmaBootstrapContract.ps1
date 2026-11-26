@@ -73,7 +73,7 @@ try{
     if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
     Remove-Item -LiteralPath $old
     if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
-    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts')){
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer')){
         $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
         if($fn.Count -ne 1){throw "Missing helper $name"}
         . ([scriptblock]::Create($fn[0].Extent.Text))
@@ -123,6 +123,18 @@ try{
     if($items.Count -ne 2 -or $items[0].text -ne 'Setup' -or $items[1].text -ne 'Measured'){throw 'Single setup/measured prompt batch corrupted'}
     $rejected=$false;try{New-LfoBatchInputFile $batch @('')}catch{$rejected=$true}
     if(-not $rejected){throw 'Empty batch prompt accepted'}
+    $g=@{NumPredictNormal=1024;NumPredictThink=2048;UmaNumPredictNormal=4096;UmaNumPredictThink=8192}
+    $msgs=@(@{role='user';content='Short prompt'})
+    if((Get-LfoGenerationBudget $g $false 'UMA' 16384 $msgs @{}) -ne 4096){throw 'UMA normal budget mismatch'}
+    if((Get-LfoGenerationBudget $g $true 'UMA' 16384 $msgs @{}) -ne 8192){throw 'UMA think budget mismatch'}
+    if((Get-LfoGenerationBudget $g $true 'GPU' 8192 $msgs @{}) -ne 2048){throw 'Legacy generation budget changed'}
+    $long=@(@{role='user';content=('x'*36000)})
+    if((Get-LfoGenerationBudget $g $true 'UMA' 16384 $long @{}) -ge 8192){throw 'UMA context headroom not applied'}
+    if((Get-LfoPartialJsonAnswer '{"memory_ops":[{"answer":"secret"}],"answer":"First\nSecond') -ne ('First'+[char]10+'Second')){throw 'Truncated answer recovery failed'}
+    if((Get-LfoPartialJsonAnswer '{"memory_ops":[{"answer":"secret"}]') -ne ''){throw 'Nested answer exposed'}
+    if((Get-LfoPartialJsonAnswer '{"answer":"escaped \"quote\" and \u00') -ne 'escaped "quote" and'){throw 'Partial escape recovery failed'}
+    if((Get-LfoPartialJsonAnswer '{"answer":"Complete","memory_ops":[') -ne 'Complete'){throw 'Complete answer prefix lost'}
+    Write-Host 'PASS: UMA generation ceilings, context estimate and partial JSON isolation.'
     Write-Host 'PASS: singleton experiment prompt arrays and batch input validation.'
     Write-Host 'PASS: aligned table layout, width, wrapping, multiline import and 1000-entry splitting.'
     Write-Host 'PASS: v1/v2 manifests, Markdown spans, control stripping, raw export, path and overwrite guards.'

@@ -430,12 +430,23 @@ function Start-LfoOwnedSurreal {
     }
 }
 
+function Assert-LfoSurrealCopySafe($State){
+    $uri=[string]$State.SurrealDB.BaseUri
+    if([string]::IsNullOrWhiteSpace($uri)){throw 'Production SurrealDB endpoint missing; cannot verify safe copy.'}
+    if(Test-LfoSurrealReady $uri){throw 'Stop production SurrealDB before copying its RocksDB datastore.'}
+    $source=[IO.Path]::GetFullPath([string]$State.SurrealDB.DataDirectory).Replace('\','/').TrimEnd('/')+'/'
+    foreach($p in @(Get-CimInstance Win32_Process -Filter "Name='surreal.exe'" -ErrorAction Stop)){
+        if([string]::IsNullOrWhiteSpace([string]$p.CommandLine)){throw 'Cannot verify SurrealDB process command line; refusing datastore copy.'}
+        if(([string]$p.CommandLine).Replace('\','/').IndexOf($source,[StringComparison]::OrdinalIgnoreCase) -ge 0){throw 'Production RocksDB datastore is still open; stop SurrealDB before copying.'}
+    }
+}
 function New-LfoIsolatedSurrealDataCopy {
     param(
         [Parameter(Mandatory=$true)]$State,
         [Parameter(Mandatory=$true)][string]$Destination
     )
     $source = [string]$State.SurrealDB.DataDirectory
+    Assert-LfoSurrealCopySafe $State
     if (-not (Test-Path -LiteralPath $source -PathType Container)) {
         throw "Source L4 data directory not found: $source"
     }
@@ -1022,6 +1033,7 @@ function Invoke-LfoExperiment {
     $minGpu = if ($null -ne $plan.minimumGpuVramMiB) { [int]$plan.minimumGpuVramMiB } else { 6144 }
     $device = Resolve-LfoDevice $requestedDevice $state $minGpu
     $modelSpec = Get-LfoModelSpec $state $device
+    $env:LFO_RUNTIME_DEVICE = $device
     if ([string]::IsNullOrWhiteSpace([string]$modelSpec.Model)) { throw "No $device model alias is configured in install-state.json." }
 
     $outputRoot = Get-LfoExperimentOutputRoot $plan $InstallRoot $experimentPathResolved
@@ -1405,6 +1417,7 @@ try {
     $requestedDevice = if ([string]::IsNullOrWhiteSpace($Device)) { 'Auto' } else { $Device }
     $resolvedDevice = Resolve-LfoDevice $requestedDevice $state 6144
     $modelSpec = Get-LfoModelSpec $state $resolvedDevice
+    $env:LFO_RUNTIME_DEVICE = $resolvedDevice
     $config = [string]$state.LFO.ConfigPath
     if (-not (Test-Path -LiteralPath $config -PathType Leaf)) { throw "LFO config not found: $config" }
     $runtimePriority = if (-not [string]::IsNullOrWhiteSpace($Priority)) {

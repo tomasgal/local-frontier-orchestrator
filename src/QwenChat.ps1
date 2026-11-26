@@ -726,6 +726,54 @@ function Invoke-LfoChatApi([string]$Phase, [string]$Body) {
     }
 }
 
+# Preserve CPU/GPU defaults; UMA context headroom is a heuristic.
+function Get-LfoGenerationBudget($Generation,[bool]$Thinking,[string]$Device,[int]$Context,[object[]]$Messages,$Format){
+    $legacy=if($Thinking){[int]$Generation.NumPredictThink}else{[int]$Generation.NumPredictNormal}
+    if($Device -ne 'UMA' -or $Context -le 0){return $legacy}
+    $target=if($Thinking){[int]$Generation.UmaNumPredictThink}else{[int]$Generation.UmaNumPredictNormal}
+    if($target -le 0){$target=$legacy}
+    $chars=0
+    foreach($message in $Messages){$chars+=([string]$message.content).Length+48}
+    if($null -ne $Format){$chars+=($Format|ConvertTo-Json -Depth 12 -Compress).Length}
+    $estimatedInput=[int][Math]::Ceiling($chars/3.0)+512
+    $remaining=[Math]::Max(128,$Context-$estimatedInput)
+    return [int][Math]::Min($target,[Math]::Min([Math]::Max(128,[Math]::Floor($Context/2)),$remaining))
+}
+# Extract only the top-level answer string; drop incomplete trailing escapes.
+function Get-LfoPartialJsonAnswer([string]$Content){
+    if([string]::IsNullOrWhiteSpace($Content)){return ''}
+    $s=$Content.TrimStart()
+    if(-not $s.StartsWith('{')){return ''}
+    $depth=1;$i=1
+    $stringToken=[regex]'(?s)\G"(?<body>(?:[^"\\\x00-\x1F]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*)(?<close>")?'
+    while($i -lt $s.Length){
+        $ch=$s[$i]
+        if($ch -eq '"'){
+            $token=$stringToken.Match($s,$i)
+            if(-not $token.Success -or -not $token.Groups['close'].Success){return ''}
+            $i+=$token.Length
+            if($depth -eq 1 -and $token.Groups['body'].Value -ceq 'answer'){
+                $colon=[regex]::Match($s.Substring($i),'^\s*:\s*')
+                if($colon.Success){
+                    $valueStart=$i+$colon.Length
+                    if($valueStart -ge $s.Length){return ''}
+                    $value=$stringToken.Match($s,$valueStart)
+                    if(-not $value.Success){return ''}
+                    try{
+                        $decoded=('{"answer":"'+$value.Groups['body'].Value+'"}'|ConvertFrom-Json -ErrorAction Stop).answer
+                        return ([string]$decoded).Trim()
+                    }catch{return ''}
+                }
+            }
+            continue
+        }
+        if($ch -eq '{' -or $ch -eq '['){$depth++}
+        elseif($ch -eq '}' -or $ch -eq ']'){$depth--;if($depth -le 0){return ''}}
+        $i++
+    }
+    return ''
+}
+
 function Invoke-QwenLocalApi {
     # Distinguish PowerShell prompt/schema construction from the HTTP model
     # request. Both FULL and COMPACT share identical instrumentation.
@@ -741,15 +789,12 @@ function Invoke-QwenLocalApi {
         # to the selected Ollama model profile. Keep only per-request generation
         # controls here so QwenChat does not override host-specific profiles.
         options    = @{
-            num_predict = $(if ($script:ThinkEnabled) {
-                [int]$script:Config.LocalGeneration.NumPredictThink
-            } else {
-                [int]$script:Config.LocalGeneration.NumPredictNormal
-            })
+            num_predict = 1 # resolved after request construction
             temperature = [double]$script:Config.LocalGeneration.Temperature
         }
     }
 
+    $bodyObj.options.num_predict = Get-LfoGenerationBudget $script:Config.LocalGeneration $script:ThinkEnabled $env:LFO_RUNTIME_DEVICE $script:ContextLengthHint $bodyObj.messages $bodyObj.format
     $body = $bodyObj | ConvertTo-Json -Depth 12 -Compress
     $prepareSw.Stop()
     Add-LfoTurnPhase -Phase 'local_request_build' -Kind 'prepare' `
@@ -779,14 +824,11 @@ function Invoke-QwenAnswerRecovery([string]$Prompt) {
         keep_alive = '5m'
         format     = (Get-QwenAnswerRecoveryOutputFormat)
         options    = @{
-            num_predict = $(if ($script:ThinkEnabled) {
-                [int]$script:Config.LocalGeneration.NumPredictThink
-            } else {
-                [int]$script:Config.LocalGeneration.NumPredictNormal
-            })
+            num_predict = 1 # resolved after request construction
             temperature = [double]$script:Config.LocalGeneration.Temperature
         }
     }
+    $bodyObj.options.num_predict = Get-LfoGenerationBudget $script:Config.LocalGeneration $script:ThinkEnabled $env:LFO_RUNTIME_DEVICE $script:ContextLengthHint $bodyObj.messages $bodyObj.format
     $body = $bodyObj | ConvertTo-Json -Depth 12 -Compress
     return Invoke-LfoChatApi -Phase 'answer_recovery' -Body $body
 }
@@ -828,16 +870,13 @@ $FrontierResult
         keep_alive = '5m'
         format     = (Get-QwenSynthesisOutputFormat)
         options    = @{
-            num_predict = $(if ($script:ThinkEnabled) {
-                [int]$script:Config.SynthesisGeneration.NumPredictThink
-            } else {
-                [int]$script:Config.SynthesisGeneration.NumPredictNormal
-            })
+            num_predict = 1 # resolved after request construction
             temperature      = [double]$script:Config.SynthesisGeneration.Temperature
             presence_penalty = [double]$script:Config.SynthesisGeneration.PresencePenalty
         }
     }
 
+    $bodyObj.options.num_predict = Get-LfoGenerationBudget $script:Config.SynthesisGeneration $script:ThinkEnabled $env:LFO_RUNTIME_DEVICE $script:ContextLengthHint $bodyObj.messages $bodyObj.format
     $body = $bodyObj | ConvertTo-Json -Depth 12 -Compress
     return Invoke-LfoChatApi -Phase 'frontier_synthesis' -Body $body
 }
@@ -959,7 +998,24 @@ function Invoke-Qwen([string]$Prompt) {
         Add-LfoL0StageSource $stageSources 'LOCAL' 'LOCAL_RESPONSE' 'initial' 'LOCAL' $candidate
         $structured = ConvertFrom-QwenStructuredContent $candidate -ExpectRoute
 
-        if ($structured.Success) {
+        if ([string]$r.done_reason -eq 'length') {
+            # No frontier routing or model-generated memory from a capped envelope.
+            $route = 'LOCAL'
+            $finalContent = if($structured.Success -and $structured.Route -eq 'LOCAL'){[string]$structured.Answer}else{Get-LfoPartialJsonAnswer $candidate}
+            if($structured.Success -and $structured.Route -eq 'FRONTIER'){$finalContent=''}
+            $finalProducer = 'LOCAL'
+            $finalPhase = 'generation_limit'
+            $inlineMemoryNote = $null
+            $inlineMemoryOps = [pscustomobject]@{Valid=@();Rejected=@()}
+            $answerRecoveryReason = 'generation-limit'
+            Write-Host "[Qwen reached the generation limit; answer may be incomplete.]" -ForegroundColor Yellow
+            if(Test-QwenInvalidFinalAnswer $finalContent){
+                $finalContent='[Generation limit reached before a usable answer was produced.]'
+                $finalProducer='WRAPPER'
+            }else{
+                $finalContent += [Environment]::NewLine+[Environment]::NewLine+'[Incomplete response: generation limit reached.]'
+            }
+        } elseif ($structured.Success) {
             $route = [string]$structured.Route
             if ($route -eq 'FRONTIER') {
                 Write-Host "`n[Qwen route -> FRONTIER]" -ForegroundColor DarkCyan
@@ -1019,10 +1075,10 @@ function Invoke-Qwen([string]$Prompt) {
             # Structured output failure must never trigger a frontier call.
             Write-Host "`n[Qwen structured output malformed; fail-closed -> LOCAL]" -ForegroundColor Yellow
             $route = 'LOCAL'
-            $finalContent = $candidate
-            $finalProducer = 'LOCAL'
+            $finalContent = '[The model returned invalid structured output. Please retry.]'
+            $finalProducer = 'WRAPPER'
             $finalPhase = 'malformed_output'
-            $inlineMemoryNote = $structured.MemoryNote
+            $inlineMemoryNote = $null
         }
         $localPostSw.Stop()
         Add-LfoTurnPhase -Phase 'local_response_processing' -Kind 'prepare' `
@@ -1123,7 +1179,7 @@ $recentContext
     # Explicit storage requests are a wrapper-level invariant. Normal implicit
     # memory remains single-pass; only an explicit request with an empty note
     # gets one bounded memory-only extraction retry.
-    if ($script:MemoryEnabled -and $explicitMemoryIntent -and
+    if ($finalPhase -notin @('generation_limit','malformed_output') -and $script:MemoryEnabled -and $explicitMemoryIntent -and
         ($null -eq $inlineMemoryNote -or
             [string]::IsNullOrWhiteSpace([string]$inlineMemoryNote.Text))) {
         $memoryRecoveryUsed = $true

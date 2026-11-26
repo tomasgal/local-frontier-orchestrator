@@ -966,8 +966,12 @@ Write-Host '  .\Start-LFO-UMA.ps1 (PowerShell)'
 Write-Host '  .\View-LFOConversationLog.ps1 (current-month turn log viewer)'
 Write-Host ''
 Write-Host 'No shortcuts are created outside the LFO install tree; create any Windows shortcuts where you prefer.'
-Write-Host 'Opening the LFO launch directory in Windows Explorer...' -ForegroundColor Cyan
-try { Start-Process explorer.exe -ArgumentList ('"'+$installedLaunchDir+'"') | Out-Null } catch { Warn ("Unable to open Explorer: "+$_.Exception.Message) }
+if($env:SSH_CONNECTION -or $env:SSH_CLIENT -or $env:SSH_TTY -or $SkipLaunch){
+    Write-Host 'Explorer launch skipped (SSH or non-interactive bootstrap).' -ForegroundColor DarkGray
+}else{
+    Write-Host 'Opening the LFO launch directory in Windows Explorer...' -ForegroundColor Cyan
+    try { Start-Process explorer.exe -ArgumentList ('"'+$installedLaunchDir+'"') | Out-Null } catch { Warn ("Unable to open Explorer: "+$_.Exception.Message) }
+}
 
 if($SkipLaunch){
     Write-Host 'Automatic Qwen/LFO launch skipped (-SkipLaunch).' -ForegroundColor Yellow
