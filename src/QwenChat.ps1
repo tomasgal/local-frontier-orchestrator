@@ -281,6 +281,23 @@ function Get-CodexProcessSpec {
     }
 }
 
+# Status is elapsed time, not invented Codex activity. Keep draining both
+# redirected pipes asynchronously and retain the original absolute wait budget.
+function Wait-LfoCodexExit($Process,[int]$TimeoutSeconds,[bool]$Progress){
+    if(-not $Progress){return $Process.WaitForExit($TimeoutSeconds*1000)}
+    $clock=[Diagnostics.Stopwatch]::StartNew()
+    $deadline=[long]$TimeoutSeconds*1000
+    while($clock.ElapsedMilliseconds -lt $deadline){
+        $wait=[int][Math]::Min(5000,($deadline-$clock.ElapsedMilliseconds))
+        if($wait -le 0){break}
+        if($Process.WaitForExit($wait)){return $true}
+        if($clock.ElapsedMilliseconds -lt $deadline){
+            Write-Host ("[ask_codex: {0:n0}s; awaiting frontier result]" -f $clock.Elapsed.TotalSeconds) -ForegroundColor DarkCyan
+        }
+    }
+    return $Process.WaitForExit(0)
+}
+
 function Invoke-CodexReadOnly([string]$Prompt) {
     if ([string]::IsNullOrWhiteSpace($Prompt)) {
         throw 'ask_codex received an empty prompt.'
@@ -331,7 +348,7 @@ function Invoke-CodexReadOnly([string]$Prompt) {
         $p.StandardInput.BaseStream.Flush()
         $p.StandardInput.Close()
 
-        if (-not $p.WaitForExit($CodexTimeoutSec * 1000)) {
+        if (-not (Wait-LfoCodexExit $p $CodexTimeoutSec ($script:LfoStreamEnabled -and $env:LFO_RUNTIME_BATCH -ne '1'))) {
             try { & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null } catch { }
             throw "codex exec exceeded the ${CodexTimeoutSec}s timeout."
         }
@@ -779,11 +796,18 @@ function Write-LfoFinalAnswer([string]$Answer){
 }
 # Ollama's streaming response is newline-delimited JSON. Reassemble only
 # message.content/thinking, retaining final-chunk performance and done_reason.
-function Read-LfoChatNdjson([IO.TextReader]$Reader,[Diagnostics.Stopwatch]$Clock,[string]$Phase,[bool]$Preview,[string]$RouteMode,[bool]$Progress){
+function Write-LfoStreamThinkingChunk([string]$Text){
+    $safe=ConvertTo-LfoSafeConsoleText $Text
+    # Prevent a stray carriage return from rewriting earlier terminal output.
+    $safe=$safe.Replace([string][char]13,'')
+    if($safe){Write-Host $safe -ForegroundColor DarkGray -NoNewline}
+}
+function Read-LfoChatNdjson([IO.TextReader]$Reader,[Diagnostics.Stopwatch]$Clock,[string]$Phase,[bool]$Preview,[string]$RouteMode,[bool]$Progress,[bool]$ShowThinking=$false){
     $content=New-Object Text.StringBuilder
     $thinking=New-Object Text.StringBuilder
     $final=$null;$firstChunk=$null;$firstAnswer=$null;$firstVisible=$null
     $nextInspect=0.0;$nextProgress=5.0
+    $thinkingPrinted=0;$thinkingOpen=$false;$firstThinking=$null
     while($null -ne ($line=$Reader.ReadLine())){
         if([string]::IsNullOrWhiteSpace($line)){continue}
         $chunk=$line|ConvertFrom-Json -ErrorAction Stop
@@ -799,11 +823,29 @@ function Read-LfoChatNdjson([IO.TextReader]$Reader,[Diagnostics.Stopwatch]$Clock
             $raw=$content.ToString()
             $answer=Get-LfoPartialJsonAnswer $raw
             if($answer -and $null -eq $firstAnswer){$firstAnswer=$elapsed}
+            # Display only the dedicated thinking channel, never raw JSON.
+            # Flush it before the answer preview and before the final done.
+            if($ShowThinking -and $thinking.Length -gt $thinkingPrinted){
+                if(-not $thinkingOpen){
+                    $label=if($thinkingPrinted -gt 0){'--- thinking (continued) ---'}else{'--- thinking ---'}
+                    Write-Host ''
+                    Write-Host $label -ForegroundColor DarkGray
+                    $thinkingOpen=$true
+                }
+                Write-LfoStreamThinkingChunk ($thinking.ToString($thinkingPrinted,$thinking.Length-$thinkingPrinted))
+                $thinkingPrinted=$thinking.Length
+                if($null -eq $firstThinking){$firstThinking=$Clock.Elapsed.TotalSeconds}
+            }
+            if($thinkingOpen -and ($answer -or $chunk.done -eq $true)){
+                Write-Host ''
+                Write-Host '--- answer ---' -ForegroundColor DarkGray
+                $thinkingOpen=$false
+            }
             # Preview is explicitly provisional; routing may follow the answer.
             if($Preview -and $answer -and (Write-LfoStreamPreview $answer)){
                 if($null -eq $firstVisible){$firstVisible=$Clock.Elapsed.TotalSeconds}
             }
-            if($Progress -and $elapsed -ge $nextProgress -and $null -eq $firstVisible -and $chunk.done -ne $true){
+            if($Progress -and $elapsed -ge $nextProgress -and $null -eq $firstVisible -and -not $thinkingOpen -and $chunk.done -ne $true){
                 Write-Host ("[stream: {0:n0}s; awaiting complete answer block]" -f $elapsed) -ForegroundColor DarkGray
                 $nextProgress=$elapsed+5
             }
@@ -813,6 +855,8 @@ function Read-LfoChatNdjson([IO.TextReader]$Reader,[Diagnostics.Stopwatch]$Clock
     if($null -eq $final){throw 'Ollama stream ended without a final done chunk; preview was not committed.'}
     $final | Add-Member -NotePropertyName message -NotePropertyValue ([pscustomobject]@{role='assistant';content=$content.ToString();thinking=$thinking.ToString()}) -Force
     $final | Add-Member -NotePropertyName lfo_streamed -NotePropertyValue $true -Force
+    $final | Add-Member -NotePropertyName lfo_thinking_previewed -NotePropertyValue ($thinkingPrinted -gt 0) -Force
+    $final | Add-Member -NotePropertyName lfo_first_thinking_seconds -NotePropertyValue $firstThinking -Force
     $final | Add-Member -NotePropertyName lfo_first_chunk_seconds -NotePropertyValue $firstChunk -Force
     $final | Add-Member -NotePropertyName lfo_first_answer_seconds -NotePropertyValue $firstAnswer -Force
     $final | Add-Member -NotePropertyName lfo_first_visible_seconds -NotePropertyValue $firstVisible -Force
@@ -832,9 +876,9 @@ function Invoke-LfoStreamChatApi([string]$Phase,[string]$Body,[Diagnostics.Stopw
         try{$output.Write($bytes,0,$bytes.Length)}finally{$output.Dispose()}
         $http=$request.GetResponse()
         $reader=New-Object IO.StreamReader($http.GetResponseStream(),[Text.Encoding]::UTF8)
-        return Read-LfoChatNdjson $reader $Clock $Phase (-not $script:ThinkEnabled) $script:LfoTurnRouteMode $true
+        return Read-LfoChatNdjson $reader $Clock $Phase $true $script:LfoTurnRouteMode $true ([bool]$script:ThinkEnabled)
     }catch{
-        if($script:LfoStreamShownPrefix){Write-Host '[Stream interrupted; provisional output was not committed.]' -ForegroundColor Yellow}
+        if($script:LfoStreamShownPrefix -or $script:ThinkEnabled){Write-Host '';Write-Host '[Stream interrupted; provisional output was not committed.]' -ForegroundColor Yellow}
         throw
     }finally{
         if($null -ne $reader){$reader.Dispose()}
@@ -1020,9 +1064,9 @@ $FrontierResult
 
 function Show-QwenThinking($Response) {
     $thinking = [string]$Response.message.thinking
-    if ($script:ThinkEnabled -and $thinking) {
+    if ($script:ThinkEnabled -and $thinking -and -not $Response.lfo_thinking_previewed) {
         Write-Host "`n--- thinking ---" -ForegroundColor DarkGray
-        Write-Host $thinking -ForegroundColor DarkGray
+        Write-Host (ConvertTo-LfoSafeConsoleText $thinking) -ForegroundColor DarkGray
         Write-Host "--- answer ---" -ForegroundColor DarkGray
     }
 }
@@ -1412,6 +1456,7 @@ $recentContext
     if($env:LFO_RUNTIME_BATCH -ne '1'){
         $phaseLabels=@(Get-LfoTurnPhases|Where-Object {$_.kind -in @('model','frontier')}|ForEach-Object{
             $label=('{0}={1:n2}s' -f $_.phase,$_.wall_seconds)
+            if($null -ne $_.first_thinking_seconds){$label+=(' (first thinking {0:n2}s)' -f $_.first_thinking_seconds)}
             if($null -ne $_.first_visible_seconds){$label+=(' (first visible {0:n2}s)' -f $_.first_visible_seconds)}
             elseif($null -ne $_.first_answer_seconds){$label+=(' (answer detected {0:n2}s)' -f $_.first_answer_seconds)}
             $label

@@ -73,7 +73,7 @@ try{
     if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
     Remove-Item -LiteralPath $old
     if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
-    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Read-LfoChatNdjson')){
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Read-LfoChatNdjson','Write-LfoStreamThinkingChunk','Show-QwenThinking','Wait-LfoCodexExit')){
         $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
         if($fn.Count -ne 1){throw "Missing helper $name"}
         . ([scriptblock]::Create($fn[0].Extent.Text))
@@ -176,6 +176,34 @@ try{
     if($script:previewCalls.Count -lt 2 -or $script:previewCalls[0] -ne ('Provisional'+$nl+$nl+'Next')){throw 'AUTO preview waited for route'}
     if(($script:previewCalls -join ' ') -match 'private marker'){throw 'Memory bookkeeping leaked into preview'}
     if(($result.message.content|ConvertFrom-Json).route -ne 'FRONTIER'){throw 'Preview changed final routing'}
+    # Thinking is independently streamed when explicitly enabled. The
+    # final response keeps the original text, and the final renderer must
+    # not replay the thinking already displayed.
+    $thinkChunks=@(
+        (@{message=@{thinking='Reasoning first';content=''};done=$false}|ConvertTo-Json -Depth 8 -Compress),
+        (@{message=@{thinking=' and last';content=''};done=$false}|ConvertTo-Json -Depth 8 -Compress),
+        (@{message=@{thinking='';content='{"answer":"Visible answer\n\nNext","route":"LOCAL"}'};done=$true;done_reason='stop'}|ConvertTo-Json -Depth 8 -Compress)
+    )
+    $script:previewCalls.Clear()
+    $reader=New-Object IO.StringReader(($thinkChunks -join $nl))
+    try{$captured=@(Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $true 'AUTO' $false $true 6>&1)}finally{$reader.Dispose()}
+    $result=@($captured|Where-Object {$_ -isnot [Management.Automation.InformationRecord]})[0]
+    $shown=($captured|Where-Object {$_ -is [Management.Automation.InformationRecord]}|ForEach-Object {[string]$_.MessageData}) -join ''
+    if($result.message.thinking -ne 'Reasoning first and last' -or -not $result.lfo_thinking_previewed -or $null -eq $result.lfo_first_thinking_seconds){throw 'Thinking stream assembly failed'}
+    if($shown -notmatch '--- thinking ---.*Reasoning first and last.*--- answer ---'){throw 'Thinking display sequence failed'}
+    if($script:previewCalls.Count -lt 1 -or $script:previewCalls[0] -notmatch '^Visible answer'){throw 'Thinking blocked answer preview'}
+    $script:ThinkEnabled=$true
+    if(@(Show-QwenThinking $result 6>&1).Count -ne 0){throw 'Thinking replayed after streaming'}
+    $script:ThinkEnabled=$false
+    $reader=New-Object IO.StringReader(($thinkChunks -join $nl))
+    try{$captured=@(Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $false 'AUTO' $false $false 6>&1)}finally{$reader.Dispose()}
+    if(@($captured|Where-Object {$_ -is [Management.Automation.InformationRecord]}).Count -ne 0){throw 'Disabled thinking leaked to console'}
+    $fake=[pscustomobject]@{Waits=(New-Object 'System.Collections.Generic.List[int]')}
+    $fake|Add-Member ScriptMethod WaitForExit {param([int]$Milliseconds);[void]$this.Waits.Add($Milliseconds);return $true}
+    if(-not (Wait-LfoCodexExit $fake 30 $true) -or $fake.Waits[0] -gt 5000){throw 'Interactive Codex wait interval incorrect'}
+    $fake.Waits.Clear()
+    if(-not (Wait-LfoCodexExit $fake 30 $false) -or $fake.Waits[0] -ne 30000){throw 'Benchmark Codex wait changed'}
+    Write-Host 'PASS: thinking preview, answer continuation, no duplicate reasoning, and Codex wait modes.'
     Write-Host 'PASS: AUTO preview independent of final route.'
     Write-Host 'PASS: explicit routing, Markdown stream boundaries, NDJSON assembly and incomplete transport rejection.'
     Write-Host 'PASS: UMA generation ceilings, context estimate and partial JSON isolation.'
