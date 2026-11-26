@@ -336,6 +336,15 @@ $ImportDirectory=[IO.Path]::GetFullPath($ImportDirectory)
 $ExportDirectory=[IO.Path]::GetFullPath($ExportDirectory)
 foreach($d in @($ImportDirectory,$ExportDirectory)){New-Item -ItemType Directory -Path $d -Force|Out-Null}
 
+# Explicit tags and branches retain their ref type in the archive fallback.
+function Get-LfoSourceArchiveUrl([string]$Ref){
+    $base='https://codeload.github.com/tomasgal/local-frontier-orchestrator/zip/'
+    if($Ref -match '^[0-9a-fA-F]{40}$'){return $base+$Ref}
+    if($Ref -match '^refs/(heads|tags)/.+$'){return $base+$Ref}
+    if($Ref -match '^v[0-9]+\.[0-9]+\.[0-9]+(?:[-.][A-Za-z0-9.-]+)?$'){return $base+'refs/tags/'+$Ref}
+    return $base+'refs/heads/'+$Ref
+}
+
 Step 'Obtain canonical LFO source'
 $git=Resolve-CommandPath 'git.exe'; if(-not $git){$git=Resolve-CommandPath 'git'}
 if ($git) {
@@ -354,7 +363,7 @@ if ($git) {
     }
     & $git -C $AppRoot fetch --prune origin $SourceRef | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "Unable to fetch source ref $SourceRef." }
-    $targetCommit=(& $git -C $AppRoot rev-parse FETCH_HEAD 2>&1 | Out-String).Trim()
+    $targetCommit=(& $git -C $AppRoot rev-parse 'FETCH_HEAD^{commit}' 2>&1 | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or $targetCommit -notmatch '^[0-9a-f]{40}$') { throw "Unable to resolve fetched source ref $SourceRef to an exact commit." }
     & $git -C $AppRoot checkout --detach --force $targetCommit | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "Unable to checkout fetched source commit $targetCommit." }
@@ -365,7 +374,7 @@ if ($git) {
     $tmpRoot=Join-Path ([IO.Path]::GetTempPath()) ('LFO-source-'+[guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tmpRoot | Out-Null
     $zip=Join-Path $tmpRoot 'source.zip'
-    if($SourceRef -match '^[0-9a-fA-F]{40}$'){$archiveUrl='https://codeload.github.com/tomasgal/local-frontier-orchestrator/zip/'+$SourceRef}else{$archiveUrl='https://codeload.github.com/tomasgal/local-frontier-orchestrator/zip/refs/heads/'+$SourceRef}
+    $archiveUrl=Get-LfoSourceArchiveUrl $SourceRef
     try {
         Invoke-WebRequest -UseBasicParsing -Uri $archiveUrl -OutFile $zip -TimeoutSec 600
         $expanded=Join-Path $tmpRoot 'expanded'; Expand-Archive -LiteralPath $zip -DestinationPath $expanded -Force

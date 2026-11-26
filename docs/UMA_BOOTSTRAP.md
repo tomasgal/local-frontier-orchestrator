@@ -1,6 +1,6 @@
 # Windows UMA bootstrap — AMD Ryzen AI Max+ / Radeon 8060S
 
-Status: **reference-host integration accepted on 2026-11-26; v9.6.6 release candidate**. Historical release tags remain unchanged.
+Status: **reference-host integration accepted on 2026-11-26; stable v9.6.6 source**. Historical release tags remain unchanged.
 
 ## Intent and boundaries
 
@@ -37,13 +37,13 @@ Do not run a heavy T4AI/ComfyUI inference at the same time as the initial LFO va
 
 ## Installation
 
-After this branch is merged into `main`, the normal third bootstrap command is:
+For the stable v9.6.6 release, use the matching installer and explicit tag:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/main/install/Install-LFO.ps1' -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile UMA -SkipLaunch
+Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.6/install/Install-LFO.ps1' -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile UMA -SourceRef refs/tags/v9.6.6 -SkipLaunch
 ```
 
-To test the development branch *before merge*, download its installer and set matching `-SourceRef`:
+For historical reproduction of the feature branch only (not the stable release), download its installer and set matching `-SourceRef`:
 
 ```powershell
 $ref='feat/uma-bootstrap-20261123'
@@ -100,7 +100,7 @@ Then verify interactive LOCAL answer, `/analyze`/L4 configured, `/exit`, and opt
 
 ## v9.6.6 compatibility and file exchange
 
-The development branch incorporates v9.6.5 research tooling. The installer recognizes both legacy Ollama manifests and the newer manifests-v2/ollama.com layout, preferring v2 when both are present. It can reuse a previously created UMA alias with -SkipModelPull. The console renders common Markdown constructs using native PowerShell console colors (headings, emphasis, links, lists, task lists, blockquotes, rules, tables and code fences); this is a terminal-oriented subset, not a browser/CommonMark engine. Set LFO_MARKDOWN_PLAIN=1 or NO_COLOR to preserve plain output. Raw Markdown remains the persisted and exported response.
+The stable source incorporates v9.6.5 research tooling. The installer recognizes both legacy Ollama manifests and the newer manifests-v2/ollama.com layout, preferring v2 when both are present. It can reuse a previously created UMA alias with -SkipModelPull. The console renders common Markdown constructs using native PowerShell console colors (headings, emphasis, links, lists, task lists, blockquotes, rules, tables and code fences); this is a terminal-oriented subset, not a browser/CommonMark engine. Set LFO_MARKDOWN_PLAIN=1 or NO_COLOR to preserve plain output. Raw Markdown remains the persisted and exported response.
 
 Optional bootstrap parameters -ImportDirectory and -ExportDirectory select existing or newly created exchange directories; defaults are import and export under the install root. These paths persist on reinstall. /files lists import files and both paths. /import NAME reads a UTF-8 text file (up to 64 MiB). A line containing only ||| (optional surrounding spaces) submits the current entry and starts another. Ordinary newlines remain inside prompts; EOF submits the last entry; blank entries are skipped. Each entry is limited to 32 KiB, and normal routing, slash commands, persistent memory and logging apply. Nested imports are rejected; /exit ends the session and remaining entries are not executed. There is no separate batch mode or automatic resume. Do not import confidential data if frontier routing is enabled. /export [NAME] writes the last response from this session as raw Markdown without overwriting existing files. /export-log explicitly copies the current monthly conversation JSONL, including potentially sensitive historical prompts. No automatic transfer of memory databases or credentials. Configure access to the exchange directories separately.
 

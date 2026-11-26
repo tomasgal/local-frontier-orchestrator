@@ -55,11 +55,21 @@ $state.LFO.DefaultProfile='CPU'
 if ((Resolve-LfoDevice 'UMA' $state) -ne 'UMA') { throw 'Explicit UMA override failed on legacy host.' }
 Write-Host 'PASS: UMA source syntax, installer guards, model specs and legacy context invariants.' -ForegroundColor Green
 
-foreach($name in @('Get-OllamaLibraryManifestPath','Test-OllamaStoreHasModel')){
+foreach($name in @('Get-OllamaLibraryManifestPath','Test-OllamaStoreHasModel','Get-LfoSourceArchiveUrl')){
     $fn=@($asts['install/Install-LFO.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
     if($fn.Count -ne 1){throw "Missing helper $name"}
     . ([scriptblock]::Create($fn[0].Extent.Text))
 }
+$archiveBase='https://codeload.github.com/tomasgal/local-frontier-orchestrator/zip/'
+foreach($ref in @('v9.6.6','refs/tags/v9.6.6')){
+    if((Get-LfoSourceArchiveUrl $ref) -cne ($archiveBase+'refs/tags/v9.6.6')){throw 'Release tag archive URL incorrect'}
+}
+if((Get-LfoSourceArchiveUrl 'main') -cne ($archiveBase+'refs/heads/main')){throw 'Branch archive URL incorrect'}
+if((Get-LfoSourceArchiveUrl 'refs/heads/feat/example') -cne ($archiveBase+'refs/heads/feat/example')){throw 'Explicit branch archive URL incorrect'}
+$sha='0123456789abcdef0123456789abcdef01234567'
+if((Get-LfoSourceArchiveUrl $sha) -cne ($archiveBase+$sha)){throw 'Pinned SHA archive URL incorrect'}
+if(-not $installer.Contains("rev-parse 'FETCH_HEAD^{commit}'")){throw 'Annotated release tag is not peeled to commit'}
+Write-Host 'PASS: tagged/branch/SHA bootstrap source resolution.'
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('lfo-manifest-test-'+[guid]::NewGuid().ToString('N'))
 try{
     $old=Join-Path $temp 'manifests\registry.ollama.ai\library\test-model\latest'

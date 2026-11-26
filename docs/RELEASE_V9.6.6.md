@@ -1,12 +1,13 @@
 # LFO v9.6.6 — Windows UMA and terminal usability
 
 **Reference-host acceptance:** 2026-11-26  
-**Type:** backwards-compatible Windows runtime expansion; release candidate pending exact-source CI and publication.  
+**Type:** backwards-compatible Windows runtime expansion; stable release.  
 **Accepted host implementation:** `69039ded73324b8064bbb96ecb29e037f50cf3ef`.
 
 ## Changes
 
 - Third Windows execution profile: UMA, automatic selection on a UMA installation, shared existing native Ollama model store and a 35B Q8 alias with 16k context. No duplicate weight download for the alias.
+- Version-pinned CPU, GPU and UMA bootstrap commands; annotated release tag resolution and explicit tag support in the archive fallback.
 - Ollama v1/v2 manifest compatibility; persistent import/export paths; SSH and SkipLaunch suppress Explorer.
 - Terminal-oriented Markdown renderer, including wrapped aligned tables, optional outer pipes and control-character stripping. Raw Markdown export remains separate from rendering.
 - Sequential UTF-8 prompt import using a standalone three-pipe separator; ordinary interactive routing and memory semantics retained. Explicit last-answer and monthly log export.
@@ -25,7 +26,7 @@ Windows 11 Pro reference host: Ryzen AI Max+ 395, Radeon 8060S, 128 GB unified L
 | L4 recording and manual analysis | PASS |
 | L3 runtime-context offline fixture | PASS, 1091 characters saved; fallback parity |
 | v9.6.5 research tooling | PASS, 16 parameter configurations, 2 replay items, 12 audit rows |
-| Markdown table rendering and import/export | PASS, six targeted table cases and sequential batch |
+| Markdown table rendering and import/export | PASS, targeted table cases including optional outer pipes and sequential batch |
 | Isolated LOCAL-only experiment, L4 OFF | PASS, 38.33 decode tokens/s |
 | Isolated LOCAL-only experiment, L4 ON | PASS, 37.46 decode tokens/s, observation CREATED |
 | Long LOCAL response after quote mitigation | PASS, 1947 generated tokens, 53.13 s |
