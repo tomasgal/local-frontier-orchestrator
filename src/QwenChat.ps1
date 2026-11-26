@@ -131,10 +131,20 @@ Structured answer writing:
 - Closing the JSON answer string is the end of the user-facing response. Do not close it merely because a quoted phrase or example ends.
 '@
 }
+# Distinguish current tool evidence from retrieved historical context.
+# This is a generation instruction, not a proof of model compliance.
+function Add-LfoLocalEvidencePolicy([string]$Policy,[string]$RouteMode){
+    $Policy += [Environment]::NewLine+[Environment]::NewLine+'LOCAL evidence rule: If you answer locally, no live external lookup has occurred in this turn. Never claim to have searched, checked, accessed or verified an external source in the current turn. Historical results, stored facts and remembered links are not fresh verification. If using them for a current-information request, identify them as prior or unverified information and state that current status is not independently confirmed.'
+    if($RouteMode -eq 'LOCAL'){
+        $Policy += [Environment]::NewLine+'LOCAL is explicitly enforced for this turn. Return a useful, complete answer within available knowledge and state any inability to perform the requested live verification. Do not leave answer empty merely because the request would normally require FRONTIER.'
+    }
+    return $Policy
+}
 function Get-OrchestratorSystemPrompt {
     $policy = Add-LfoStructuredAnswerPolicy (Expand-RuntimePolicy $script:OrchestratorSystemTemplate) $env:LFO_RUNTIME_DEVICE
     if($env:LFO_RUNTIME_BATCH -ne '1'){
         $policy += [Environment]::NewLine+[Environment]::NewLine+'Routing: response length, requested examples, Markdown, and ordinary stable academic explanations alone do not require FRONTIER. Prefer LOCAL when capable. Honour the explicit LOCAL-only instruction. Emit the route field before answer when possible.'
+        $policy=Add-LfoLocalEvidencePolicy $policy $script:LfoTurnRouteMode
     }
     return $policy
 }
@@ -996,6 +1006,7 @@ function Invoke-QwenAnswerRecovery([string]$Prompt) {
     # A rare answer-only retry. The first pass remains the sole source of
     # memory_note, and this call cannot route or invoke Codex.
     $systemText = Add-LfoStructuredAnswerPolicy 'Provide a complete user-facing answer to the most recent user message. Return only the answer field. If uncertain, say so plainly.' $env:LFO_RUNTIME_DEVICE
+    if($env:LFO_RUNTIME_BATCH -ne '1'){$systemText=Add-LfoLocalEvidencePolicy $systemText 'LOCAL'}
     $memoryBlock = Get-LfoTurnMemoryBlock $Prompt
     if (-not [string]::IsNullOrWhiteSpace($memoryBlock)) {
         $systemText += [Environment]::NewLine + [Environment]::NewLine +
@@ -1152,6 +1163,8 @@ function Invoke-Qwen([string]$Prompt) {
     Start-LfoTurnTelemetry
     $script:LfoTurnContext = $null
     Start-LfoTurnContext $Prompt
+    $localLookupBlocked=($script:LfoTurnRouteMode -eq 'LOCAL' -and -not [string]::IsNullOrWhiteSpace((Get-FrontierPolicyReason $Prompt)))
+    if($localLookupBlocked){Write-Host '[LOCAL-only: external verification disabled for this request.]' -ForegroundColor DarkCyan}
     $policyReason = switch($script:LfoTurnRouteMode){
         'LOCAL' {'user-route-local'}
         'FRONTIER' {'user-route-frontier'}
@@ -1431,6 +1444,11 @@ $recentContext
         $finalPhase = 'raw_sentinel'
     }
 
+    # Keep a deterministic evidence boundary in the delivered/exported answer
+    # even if the model fails to follow its epistemic instruction.
+    if($localLookupBlocked -and $route -eq 'LOCAL' -and -not [string]::IsNullOrWhiteSpace($finalContent)){
+        $finalContent += [Environment]::NewLine+[Environment]::NewLine+'[LFO: No external lookup was performed in this turn. Current facts and cited sources have not been independently reverified.]'
+    }
     $sw.Stop()
 
     if ([string]::IsNullOrWhiteSpace($finalContent)) {
@@ -1448,7 +1466,13 @@ $recentContext
         Trim-Messages
     }
 
-    if ($null -ne $r) {
+    $answerTotals=Get-LfoAnswerGenerationTotals @(Get-LfoTurnPhases)
+    if($env:LFO_RUNTIME_BATCH -ne '1' -and $answerTotals.calls -gt 1){
+        $promptDisplay=if($null -eq $answerTotals.prompt_tokens){'n/a'}else{$answerTotals.prompt_tokens}
+        $generatedDisplay=if($null -eq $answerTotals.generated_tokens){'n/a'}else{$answerTotals.generated_tokens}
+        $rateDisplay=if($null -eq $answerTotals.decode_tokens_per_second){'n/a'}else{$answerTotals.decode_tokens_per_second}
+        Write-Host ("[{0:n2}s; prompt total {1} tok; generated total {2} tok; {3} tok/s; model calls={4}; think={5}; route={6}]" -f $sw.Elapsed.TotalSeconds,$promptDisplay,$generatedDisplay,$rateDisplay,$answerTotals.calls,$script:ThinkEnabled,$route) -ForegroundColor DarkGray
+    } elseif ($null -ne $r) {
         $tokps = $null
         if ($r.eval_duration -gt 0 -and $r.eval_count) {
             $tokps = [Math]::Round(($r.eval_count * 1e9) / $r.eval_duration, 2)

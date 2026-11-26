@@ -64,3 +64,23 @@ function Get-LfoTurnPhases {
     if ($null -eq $script:LfoTurnPhases) { return @() }
     return @($script:LfoTurnPhases.ToArray())
 }
+
+
+# Sum the answer-generation phases only. Memory work follows the visible
+# answer and is deliberately excluded. Preserve legacy per-response metrics.
+function Get-LfoAnswerGenerationTotals([object[]]$Phases){
+    $modelPhases=@($Phases|Where-Object {$_.kind -eq 'model' -and $_.phase -in @('local_generation','answer_recovery','frontier_synthesis')})
+    $prompt=[long]0;$generated=[long]0;$decode=[double]0
+    $promptKnown=$true;$generatedKnown=$true;$decodeKnown=$true
+    foreach($phase in $modelPhases){
+        if($null -eq $phase.prompt_eval_count){$promptKnown=$false}else{$prompt+=[long]$phase.prompt_eval_count}
+        if($null -eq $phase.eval_count){$generatedKnown=$false}else{$generated+=[long]$phase.eval_count}
+        if($null -eq $phase.decode_seconds){$decodeKnown=$false}else{$decode+=[double]$phase.decode_seconds}
+    }
+    return [pscustomobject]@{
+        calls=$modelPhases.Count
+        prompt_tokens=$(if($promptKnown -and $modelPhases.Count){$prompt}else{$null})
+        generated_tokens=$(if($generatedKnown -and $modelPhases.Count){$generated}else{$null})
+        decode_tokens_per_second=$(if($generatedKnown -and $decodeKnown -and $decode -gt 0){[Math]::Round($generated/$decode,2)}else{$null})
+    }
+}

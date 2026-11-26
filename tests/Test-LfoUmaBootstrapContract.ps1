@@ -73,7 +73,7 @@ try{
     if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
     Remove-Item -LiteralPath $old
     if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
-    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Read-LfoChatNdjson','Write-LfoStreamThinkingChunk','Show-QwenThinking','Wait-LfoCodexExit','Get-LfoSlashCommands','Get-LfoSlashCommandState','Show-LfoSlashHelp')){
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Read-LfoChatNdjson','Write-LfoStreamThinkingChunk','Show-QwenThinking','Wait-LfoCodexExit','Get-LfoSlashCommands','Get-LfoSlashCommandState','Show-LfoSlashHelp','Add-LfoLocalEvidencePolicy')){
         $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
         if($fn.Count -ne 1){throw "Missing helper $name"}
         . ([scriptblock]::Create($fn[0].Extent.Text))
@@ -231,6 +231,22 @@ try{
     $loop=$chatSource.Substring($chatSource.LastIndexOf('while ($true) {'))
     if($loop.IndexOf('$commandState=Get-LfoSlashCommandState $prompt') -lt 0 -or $loop.IndexOf('$commandState=Get-LfoSlashCommandState $prompt') -gt $loop.IndexOf('switch -Regex')){throw 'Missing pre-dispatch command guard'}
     if(-not $loop.Contains("if("+ '$commandState' +" -eq 'PROMPT'){Invoke-Qwen "+'$prompt'+"}")){throw 'Default dispatcher can send slash commands to inference'}
+    $evidencePolicy=Add-LfoLocalEvidencePolicy 'base' 'LOCAL'
+    if($evidencePolicy -notmatch 'no live external lookup' -or $evidencePolicy -notmatch 'LOCAL is explicitly enforced' -or $evidencePolicy -notmatch 'not fresh verification'){throw 'Missing local evidence boundary'}
+    if((Add-LfoLocalEvidencePolicy 'base' 'AUTO') -match 'LOCAL is explicitly enforced'){throw 'AUTO incorrectly forced local'}
+    . (Join-Path $root 'src/LfoTurnTelemetry.ps1')
+    $testPhases=@(
+        [pscustomobject]@{kind='model';phase='local_generation';prompt_eval_count=100;eval_count=20;decode_seconds=0.5},
+        [pscustomobject]@{kind='model';phase='answer_recovery';prompt_eval_count=200;eval_count=180;decode_seconds=4.5},
+        [pscustomobject]@{kind='frontier';phase='frontier_handoff';prompt_eval_count=$null;eval_count=$null;decode_seconds=$null},
+        [pscustomobject]@{kind='model';phase='memory_recovery';prompt_eval_count=50;eval_count=10;decode_seconds=1.0}
+    )
+    $totals=Get-LfoAnswerGenerationTotals $testPhases
+    if($totals.calls -ne 2 -or $totals.prompt_tokens -ne 300 -or $totals.generated_tokens -ne 200 -or $totals.decode_tokens_per_second -ne 40){throw 'Answer telemetry totals incorrect'}
+    $testPhases[1].eval_count=$null
+    $totals=Get-LfoAnswerGenerationTotals $testPhases
+    if($null -ne $totals.generated_tokens -or $null -ne $totals.decode_tokens_per_second){throw 'Unknown token metrics treated as zero'}
+    Write-Host 'PASS: local evidence policy and answer-generation telemetry aggregation.'
     Write-Host 'PASS: all slash-command parameter validation, help and inference guard.'
     Write-Host 'PASS: thinking preview, answer continuation, no duplicate reasoning, and Codex wait modes.'
     Write-Host 'PASS: AUTO preview independent of final route.'
