@@ -608,7 +608,7 @@ function Get-RelevantDataContext([string]$Query) {
     $scored = @()
     foreach ($row in $older) {
         $u = ConvertTo-SearchText ([string]$row.user)
-        $a = ConvertTo-SearchText ([string]$row.assistant)
+        $a = ConvertTo-SearchText (Get-LfoHistoricalAssistantText $row)
         $score = 0
 
         foreach ($term in $terms) {
@@ -644,7 +644,7 @@ function Get-RelevantDataContext([string]$Query) {
         $uBudget = [Math]::Max(120, [int]($perItem * 0.62))
         $aBudget = [Math]::Max(80, $perItem - $uBudget - 30)
         $uText = Get-BoundedText ([string]$row.user) $uBudget
-        $aText = Get-BoundedText ([string]$row.assistant) $aBudget
+        $aText = Get-BoundedText (Get-LfoHistoricalAssistantText $row) $aBudget
         $label=Get-LfoHistoricalTurnLabel $row
         $snippet = "T$($hit.turn_id) $label U:$uText A:$aText"
 
@@ -1227,7 +1227,7 @@ function Load-RecentConversationFromDisk {
         }
 
         $label=Get-LfoHistoricalTurnLabel $t
-        $assistantStored = "ROUTE: $([string]$t.route)`n$label`n$([string]$t.assistant)"
+        $assistantStored = "ROUTE: $([string]$t.route)`n$label`n$(Get-LfoHistoricalAssistantText $t)"
         $script:Messages += @{
             role = 'assistant'
             content = $assistantStored
@@ -1415,7 +1415,8 @@ function Persist-TurnAndMemory(
     [string]$MemoryNoteSource,
     [object[]]$StageSources = @(),
     [scriptblock]$PostL0 = $null,
-    [ValidateSet('NONE','REQUESTED','OBSERVED','UNKNOWN')][string]$ExternalEvidenceStatus='UNKNOWN'
+    [ValidateSet('NONE','REQUESTED','OBSERVED','UNKNOWN')][string]$ExternalEvidenceStatus='UNKNOWN',
+    [AllowEmptyString()][string]$RuntimeAnnotation=''
 ) {
     if (-not $script:MemoryEnabled -and
         -not [bool]$script:Config.ResearchLogging.Enabled) {
@@ -1490,6 +1491,7 @@ function Persist-TurnAndMemory(
             epoch = $epoch
             route = $Route
             external_evidence_status = $ExternalEvidenceStatus
+            runtime_annotation = $RuntimeAnnotation
             user = $Prompt
             assistant = $FinalContent
         }
@@ -1596,7 +1598,8 @@ function Persist-TurnAndMemory(
     $l3IndexSw = [System.Diagnostics.Stopwatch]::StartNew()
     if ($script:L3IndexEnabled -and (Get-Command Invoke-LfoL3PostTurnIndex -ErrorAction SilentlyContinue)) {
         try {
-            $l3IndexResult = Invoke-LfoL3PostTurnIndex $Prompt $FinalContent $turnId $epoch $script:StructuredMemoryPath $script:L3Path $script:L3TopicRules $(if ($null -ne $conversationLogPath) { [IO.Path]::GetFileName($conversationLogPath) } else { $null }) $conversationByteOffset $conversationByteLength
+            $indexAnswer=Get-LfoHistoricalAssistantText ([pscustomobject]@{assistant=$FinalContent;runtime_annotation=$RuntimeAnnotation;route=$Route})
+            $l3IndexResult = Invoke-LfoL3PostTurnIndex $Prompt $indexAnswer $turnId $epoch $script:StructuredMemoryPath $script:L3Path $script:L3TopicRules $(if ($null -ne $conversationLogPath) { [IO.Path]::GetFileName($conversationLogPath) } else { $null }) $conversationByteOffset $conversationByteLength
             $l3IndexStatus = [string]$l3IndexResult.Status
             $l3IndexError = $l3IndexResult.Error
         } catch {
@@ -1697,6 +1700,7 @@ function Persist-TurnAndMemory(
             route = $Route
             route_reason = $PolicyReason
             external_evidence_status = $ExternalEvidenceStatus
+            runtime_annotation = $RuntimeAnnotation
             answer_seconds = [Math]::Round($AnswerSeconds, 3)
             answer_recovery_used = $AnswerRecoveryUsed
             answer_recovery_reason = if ($AnswerRecoveryUsed) { $AnswerRecoveryReason } else { $null }

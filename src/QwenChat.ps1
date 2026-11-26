@@ -800,7 +800,8 @@ function Get-LfoStreamBlockBoundary([string]$Text){
 function Write-LfoStreamPreview([string]$Answer){
     $prior=[string]$script:LfoStreamShownPrefix
     if(-not $Answer.StartsWith($prior,[StringComparison]::Ordinal)){return $false}
-    $boundary=Get-LfoStreamBlockBoundary $Answer
+    $previewLimit=Get-LfoAnnotationPreviewLimit $Answer
+    $boundary=Get-LfoStreamBlockBoundary ($Answer.Substring(0,$previewLimit))
     if($boundary -le $prior.Length){return $false}
     if(-not $prior){Write-Host '[stream: provisional answer; final JSON validation pending]' -ForegroundColor DarkGray}
     $delta=$Answer.Substring($prior.Length,$boundary-$prior.Length)
@@ -1456,8 +1457,17 @@ $recentContext
 
     # Keep a deterministic evidence boundary in the delivered/exported answer
     # even if the model fails to follow its epistemic instruction.
+    $runtimeAnnotation=''
+    $contextAnswer=[string]$finalContent
     if($localLookupBlocked -and $route -eq 'LOCAL' -and -not [string]::IsNullOrWhiteSpace($finalContent)){
-        $finalContent += [Environment]::NewLine+[Environment]::NewLine+'[LFO: No external lookup was performed in this turn. Current facts and cited sources have not been independently reverified.]'
+        $runtimeAnnotation=Get-LfoNoLookupAnnotation
+        $contextAnswer=Remove-LfoNoLookupAnnotation $finalContent
+        if([string]::IsNullOrWhiteSpace($contextAnswer)){
+            $contextAnswer='The model did not produce a usable answer. Please try again.'
+            $finalProducer='WRAPPER'
+            $finalPhase='annotation_only'
+        }
+        $finalContent=$contextAnswer+[Environment]::NewLine+[Environment]::NewLine+$runtimeAnnotation
     }
     $sw.Stop()
 
@@ -1472,7 +1482,7 @@ $recentContext
         # prevents previous assistant turns from becoming counterexamples to the
         # system instruction that every normal turn must start with ROUTE: ...
         $label=Get-LfoHistoricalTurnLabel ([pscustomobject]@{route=$route;external_evidence_status=$externalEvidenceStatus})
-        $historyContent = "ROUTE: $route`n$label`n$finalContent"
+        $historyContent = "ROUTE: $route`n$label`n$contextAnswer"
         $script:Messages += @{ role = 'assistant'; content = $historyContent }
         Trim-Messages
     }
@@ -1513,6 +1523,7 @@ $recentContext
             -PostL0 $script:LfoL4PostL0 `
             -StageSources $stageSources.ToArray() `
             -ExternalEvidenceStatus $externalEvidenceStatus `
+            -RuntimeAnnotation $runtimeAnnotation `
             -Prompt $Prompt `
             -FinalContent $finalContent `
             -Route $route `

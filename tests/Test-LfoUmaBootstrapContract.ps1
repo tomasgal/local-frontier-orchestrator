@@ -313,6 +313,40 @@ try{
     $found=@(Get-LfoL3RuntimeL0Evidence @($candidate) $evidenceDir 1)
     if($found.Count -ne 1 -or $found[0].Text -cne 'T7 [route=FRONTIER; external_evidence=REQUESTED] U:question A:claim'){throw 'L3 provenance inheritance failed'}
     if(-not $chatSource.Contains("-ExternalEvidenceStatus "+'$externalEvidenceStatus')){throw 'Runtime evidence status not passed to persistence'}
+    $notice=Get-LfoNoLookupAnnotation
+    $nl=[Environment]::NewLine
+    $answer='Answer with useful content.'
+    $delivered=$answer+$nl+$nl+$notice
+    $duplicate=$delivered+$nl+$nl+$notice
+    if((Remove-LfoNoLookupAnnotation $duplicate) -cne $answer){throw 'Duplicate annotation not removed'}
+    if((Remove-LfoNoLookupAnnotation $notice) -ne ''){throw 'Annotation-only response not detected'}
+    $quoted='> '+$notice
+    $fence=([string][char]96)*3
+    $code=$fence+$nl+$nl+$notice
+    foreach($literal in @($quoted,('prefix '+$notice),($code+$nl+$fence),$code,($delivered+$nl+$nl+'Later content'))){
+        if((Remove-LfoNoLookupAnnotation $literal) -cne $literal){throw 'Non-wrapper text altered'}
+    }
+    $newRow=[pscustomobject]@{route='LOCAL';assistant=$delivered;runtime_annotation=$notice}
+    if((Get-LfoHistoricalAssistantText $newRow) -cne $answer -or $newRow.assistant -cne $delivered){throw 'Audit/context separation failed'}
+    $legacyRow=[pscustomobject]@{route='LOCAL';assistant=$duplicate}
+    if((Get-LfoHistoricalAssistantText $legacyRow) -cne $answer){throw 'Legacy duplicate not removed'}
+    $literalRow=[pscustomobject]@{route='LOCAL';assistant=$delivered;runtime_annotation=''}
+    if((Get-LfoHistoricalAssistantText $literalRow) -cne $delivered){throw 'Explicit no-annotation content removed'}
+    $frontierRow=[pscustomobject]@{route='FRONTIER';assistant=$delivered}
+    if((Get-LfoHistoricalAssistantText $frontierRow) -cne $delivered){throw 'Legacy FRONTIER content altered'}
+    $row.route='LOCAL'
+    $row.external_evidence_status='NONE'
+    $row.assistant=$delivered
+    $row.runtime_annotation=$notice
+    $row|ConvertTo-Json -Compress|Set-Content -LiteralPath (Join-Path $evidenceDir 'conversation-2026-01.jsonl') -Encoding UTF8
+    $found=@(Get-LfoL3RuntimeL0Evidence @($candidate) $evidenceDir 1)
+    if($found.Count -ne 1 -or $found[0].Text -notlike '*A:Answer with useful content.' -or $found[0].Text.Contains($notice)){throw 'L3 context leaked wrapper annotation'}
+    $previewText=$duplicate+$nl+$nl
+    if((Get-LfoAnnotationPreviewLimit $previewText) -ne ($answer.Length+2*$nl.Length)){throw 'Preview did not hold reserved annotation'}
+    if((Get-LfoAnnotationPreviewLimit $answer) -ne $answer.Length){throw 'Ordinary preview affected'}
+    if(-not $chatSource.Contains("-RuntimeAnnotation "+'$runtimeAnnotation')){throw 'Runtime annotation metadata not persisted'}
+    if(-not $chatSource.Contains('$historyContent = "ROUTE: $route'+[char]96+'n$label'+[char]96+'n$contextAnswer"')){throw 'Live conversation history uses delivered text'}
+    Write-Host 'PASS: runtime annotation separation, duplicate suppression, legacy compatibility, literal text and L3 context.'
     Write-Host 'PASS: additive turn evidence metadata, legacy UNKNOWN and L3 provenance inheritance.'
     Write-Host 'PASS: local evidence policy and answer-generation telemetry aggregation.'
     Write-Host 'PASS: all slash-command parameter validation, help and inference guard.'

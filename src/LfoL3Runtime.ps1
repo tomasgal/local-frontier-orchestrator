@@ -91,7 +91,7 @@ function Get-LfoL3RuntimeL0Evidence(
                                     [int]$row.epoch -eq $Epoch -and
                                     [int64]$row.turn_id -eq $turnId) {
                                     $u = Get-LfoL3RuntimeBoundedText ([string]$row.user) 620
-                                    $a = Get-LfoL3RuntimeBoundedText ([string]$row.assistant) 360
+                                    $a = Get-LfoL3RuntimeBoundedText (Get-LfoHistoricalAssistantText $row) 360
                                     $out += [pscustomobject]@{
                                         SourceLayer = 'L0'
                                         SourceRef = $ref
@@ -129,7 +129,7 @@ function Get-LfoL3RuntimeL0Evidence(
             if (-not $wanted.ContainsKey($turnId)) { continue }
 
             $u = Get-LfoL3RuntimeBoundedText ([string]$row.user) 620
-            $a = Get-LfoL3RuntimeBoundedText ([string]$row.assistant) 360
+            $a = Get-LfoL3RuntimeBoundedText (Get-LfoHistoricalAssistantText $row) 360
             $out += [pscustomobject]@{
                 SourceLayer = 'L0'
                 SourceRef = [string]$wanted[$turnId]
