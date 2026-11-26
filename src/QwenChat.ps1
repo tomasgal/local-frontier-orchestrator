@@ -373,11 +373,120 @@ function Write-LfoMarkdownInline([string]$Text,[ConsoleColor]$Color='Gray'){
     foreach($span in @(Get-LfoMarkdownInlineSpans $Text $Color)){Write-Host $span.Text -ForegroundColor $span.Color -NoNewline}
     Write-Host ''
 }
+# Table layout uses visible text, not Markdown delimiters.
+function Get-LfoTableCells([string]$Line){
+    $s=$Line.Trim()
+    if($s.StartsWith('|')){$s=$s.Substring(1)}
+    if($s.EndsWith('|') -and -not $s.EndsWith('\|')){$s=$s.Substring(0,$s.Length-1)}
+    foreach($part in [regex]::Split($s,'(?<!\\)\|')){$part.Trim().Replace('\|','|')}
+}
+function Get-LfoVisibleWidth([string]$Text){
+    $width=0
+    $e=[Globalization.StringInfo]::GetTextElementEnumerator($Text)
+    while($e.MoveNext()){
+        $g=$e.GetTextElement()
+        $cp=[char]::ConvertToUtf32($g,0)
+        $cat=[Globalization.CharUnicodeInfo]::GetUnicodeCategory($g,0)
+        if($cat -in @([Globalization.UnicodeCategory]::NonSpacingMark,[Globalization.UnicodeCategory]::EnclosingMark,[Globalization.UnicodeCategory]::Format)){continue}
+        if(($cp -ge 0x1100 -and $cp -le 0x115F) -or ($cp -ge 0x2E80 -and $cp -le 0xA4CF) -or ($cp -ge 0xAC00 -and $cp -le 0xD7A3) -or ($cp -ge 0xF900 -and $cp -le 0xFAFF) -or ($cp -ge 0xFE10 -and $cp -le 0xFE6F) -or ($cp -ge 0xFF01 -and $cp -le 0xFF60) -or ($cp -ge 0x1F300 -and $cp -le 0x1FAFF) -or ($cp -ge 0x20000 -and $cp -le 0x3FFFD)){$width+=2}else{$width++}
+    }
+    return $width
+}
+function Split-LfoTableCell([string]$Text,[int]$Width){
+    if(-not $Text){'';return}
+    $line=''
+    foreach($word in ($Text -split '\s+')){
+        if(-not $word){continue}
+        $candidate=if($line){$line+' '+$word}else{$word}
+        if((Get-LfoVisibleWidth $candidate) -le $Width){$line=$candidate;continue}
+        if($line){$line;$line=''}
+        $e=[Globalization.StringInfo]::GetTextElementEnumerator($word)
+        while($e.MoveNext()){
+            $g=$e.GetTextElement()
+            if($line -and (Get-LfoVisibleWidth ($line+$g)) -gt $Width){$line;$line=''}
+            $line+=$g
+        }
+    }
+    if($line){$line}
+}
+function Get-LfoTableLayout([string[]]$Lines,[int]$Width){
+    if($Lines.Count -lt 2){return $null}
+    $header=@(Get-LfoTableCells $Lines[0]);$sep=@(Get-LfoTableCells $Lines[1])
+    if($header.Count -lt 2 -or $sep.Count -ne $header.Count){return $null}
+    foreach($c in $sep){if($c -notmatch '^:?-{3,}:?$'){return $null}}
+    $n=$header.Count;$rows=New-Object 'System.Collections.Generic.List[object]'
+    $widths=New-Object 'int[]' $n
+    $align=New-Object 'string[]' $n
+    for($i=0;$i -lt $n;$i++){$align[$i]=if($sep[$i] -match '^:.*:$'){'center'}elseif($sep[$i].EndsWith(':')){'right'}else{'left'}}
+    for($r=0;$r -lt $Lines.Count;$r++){
+        if($r -eq 1){continue}
+        $cells=@(Get-LfoTableCells $Lines[$r])
+        if($cells.Count -ne $n){return $null}
+        $plain=New-Object 'string[]' $n
+        for($i=0;$i -lt $n;$i++){
+            $plain[$i]=(@(Get-LfoMarkdownInlineSpans $cells[$i] | ForEach-Object {$_.Text}) -join '') -replace '\s+',' '
+            $widths[$i]=[Math]::Max($widths[$i],(Get-LfoVisibleWidth $plain[$i]))
+        }
+        $rows.Add($plain)
+    }
+    $available=$Width-1-3*$n
+    if($available -lt 4*$n){return $null}
+    for($i=0;$i -lt $n;$i++){$widths[$i]=[Math]::Max(4,$widths[$i])}
+    $total=($widths|Measure-Object -Sum).Sum
+    while($total -gt $available){
+        $largest=0
+        for($i=1;$i -lt $n;$i++){if($widths[$i] -gt $widths[$largest]){$largest=$i}}
+        $widths[$largest]--;$total--
+    }
+    return [pscustomobject]@{Rows=$rows;Widths=$widths;Align=$align}
+}
+function Write-LfoTableBorder($Widths,[int]$Left,[int]$Middle,[int]$Right){
+    $parts=@(foreach($w in $Widths){([string][char]0x2500)*($w+2)})
+    Write-Host (([string][char]$Left)+($parts -join ([string][char]$Middle))+([string][char]$Right)) -ForegroundColor DarkCyan
+}
+function Write-LfoMarkdownTable($Layout){
+    $bar=[string][char]0x2502
+    Write-LfoTableBorder $Layout.Widths 0x250C 0x252C 0x2510
+    for($r=0;$r -lt $Layout.Rows.Count;$r++){
+        $wrapped=New-Object 'System.Collections.Generic.List[object]';$height=1
+        for($i=0;$i -lt $Layout.Widths.Count;$i++){
+            $pieces=@(Split-LfoTableCell $Layout.Rows[$r][$i] $Layout.Widths[$i])
+            $wrapped.Add($pieces);$height=[Math]::Max($height,$pieces.Count)
+        }
+        $color=if($r -eq 0){'Cyan'}else{'Gray'}
+        for($j=0;$j -lt $height;$j++){
+            Write-Host $bar -ForegroundColor DarkCyan -NoNewline
+            for($i=0;$i -lt $Layout.Widths.Count;$i++){
+                $value=if($j -lt $wrapped[$i].Count){[string]$wrapped[$i][$j]}else{''}
+                $pad=[Math]::Max(0,$Layout.Widths[$i]-(Get-LfoVisibleWidth $value))
+                $left=if($Layout.Align[$i] -eq 'right'){$pad}elseif($Layout.Align[$i] -eq 'center'){[int][Math]::Floor($pad/2)}else{0}
+                Write-Host (' '+(' '*$left)+$value+(' '*($pad-$left))+' ') -ForegroundColor $color -NoNewline
+                Write-Host $bar -ForegroundColor DarkCyan -NoNewline
+            }
+            Write-Host ''
+        }
+        if($r -eq 0){Write-LfoTableBorder $Layout.Widths 0x251C 0x253C 0x2524}
+    }
+    Write-LfoTableBorder $Layout.Widths 0x2514 0x2534 0x2518
+}
+function Split-LfoImportPrompts([string]$Text){
+    foreach($part in [regex]::Split($Text,'(?m)^[ \t]*\|\|\|[ \t]*\r?$')){
+        if([string]::IsNullOrWhiteSpace($part)){continue}
+        $part=$part.Trim([char[]]@([char]13,[char]10))
+        if([Text.Encoding]::UTF8.GetByteCount($part) -gt 32768){throw 'An import entry exceeds 32 KiB; split it into smaller prompts.'}
+        $part
+    }
+}
+
 function Write-LfoMarkdown([AllowEmptyString()][string]$Text){
     $safe=ConvertTo-LfoSafeConsoleText $Text
     if((Test-Path Env:NO_COLOR) -or $env:LFO_MARKDOWN_PLAIN -eq '1'){Write-Host $safe;return}
     $fence='';$fenceLength=0
-    foreach($line in ($safe -split '\r?\n')){
+    $lines=@($safe -split '\r?\n')
+    $terminalWidth=100
+    try{if($Host.UI.RawUI.WindowSize.Width -gt 0){$terminalWidth=[Math]::Max(1,$Host.UI.RawUI.WindowSize.Width-1)}}catch{}
+    for($rowIndex=0;$rowIndex -lt $lines.Count;$rowIndex++){
+        $line=$lines[$rowIndex]
         if($line -match '^\s*(\x60{3,}|~{3,})(.*)$'){
             $marker=$Matches[1];$rest=$Matches[2].Trim()
             if(-not $fence){$fence=$marker.Substring(0,1);$fenceLength=$marker.Length;Write-Host ('  +--- code'+$(if($rest){': '+$rest})+' ---') -ForegroundColor DarkCyan;continue}
@@ -393,13 +502,11 @@ function Write-LfoMarkdown([AllowEmptyString()][string]$Text){
             if($body -match '^\[([ xX])\]\s+(.*)$'){$bullet=if($Matches[1] -eq ' '){'[ ]'}else{'[x]'};$body=$Matches[2]}
             Write-Host ($indent+$bullet+' ') -ForegroundColor Green -NoNewline;Write-LfoMarkdownInline $body;continue
         }
-        if($line -match '^\s*\|.*\|\s*$'){
-            foreach($cell in ($line.Trim().Trim('|') -split '\|')){
-                Write-Host '| ' -ForegroundColor DarkCyan -NoNewline
-                foreach($span in @(Get-LfoMarkdownInlineSpans $cell.Trim() 'Gray')){Write-Host $span.Text -ForegroundColor $span.Color -NoNewline}
-                Write-Host ' ' -NoNewline
-            }
-            Write-Host '|' -ForegroundColor DarkCyan;continue
+        if($line -match '^\s*\|.*\|\s*$' -and ($rowIndex+1) -lt $lines.Count -and $lines[$rowIndex+1] -match '^\s*\|.*\|\s*$'){
+            $end=$rowIndex+2
+            while($end -lt $lines.Count -and $lines[$end] -match '^\s*\|.*\|\s*$'){$end++}
+            $layout=Get-LfoTableLayout $lines[$rowIndex..($end-1)] $terminalWidth
+            if($null -ne $layout){Write-LfoMarkdownTable $layout;$rowIndex=$end-1;continue}
         }
         Write-LfoMarkdownInline $line
     }
@@ -1140,8 +1247,17 @@ $transferRoot=if($env:LFO_INSTALL_ROOT){$env:LFO_INSTALL_ROOT}else{Join-Path $en
 $script:LfoImportDir=if($env:LFO_IMPORT_DIR){$env:LFO_IMPORT_DIR}else{Join-Path $transferRoot 'import'}
 $script:LfoExportDir=if($env:LFO_EXPORT_DIR){$env:LFO_EXPORT_DIR}else{Join-Path $transferRoot 'export'}
 $script:LfoLastExportAnswer=''
+$script:LfoImportQueue=$null
 while ($true) {
-    $prompt = Read-Host "Qwen>"
+    if($script:LfoImportQueue -and $script:LfoImportQueue.Count -gt 0){
+        $prompt=$script:LfoImportQueue.Dequeue()
+        $script:LfoImportIndex++
+        Write-Host ("[import {0}/{1}]" -f $script:LfoImportIndex,$script:LfoImportTotal) -ForegroundColor Cyan
+        Write-Host ('Qwen>: '+(ConvertTo-LfoSafeConsoleText $prompt)) -ForegroundColor DarkGray
+    }else{
+        $script:LfoImportQueue=$null
+        $prompt = Read-Host "Qwen>"
+    }
     if ($null -eq $prompt) { continue }
 
     switch -Regex ($prompt.Trim()) {
@@ -1162,11 +1278,15 @@ while ($true) {
             try {
                 $path=Get-LfoTransferFile $script:LfoImportDir $name
                 $item=Get-Item -LiteralPath $path -ErrorAction Stop
-                if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $item.Length -gt 32768 -or $item.Extension -notin @('.txt','.md','.json','.csv','.ps1','.py','.log','.xml','.yaml','.yml')){throw 'Import requires a regular UTF-8 text file of at most 32 KiB.'}
+                if($null -ne $script:LfoImportQueue){throw 'Nested /import is not supported.'}
+                if($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $item.Length -gt 67108864 -or $item.Extension -notin @('.txt','.md','.json','.csv','.ps1','.py','.log','.xml','.yaml','.yml')){throw 'Import requires a regular UTF-8 text file of at most 64 MiB.'}
                 $text=[IO.File]::ReadAllText($path,(New-Object Text.UTF8Encoding($false,$true)))
-                if([string]::IsNullOrWhiteSpace($text)){throw 'Import file is empty.'}
-                Write-Host ("[Importing {0}; normal routing and logging apply]" -f $item.Name) -ForegroundColor Cyan
-                Invoke-Qwen $text
+                $entries=@(Split-LfoImportPrompts $text)
+                if($entries.Count -eq 0){throw 'Import file is empty.'}
+                $script:LfoImportQueue=New-Object 'System.Collections.Generic.Queue[string]'
+                foreach($entry in $entries){$script:LfoImportQueue.Enqueue($entry)}
+                $script:LfoImportIndex=0;$script:LfoImportTotal=$entries.Count
+                Write-Host ("[Importing {0}: {1} entries; normal routing and logging apply]" -f $item.Name,$entries.Count) -ForegroundColor Cyan
             } catch {Write-Host ("Import failed: "+$_.Exception.Message) -ForegroundColor Yellow}
             continue
         }

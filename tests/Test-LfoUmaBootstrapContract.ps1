@@ -73,7 +73,7 @@ try{
     if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
     Remove-Item -LiteralPath $old
     if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
-    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport')){
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Split-LfoImportPrompts')){
         $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
         if($fn.Count -ne 1){throw "Missing helper $name"}
         . ([scriptblock]::Create($fn[0].Extent.Text))
@@ -89,5 +89,17 @@ try{
     if(-not $rejected){throw 'Path traversal accepted'}
     $rejected=$false;try{Write-LfoTransferExport $file 'overwrite'}catch{$rejected=$true}
     if(-not $rejected){throw 'Export overwrite accepted'}
+    $layout=Get-LfoTableLayout @('| Name | Description |','| --- | ---: |','| **RAM** | Long text that wraps correctly |','| GPU | Compute |') 28
+    if($null -eq $layout -or $layout.Rows.Count -ne 3 -or $layout.Rows[1][0] -ne 'RAM' -or $layout.Align[1] -ne 'right'){throw 'Table layout failed'}
+    if((($layout.Widths|Measure-Object -Sum).Sum+7) -gt 28){throw 'Table exceeds width'}
+    $pieces=@(Split-LfoTableCell 'a verylongunbrokenword and more text' 5)
+    foreach($piece in $pieces){if((Get-LfoVisibleWidth $piece) -gt 5){throw 'Cell wrap exceeds width'}}
+    $nl=[string][char]10;$crlf=[string][char]13+$nl
+    $entries=@(Split-LfoImportPrompts ('First line'+$nl+'Second line'+$crlf+' ||| '+$crlf+'/think on'+$nl+'|||'+$nl+'/analyze'+$nl+'|||'+$nl))
+    if($entries.Count -ne 3 -or $entries[0] -ne ('First line'+$nl+'Second line') -or $entries[1] -ne '/think on' -or $entries[2] -ne '/analyze'){throw 'Import split failed'}
+    if(@(Split-LfoImportPrompts 'literal ||| inline').Count -ne 1){throw 'Inline separator was split'}
+    $many=@(Split-LfoImportPrompts ((1..1000|ForEach-Object{"Prompt $_"}) -join ($nl+'|||'+$nl)))
+    if($many.Count -ne 1000 -or $many[999] -ne 'Prompt 1000'){throw 'Large import split failed'}
+    Write-Host 'PASS: aligned table layout, width, wrapping, multiline import and 1000-entry splitting.'
     Write-Host 'PASS: v1/v2 manifests, Markdown spans, control stripping, raw export, path and overwrite guards.'
 }finally{Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}
