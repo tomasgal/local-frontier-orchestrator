@@ -799,12 +799,12 @@ function Read-LfoChatNdjson([IO.TextReader]$Reader,[Diagnostics.Stopwatch]$Clock
             $raw=$content.ToString()
             $answer=Get-LfoPartialJsonAnswer $raw
             if($answer -and $null -eq $firstAnswer){$firstAnswer=$elapsed}
-            $canShow=($Phase -ne 'local_generation' -or $RouteMode -eq 'LOCAL' -or (Get-LfoPartialJsonAnswer $raw 'route' -RequireComplete) -ceq 'LOCAL')
-            if($Preview -and $canShow -and $answer -and (Write-LfoStreamPreview $answer)){
+            # Preview is explicitly provisional; routing may follow the answer.
+            if($Preview -and $answer -and (Write-LfoStreamPreview $answer)){
                 if($null -eq $firstVisible){$firstVisible=$Clock.Elapsed.TotalSeconds}
             }
             if($Progress -and $elapsed -ge $nextProgress -and $null -eq $firstVisible -and $chunk.done -ne $true){
-                Write-Host ("[stream: {0:n0}s; awaiting complete answer block / route]" -f $elapsed) -ForegroundColor DarkGray
+                Write-Host ("[stream: {0:n0}s; awaiting complete answer block]" -f $elapsed) -ForegroundColor DarkGray
                 $nextProgress=$elapsed+5
             }
         }
@@ -1196,6 +1196,10 @@ function Invoke-Qwen([string]$Prompt) {
                         $answerRecoverySuccess = $false
                         Write-Host "[Qwen answer invalid; trying one LOCAL answer-only recovery.]" -ForegroundColor Yellow
                         try {
+                            if($script:LfoStreamShownPrefix){
+                                Write-Host '[Initial preview superseded; answer recovery follows.]' -ForegroundColor Yellow
+                                $script:LfoStreamShownPrefix=''
+                            }
                             $recoveryResponse = Invoke-QwenAnswerRecovery $Prompt
                             Show-QwenThinking $recoveryResponse
                             $recoveryContent = Get-CleanQwenContent $recoveryResponse
@@ -1234,6 +1238,10 @@ function Invoke-Qwen([string]$Prompt) {
     }
 
     if ($route -eq 'FRONTIER') {
+        if($script:LfoStreamShownPrefix){
+            Write-Host '[Initial LOCAL-model preview ended; FRONTIER synthesis follows.]' -ForegroundColor DarkCyan
+            $script:LfoStreamShownPrefix=''
+        }
         $memoryBlock = Get-LfoTurnMemoryBlock $Prompt
         $recentConversation = Get-RecentConversationText -ExcludeLastUser
 

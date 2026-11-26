@@ -160,6 +160,23 @@ try{
     $reader=New-Object IO.StringReader($chunks[0]);$rejected=$false
     try{Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $false 'AUTO' $false|Out-Null}catch{$rejected=$true}finally{$reader.Dispose()}
     if(-not $rejected){throw 'Missing final stream chunk accepted'}
+    # AUTO may display the answer before the route field arrives, even if
+    # the final route is FRONTIER. No memory side channel is displayed.
+    $script:previewCalls=New-Object 'System.Collections.Generic.List[string]'
+    function Write-LfoStreamPreview([string]$Answer){
+        [void]$script:previewCalls.Add($Answer)
+        return $true
+    }
+    $previewChunks=@(
+        (@{message=@{content='{"answer":"Provisional\n\nNext'};done=$false}|ConvertTo-Json -Depth 8 -Compress),
+        (@{message=@{content='","memory_note":"private marker","memory_ops":[],"route":"FRONTIER"}'};done=$true;done_reason='stop'}|ConvertTo-Json -Depth 8 -Compress)
+    )
+    $reader=New-Object IO.StringReader(($previewChunks -join $nl))
+    try{$result=Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $true 'AUTO' $false}finally{$reader.Dispose()}
+    if($script:previewCalls.Count -lt 2 -or $script:previewCalls[0] -ne ('Provisional'+$nl+$nl+'Next')){throw 'AUTO preview waited for route'}
+    if(($script:previewCalls -join ' ') -match 'private marker'){throw 'Memory bookkeeping leaked into preview'}
+    if(($result.message.content|ConvertFrom-Json).route -ne 'FRONTIER'){throw 'Preview changed final routing'}
+    Write-Host 'PASS: AUTO preview independent of final route.'
     Write-Host 'PASS: explicit routing, Markdown stream boundaries, NDJSON assembly and incomplete transport rejection.'
     Write-Host 'PASS: UMA generation ceilings, context estimate and partial JSON isolation.'
     Write-Host 'PASS: singleton experiment prompt arrays and batch input validation.'
