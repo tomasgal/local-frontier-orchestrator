@@ -73,7 +73,7 @@ try{
     if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
     Remove-Item -LiteralPath $old
     if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
-    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy')){
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Read-LfoChatNdjson')){
         $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
         if($fn.Count -ne 1){throw "Missing helper $name"}
         . ([scriptblock]::Create($fn[0].Extent.Text))
@@ -137,6 +137,30 @@ try{
     if((Add-LfoStructuredAnswerPolicy 'base' 'GPU') -cne 'base'){throw 'Legacy answer policy changed'}
     $answerPolicy=Add-LfoStructuredAnswerPolicy 'base' 'UMA'
     if(-not $answerPolicy.StartsWith('base') -or -not $answerPolicy.Contains('\"') -or -not $answerPolicy.Contains('verbatim')){throw 'UMA structured answer policy missing'}
+    if((Get-LfoRequestedRouteMode 'Bez pouzitia FRONTIER vysvetli RAM.' 'AUTO') -ne 'LOCAL'){throw 'Explicit local-only instruction not enforced'}
+    if((Get-LfoRequestedRouteMode 'Translate the phrase without using FRONTIER.' 'AUTO') -ne 'AUTO'){throw 'Embedded phrase changed route'}
+    if((Get-LfoRequestedRouteMode 'Search the web' 'LOCAL') -ne 'LOCAL'){throw 'Session LOCAL override lost'}
+    if((Get-LfoRequestedRouteMode 'Explain RAM' 'FRONTIER') -ne 'FRONTIER'){throw 'Session FRONTIER override lost'}
+    if((Get-LfoPartialJsonAnswer '{"answer":"LOCAL","route":"LOC' 'route' -RequireComplete) -ne ''){throw 'Incomplete route accepted'}
+    if((Get-LfoPartialJsonAnswer '{"memory_ops":[{"route":"LOCAL"}],"route":"FRONTIER"}' 'route' -RequireComplete) -ne 'FRONTIER'){throw 'Nested route confused with root'}
+    $fence='~'*3
+    $blocks='First'+$nl+$nl+$fence+'python'+$nl+'x = 1'+$nl+$nl+'y = 2'
+    if((Get-LfoStreamBlockBoundary $blocks) -ne 7){throw 'Preview flushed incomplete fence'}
+    $blocks+=$nl+$fence+$nl+$nl+'Next'
+    if((Get-LfoStreamBlockBoundary $blocks) -ne ($blocks.Length-4)){throw 'Closed fence not flushed'}
+    $chunks=@(
+        (@{message=@{content='{"route":"LOCAL","answer":"A';thinking='reason '};done=$false}|ConvertTo-Json -Depth 8 -Compress),
+        (@{message=@{content='\nB","memory_note":"-","memory_ops":[]}';thinking='end'};done=$false}|ConvertTo-Json -Depth 8 -Compress),
+        (@{message=@{content=''};done=$true;done_reason='stop';eval_count=7;prompt_eval_count=3}|ConvertTo-Json -Depth 8 -Compress)
+    )
+    $reader=New-Object IO.StringReader(($chunks -join $nl))
+    try{$result=Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $false 'AUTO' $false}finally{$reader.Dispose()}
+    $envelope=$result.message.content|ConvertFrom-Json
+    if($envelope.answer -ne ('A'+$nl+'B') -or $result.message.thinking -ne 'reason end' -or $result.eval_count -ne 7 -or $result.done_reason -ne 'stop' -or -not $result.lfo_streamed){throw 'NDJSON assembly lost content or metrics'}
+    $reader=New-Object IO.StringReader($chunks[0]);$rejected=$false
+    try{Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $false 'AUTO' $false|Out-Null}catch{$rejected=$true}finally{$reader.Dispose()}
+    if(-not $rejected){throw 'Missing final stream chunk accepted'}
+    Write-Host 'PASS: explicit routing, Markdown stream boundaries, NDJSON assembly and incomplete transport rejection.'
     Write-Host 'PASS: UMA generation ceilings, context estimate and partial JSON isolation.'
     Write-Host 'PASS: singleton experiment prompt arrays and batch input validation.'
     Write-Host 'PASS: aligned table layout, width, wrapping, multiline import and 1000-entry splitting.'

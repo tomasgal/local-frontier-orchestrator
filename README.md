@@ -1,6 +1,8 @@
 # Local Frontier Orchestrator
 
-**v9.6.6 release candidate — Windows UMA support, Ollama manifest v2 compatibility, console Markdown and file exchange, incorporating v9.6.5 research tooling.** v9.6.5 retains the accepted v9.6.4 security hardening, v9.6.3 Windows runtime behavior, L0–L4 memory semantics and High-priority inference profile. It adds provider-neutral offline tooling for mediator parameter sweeps, frozen-response/replay-bank validation and paired neutral-vs-leading model audits; it does not promote P1/P2 into the normal response path.
+**Development branch v9.6.7-dev — streaming and explicit routing on top of v9.6.6.**
+
+**v9.6.6 baseline — Windows UMA support, Ollama manifest v2 compatibility, console Markdown and file exchange, incorporating v9.6.5 research tooling.** v9.6.5 retains the accepted v9.6.4 security hardening, v9.6.3 Windows runtime behavior, L0–L4 memory semantics and High-priority inference profile. It adds provider-neutral offline tooling for mediator parameter sweeps, frozen-response/replay-bank validation and paired neutral-vs-leading model audits; it does not promote P1/P2 into the normal response path.
 
 Release notes: [v9.6.6 UMA](docs/RELEASE_V9.6.6.md) · [v9.6.5 research tooling](docs/RELEASE_V9.6.5.md) · [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 runtime baseline](docs/RELEASE_V9.6.3.md).
 
@@ -568,3 +570,7 @@ Further detector coverage, automatic analytics scheduling and response intervent
 ## License
 
 No open-source license has been selected yet. Until a license is added, normal copyright rules apply.
+
+## v9.6.7-dev interactive transport
+
+On UMA, interactive streaming is enabled by default; `/stream on` and `/stream off` toggle it for the session. Complete Markdown blocks of the provisional answer are rendered as they arrive. AUTO waits for a confirmed LOCAL route; when route is emitted last the full answer may appear only at completion. `/route local` enforces local-only inference even when a freshness gate would normally escalate; `/route frontier` explicitly requests Codex for every subsequent turn; `/route auto` restores ordinary policy. A narrow, leading explicit no-frontier instruction also selects LOCAL for that turn. With thinking enabled the existing thinking/answer display order is preserved and early preview is disabled. Streamed transport is off for unattended benchmark children; phase telemetry separates model, frontier, synthesis and observed first-answer/first-visible timings. These are development changes pending host verification.

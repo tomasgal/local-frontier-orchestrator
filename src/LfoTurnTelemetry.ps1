@@ -52,6 +52,10 @@ function Add-LfoTurnPhase {
         decode_seconds = $decode
         other_seconds = $unattributed
         input_chars = $InputChars
+        streamed = $(if($null -ne $Response){[bool]$Response.lfo_streamed}else{$false})
+        first_chunk_seconds = $(if($null -ne $Response -and $null -ne $Response.lfo_first_chunk_seconds){[Math]::Round([double]$Response.lfo_first_chunk_seconds,4)}else{$null})
+        first_answer_seconds = $(if($null -ne $Response -and $null -ne $Response.lfo_first_answer_seconds){[Math]::Round([double]$Response.lfo_first_answer_seconds,4)}else{$null})
+        first_visible_seconds = $(if($null -ne $Response -and $null -ne $Response.lfo_first_visible_seconds){[Math]::Round([double]$Response.lfo_first_visible_seconds,4)}else{$null})
     })
 }
 
