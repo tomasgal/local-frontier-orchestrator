@@ -287,15 +287,24 @@ function Wait-LfoCodexExit($Process,[int]$TimeoutSeconds,[bool]$Progress){
     if(-not $Progress){return $Process.WaitForExit($TimeoutSeconds*1000)}
     $clock=[Diagnostics.Stopwatch]::StartNew()
     $deadline=[long]$TimeoutSeconds*1000
-    while($clock.ElapsedMilliseconds -lt $deadline){
-        $wait=[int][Math]::Min(5000,($deadline-$clock.ElapsedMilliseconds))
-        if($wait -le 0){break}
-        if($Process.WaitForExit($wait)){return $true}
-        if($clock.ElapsedMilliseconds -lt $deadline){
-            Write-Host ("[ask_codex: {0:n0}s; awaiting frontier result]" -f $clock.Elapsed.TotalSeconds) -ForegroundColor DarkCyan
+    $shown=$false;$statusWidth=0
+    try {
+        while($clock.ElapsedMilliseconds -lt $deadline){
+            $wait=[int][Math]::Min(5000,($deadline-$clock.ElapsedMilliseconds))
+            if($wait -le 0){break}
+            if($Process.WaitForExit($wait)){return $true}
+            if($clock.ElapsedMilliseconds -lt $deadline){
+                $status=("[ask_codex: {0:0}s; awaiting frontier result]" -f $clock.Elapsed.TotalSeconds)
+                $statusWidth=[Math]::Max($statusWidth,$status.Length)
+                # CR works without cursor APIs or ANSI support on a VT/SSH terminal.
+                Write-Host (([string][char]13)+$status.PadRight($statusWidth)) -ForegroundColor DarkCyan -NoNewline
+                $shown=$true
+            }
         }
+        return $Process.WaitForExit(0)
+    } finally {
+        if($shown){Write-Host ''}
     }
-    return $Process.WaitForExit(0)
 }
 
 function Invoke-CodexReadOnly([string]$Prompt) {

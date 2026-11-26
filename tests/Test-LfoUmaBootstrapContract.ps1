@@ -203,6 +203,16 @@ try{
     if(-not (Wait-LfoCodexExit $fake 30 $true) -or $fake.Waits[0] -gt 5000){throw 'Interactive Codex wait interval incorrect'}
     $fake.Waits.Clear()
     if(-not (Wait-LfoCodexExit $fake 30 $false) -or $fake.Waits[0] -ne 30000){throw 'Benchmark Codex wait changed'}
+    # A fake process returns immediately after one unsuccessful wait.
+    # This exercises overwrite and newline cleanup without sleeping five seconds.
+    $fakeHeartbeat=[pscustomobject]@{Calls=0}
+    $fakeHeartbeat|Add-Member ScriptMethod WaitForExit {param([int]$Milliseconds);$this.Calls++;return ($this.Calls -gt 1)}
+    $heartbeatOutput=@(Wait-LfoCodexExit $fakeHeartbeat 30 $true 6>&1)
+    $heartbeatRecords=@($heartbeatOutput|Where-Object {$_ -is [Management.Automation.InformationRecord]})
+    if($heartbeatRecords.Count -ne 2){throw 'Codex heartbeat did not produce status and final newline'}
+    $heartbeatMessage=$heartbeatRecords[0].MessageData
+    if(-not ([string]$heartbeatMessage).StartsWith([string][char]13) -or -not $heartbeatMessage.NoNewLine){throw 'Codex heartbeat did not overwrite current line'}
+    if($heartbeatRecords[1].MessageData.NoNewLine){throw 'Codex heartbeat left terminal line open'}
     Write-Host 'PASS: thinking preview, answer continuation, no duplicate reasoning, and Codex wait modes.'
     Write-Host 'PASS: AUTO preview independent of final route.'
     Write-Host 'PASS: explicit routing, Markdown stream boundaries, NDJSON assembly and incomplete transport rejection.'
