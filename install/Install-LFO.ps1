@@ -6,6 +6,8 @@ param(
     [string]$BaseModel = 'qwen3.5:4b-q4_K_M',
     [switch]$SkipModelPull,
     [switch]$SkipL4Acceptance,
+    [string]$ImportDirectory,
+    [string]$ExportDirectory,
     [switch]$SkipLaunch
 )
 
@@ -37,7 +39,7 @@ $CpuModel = 'lfo-qwen3.5-4b-cpu5k:latest'
 $UmaBaseModel = 'qwen3.5:35b-a3b-q8_0'
 $UmaModel = 'lfo-qwen3.5-35b-uma16k:latest'
 $UmaContext = 16384
-$RuntimeContract = 'v9.6.4'
+$RuntimeContract = 'v9.6.6-dev'
 
 function Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
 function Info([string]$Text) { Write-Host "    $Text" }
@@ -120,6 +122,8 @@ function Get-OllamaLibraryManifestPath([string]$Store,[string]$Model) {
     $colon=$Model.LastIndexOf(':')
     if($colon -gt 0){$name=$Model.Substring(0,$colon);$tag=$Model.Substring($colon+1)}
     if($name.IndexOf('/') -ge 0 -or $name.IndexOf('\') -ge 0){return $null}
+    $v2 = Join-Path $Store ('manifests-v2\ollama.com\library\'+$name+'\'+$tag)
+    if (Test-Path -LiteralPath $v2 -PathType Leaf) { return $v2 }
     return Join-Path $Store ('manifests\registry.ollama.ai\library\'+$name+'\'+$tag)
 }
 function Test-OllamaStoreHasModel([string]$Store,[string]$Model) {
@@ -326,6 +330,12 @@ $oldStatePath=Join-Path $ConfigRoot 'install-state.json'
 $oldState=$null
 if(Test-Path -LiteralPath $oldStatePath -PathType Leaf) { try { $oldState=Get-Content -LiteralPath $oldStatePath -Raw -Encoding UTF8 | ConvertFrom-Json } catch {} }
 
+if (-not $ImportDirectory) { $ImportDirectory=if($oldState -and $oldState.LFO.ImportDirectory){[string]$oldState.LFO.ImportDirectory}else{Join-Path $InstallRoot 'import'} }
+if (-not $ExportDirectory) { $ExportDirectory=if($oldState -and $oldState.LFO.ExportDirectory){[string]$oldState.LFO.ExportDirectory}else{Join-Path $InstallRoot 'export'} }
+$ImportDirectory=[IO.Path]::GetFullPath($ImportDirectory)
+$ExportDirectory=[IO.Path]::GetFullPath($ExportDirectory)
+foreach($d in @($ImportDirectory,$ExportDirectory)){New-Item -ItemType Directory -Path $d -Force|Out-Null}
+
 Step 'Obtain canonical LFO source'
 $git=Resolve-CommandPath 'git.exe'; if(-not $git){$git=Resolve-CommandPath 'git'}
 if ($git) {
@@ -488,7 +498,7 @@ foreach($candidateStore in @(
 $probe=Split-Path -Parent $ollamaExe
 for($depth=0;$depth -lt 4 -and $probe;$depth++) {
     $candidateStore=Join-Path $probe 'models'
-    if(Test-Path -LiteralPath (Join-Path $candidateStore 'manifests') -PathType Container){$ollamaStoreCandidates.Add($candidateStore)}
+    if((Test-Path -LiteralPath (Join-Path $candidateStore 'manifests') -PathType Container) -or (Test-Path -LiteralPath (Join-Path $candidateStore 'manifests-v2') -PathType Container)){$ollamaStoreCandidates.Add($candidateStore)}
     $next=Split-Path -Parent $probe
     if($next -eq $probe){break}
     $probe=$next
@@ -498,17 +508,17 @@ $preferredStores=@(
     $env:LFO_OLLAMA_MODELS,
     $env:OLLAMA_MODELS
 )
-$preExistingAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates) -Preferred $preferredStores
+$preExistingAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates | Where-Object { $Profile -ne 'UMA' -or -not $SkipModelPull -or (Test-OllamaStoreHasModel $_ $UmaModel) }) -Preferred $preferredStores
 if(-not $preExistingAliasStore){
     Info 'Known/persisted Ollama model stores did not contain both LFO aliases; using bounded LocalAppData fallback discovery.'
-    foreach($pattern in @('*\models\manifests','*\*\models\manifests','*\*\*\models\manifests')) {
+    foreach($pattern in @('*\models\manifests','*\*\models\manifests','*\*\*\models\manifests','*\models\manifests-v2','*\*\models\manifests-v2','*\*\*\models\manifests-v2')) {
         try {
             foreach($manifestDir in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -Directory -ErrorAction SilentlyContinue)) {
                 $ollamaStoreCandidates.Add((Split-Path -Parent $manifestDir.FullName))
             }
         } catch {}
     }
-    $preExistingAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates) -Preferred $preferredStores
+    $preExistingAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates | Where-Object { $Profile -ne 'UMA' -or -not $SkipModelPull -or (Test-OllamaStoreHasModel $_ $UmaModel) }) -Preferred $preferredStores
 }
 if($preExistingAliasStore){Info "Existing shared LFO Ollama model store: $preExistingAliasStore"}
 
@@ -550,14 +560,14 @@ if(-not $ollamaModelsDir -and $ollamaManaged){
     $probe=Split-Path -Parent $ollamaExe
     for($depth=0;$depth -lt 4 -and $probe;$depth++) {
         $candidateStore=Join-Path $probe 'models'
-        if(Test-Path -LiteralPath (Join-Path $candidateStore 'manifests') -PathType Container){$ollamaModelsDir=$candidateStore;break}
+        if((Test-Path -LiteralPath (Join-Path $candidateStore 'manifests') -PathType Container) -or (Test-Path -LiteralPath (Join-Path $candidateStore 'manifests-v2') -PathType Container)){$ollamaModelsDir=$candidateStore;break}
         $next=Split-Path -Parent $probe
         if($next -eq $probe){break}
         $probe=$next
     }
     if(-not $ollamaModelsDir) {
         $standardStore=Join-Path $env:USERPROFILE '.ollama\models'
-        if(Test-Path -LiteralPath (Join-Path $standardStore 'manifests') -PathType Container){$ollamaModelsDir=$standardStore}
+        if((Test-Path -LiteralPath (Join-Path $standardStore 'manifests') -PathType Container) -or (Test-Path -LiteralPath (Join-Path $standardStore 'manifests-v2') -PathType Container)){$ollamaModelsDir=$standardStore}
     }
 }
 if($ollamaModelsDir){Info "Ollama model store selected for LFO: $ollamaModelsDir"}
@@ -615,7 +625,7 @@ if(-not $SkipModelPull){
             if($LASTEXITCODE -ne 0){throw "Failed to create UMA model alias $UmaModel."}
             Assert-Lfo ((Get-OllamaApiModelNames $ollamaBase) -contains $UmaModel) 'UMA alias missing from Ollama after create.'
             if($ollamaModelsDir){$ollamaStoreCandidates.Add($ollamaModelsDir)}
-            $resolvedAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates) -Preferred @($ollamaModelsDir,$preExistingAliasStore,$env:LFO_OLLAMA_MODELS,$env:OLLAMA_MODELS)
+            $resolvedAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates | Where-Object { Test-OllamaStoreHasModel $_ $UmaModel }) -Preferred @($ollamaModelsDir,$preExistingAliasStore,$env:LFO_OLLAMA_MODELS,$env:OLLAMA_MODELS)
             Assert-Lfo $resolvedAliasStore 'UMA alias was created, but its filesystem model store could not be resolved. Set LFO_OLLAMA_MODELS to the active Ollama model store and rerun; no second daemon will be started.'
             Assert-Lfo (Test-OllamaStoreHasModel $resolvedAliasStore $UmaModel) 'Resolved UMA model store does not contain the new alias.'
             $ollamaModelsDir=$resolvedAliasStore
@@ -669,7 +679,7 @@ if(-not $SkipModelPull){
         $resolvedAliasStore=Resolve-LfoAliasModelStore -Candidates @($ollamaStoreCandidates) -Preferred @($ollamaModelsDir,$preExistingAliasStore,$env:LFO_OLLAMA_MODELS,$env:OLLAMA_MODELS)
         if(-not $resolvedAliasStore){
             Info 'Alias store still unresolved after model creation; using bounded LocalAppData fallback discovery.'
-            foreach($pattern in @('*\models\manifests','*\*\models\manifests','*\*\*\models\manifests')) {
+            foreach($pattern in @('*\models\manifests','*\*\models\manifests','*\*\*\models\manifests','*\models\manifests-v2','*\*\models\manifests-v2','*\*\*\models\manifests-v2')) {
                 try {
                     foreach($manifestDir in @(Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA $pattern) -Directory -ErrorAction SilentlyContinue)) {
                         $ollamaStoreCandidates.Add((Split-Path -Parent $manifestDir.FullName))
@@ -905,7 +915,7 @@ $state=[ordered]@{
         SurrealDB=[ordered]@{Pid=$surrealServicePid;StartedHeadlessByThisBootstrap=$surrealStartedHeadless;StdoutLog=$surrealStdoutLog;StderrLog=$surrealStderrLog}
     }
     Frontier=[ordered]@{CodexDetected=[bool]$codexPath;CodexExecutable=$codexPath;CodexVersion=$codexVersion;AdapterSelection='PENDING'}
-    LFO=[ordered]@{RuntimeContract=$RuntimeContract;DefaultProfile=$Profile;DefaultPriority='High';ConfigPath=$installConfigPath;MemoryDirectory=$memoryDir;L0StageSourcesEnabled=$true;L4RecordingEnabled=$true;L4Acceptance=$l4Acceptance}
+    LFO=[ordered]@{RuntimeContract=$RuntimeContract;DefaultProfile=$Profile;DefaultPriority='High';ImportDirectory=$ImportDirectory;ExportDirectory=$ExportDirectory;ConfigPath=$installConfigPath;MemoryDirectory=$memoryDir;L0StageSourcesEnabled=$true;L4RecordingEnabled=$true;L4Acceptance=$l4Acceptance}
 }
 $statePath=Join-Path $ConfigRoot 'install-state.json'
 [IO.File]::WriteAllText($statePath,($state|ConvertTo-Json -Depth 12),$utf8)
@@ -942,9 +952,11 @@ Write-Host ('L4 recording: ENABLED; acceptance='+$l4Acceptance+'; /analyze avail
 Write-Host ('Codex:        FOUND ('+$codexVersion+')') -ForegroundColor Green
 $installedLaunchDir=Join-Path $InstallRoot 'launch'
 Write-Host ('Launch dir:    '+$installedLaunchDir) -ForegroundColor Green
+Write-Host ('Import:        '+$ImportDirectory)
+Write-Host ('Export:        '+$ExportDirectory)
 Write-Host ''
 Write-Host 'Launch options:' -ForegroundColor Cyan
-Write-Host '  .\LFO.ps1           (primary v9.6.4 entrypoint; Auto device, High priority by default)'
+Write-Host '  .\LFO.ps1           (primary v9.6.6-dev entrypoint; Auto device, High priority by default)'
 Write-Host '  Start-LFO-CPU.bat   (double-click or Command Prompt)'
 Write-Host '  Start-LFO-GPU.bat   (double-click or Command Prompt)'
 Write-Host '  Start-LFO-UMA.bat   (double-click or Command Prompt)'

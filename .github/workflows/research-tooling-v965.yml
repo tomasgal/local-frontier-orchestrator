@@ -1,0 +1,30 @@
+name: LFO v9.6.5 research tooling gate
+on:
+  push:
+    branches: [v9.6.5-research-tooling, main]
+    paths: ['research/**','schema/research/**','experiments/research/**','tests/Test-ResearchToolingV965.ps1','docs/RESEARCH_TOOLING_V965.md','docs/RELEASE_V9.6.5.md','LFO.ps1','install/Install-LFO.ps1','.github/workflows/research-tooling-v965.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deterministic-research-tooling:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with: {persist-credentials: false}
+      - name: Parse changed PowerShell
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $targets=@('LFO.ps1','install\Install-LFO.ps1','research\Invoke-LfoResearchTooling.ps1','tests\Test-ResearchToolingV965.ps1')
+          foreach($target in $targets){$tokens=$null;$errors=$null;[void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $target),[ref]$tokens,[ref]$errors);if($errors.Count -gt 0){$errors|ForEach-Object{Write-Host $_};throw "Parser rejected $target"};Write-Host "PARSE PASS: $target"}
+      - name: Run deterministic research-tooling tests
+        shell: powershell
+        run: |
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-ResearchToolingV965.ps1
+          if($LASTEXITCODE -ne 0){throw "Research-tooling regression failed: $LASTEXITCODE"}
+      - name: Re-run inherited bootstrap integrity guard
+        shell: powershell
+        run: |
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-LfoCodexInstallerGuard.ps1 -BootstrapPath .\install\Install-LFO.ps1
+          if($LASTEXITCODE -ne 0){throw "Installer guard regression failed: $LASTEXITCODE"}

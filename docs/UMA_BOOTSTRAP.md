@@ -96,3 +96,12 @@ Then verify interactive LOCAL answer, `/analyze`/L4 configured, `/exit`, and opt
 - **Privacy:** the v9.6.4 research default records full local conversation/trace text and memory snapshots. Treat the installation's `data` directory as sensitive; `/clear` does not erase archives.
 
 **Acceptance gate:** do not merge or designate UMA as production-supported until the Windows PowerShell parser/static tests, install/reinstall idempotency, real AMD GPU model placement, L4 recording and one interactive/experiment smoke test pass on MS-S1 MAX.
+
+
+## v9.6.6-dev compatibility and file exchange
+
+The development branch incorporates v9.6.5 research tooling. The installer recognizes both legacy Ollama manifests and the newer manifests-v2/ollama.com layout, preferring v2 when both are present. It can reuse a previously created UMA alias with -SkipModelPull. The console renders common Markdown constructs using native PowerShell console colors (headings, emphasis, links, lists, task lists, blockquotes, rules, tables and code fences); this is a terminal-oriented subset, not a browser/CommonMark engine. Set LFO_MARKDOWN_PLAIN=1 or NO_COLOR to preserve plain output. Raw Markdown remains the persisted and exported response.
+
+Optional bootstrap parameters -ImportDirectory and -ExportDirectory select existing or newly created exchange directories; defaults are import and export under the install root. These paths persist on reinstall. /files lists import files and both paths. /import NAME reads a UTF-8 text file up to 32 KiB as a prompt (normal routing and logging apply; do not import confidential data if frontier routing is enabled). /export [NAME] writes the last response from this session as raw Markdown without overwriting existing files. /export-log explicitly copies the current monthly conversation JSONL, including potentially sensitive historical prompts. No automatic transfer of memory databases or credentials. Configure access to the exchange directories separately.
+
+Host smoke testing has demonstrated 100% GPU residency, 16k context, LOCAL and FRONTIER transport, and L4 recording/analysis on an AMD unified-memory host. A local installer workaround was required for the v2 manifest layout; this branch includes the correction. Some schema-constrained responses ended prematurely despite valid JSON; short quote-copy tests did not reproduce the issue consistently. This remains an open quality issue, not a confirmed quote parser defect. Reinstall and unattended experiment validation remain required before production promotion.

@@ -1,7 +1,7 @@
 # Offline UMA contract and PowerShell AST checks; no model inference or service lifecycle.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$paths = @('install/Install-LFO.ps1','LFO.ps1','launch/Start-LFO.ps1','launch/Start-LFO-UMA.ps1')
+$paths = @('install/Install-LFO.ps1','LFO.ps1','launch/Start-LFO.ps1','launch/Start-LFO-UMA.ps1','src/QwenChat.ps1')
 $asts = @{}
 foreach ($path in $paths) {
     $full = Join-Path $root ($path -replace '/','\')
@@ -54,3 +54,40 @@ if ((Get-LfoModelSpec $state 'GPU').Context -ne 8192) { throw 'Legacy GPU contex
 $state.LFO.DefaultProfile='CPU'
 if ((Resolve-LfoDevice 'UMA' $state) -ne 'UMA') { throw 'Explicit UMA override failed on legacy host.' }
 Write-Host 'PASS: UMA source syntax, installer guards, model specs and legacy context invariants.' -ForegroundColor Green
+
+foreach($name in @('Get-OllamaLibraryManifestPath','Test-OllamaStoreHasModel')){
+    $fn=@($asts['install/Install-LFO.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
+    if($fn.Count -ne 1){throw "Missing helper $name"}
+    . ([scriptblock]::Create($fn[0].Extent.Text))
+}
+$temp=Join-Path ([IO.Path]::GetTempPath()) ('lfo-manifest-test-'+[guid]::NewGuid().ToString('N'))
+try{
+    $old=Join-Path $temp 'manifests\registry.ollama.ai\library\test-model\latest'
+    $new=Join-Path $temp 'manifests-v2\ollama.com\library\test-model\latest'
+    if(Test-OllamaStoreHasModel $temp 'test-model:latest'){throw 'Absent manifest accepted'}
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $old)|Out-Null
+    Set-Content -LiteralPath $old -Value '{}'
+    if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'Legacy manifest not detected'}
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $new)|Out-Null
+    Set-Content -LiteralPath $new -Value '{}'
+    if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
+    Remove-Item -LiteralPath $old
+    if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport')){
+        $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
+        if($fn.Count -ne 1){throw "Missing helper $name"}
+        . ([scriptblock]::Create($fn[0].Extent.Text))
+    }
+    $spans=@(Get-LfoMarkdownInlineSpans 'Plain **bold** and *italic*')
+    if(($spans.Text -join '') -ne 'Plain bold and italic'){throw 'Markdown inline mismatch'}
+    if(-not ($spans|Where-Object {$_.Text -eq 'bold' -and $_.Color -eq 'White'})){throw 'Markdown color mismatch'}
+    if((ConvertTo-LfoSafeConsoleText ('a'+[char]27+'b')) -ne 'ab'){throw 'Unsafe terminal control'}
+    $file=Get-LfoTransferFile $temp 'reply.md'
+    Write-LfoTransferExport $file 'original **Markdown**'
+    if([IO.File]::ReadAllText($file) -ne 'original **Markdown**'){throw 'Export changed raw Markdown'}
+    $rejected=$false;try{Get-LfoTransferFile $temp '..\outside.md'|Out-Null}catch{$rejected=$true}
+    if(-not $rejected){throw 'Path traversal accepted'}
+    $rejected=$false;try{Write-LfoTransferExport $file 'overwrite'}catch{$rejected=$true}
+    if(-not $rejected){throw 'Export overwrite accepted'}
+    Write-Host 'PASS: v1/v2 manifests, Markdown spans, control stripping, raw export, path and overwrite guards.'
+}finally{Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}

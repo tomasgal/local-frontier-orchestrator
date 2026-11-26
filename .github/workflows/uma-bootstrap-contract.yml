@@ -8,6 +8,7 @@ on:
     paths:
       - 'install/Install-LFO.ps1'
       - 'LFO.ps1'
+      - 'src/QwenChat.ps1'
       - 'launch/Start-LFO.ps1'
       - 'launch/Start-LFO-UMA.ps1'
       - 'tests/Test-LfoUmaBootstrapContract.ps1'

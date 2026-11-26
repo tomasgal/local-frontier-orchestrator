@@ -1,10 +1,31 @@
 # Local Frontier Orchestrator
 
-**Current source version: v9.6.4 (2026-11-13) — security maintenance.** v9.6.4 retains the accepted v9.6.3 Windows runtime, L0–L4 memory semantics and High-priority inference profile. The patch hardens the Codex bootstrap installer and GitHub Actions dependency integrity; no existing installation needs migration to keep functioning.
+**Development source: v9.6.6-dev — UMA, Ollama manifest v2 compatibility, console Markdown and file exchange, incorporating v9.6.5 research tooling.** v9.6.5 retains the accepted v9.6.4 security hardening, v9.6.3 Windows runtime behavior, L0–L4 memory semantics and High-priority inference profile. It adds provider-neutral offline tooling for mediator parameter sweeps, frozen-response/replay-bank validation and paired neutral-vs-leading model audits; it does not promote P1/P2 into the normal response path.
 
-Release notes: [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 baseline](docs/RELEASE_V9.6.3.md).
+Release notes: [v9.6.5 research tooling](docs/RELEASE_V9.6.5.md) · [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 runtime baseline](docs/RELEASE_V9.6.3.md).
+
+## v9.6.5: controlled Human–AI research tooling
+
+v9.6.5 adds three deliberately narrow experiment-layer capabilities without reopening the accepted L0–L4 semantics:
+
+- **Mediator parameter sweeps:** a versioned schema and offline expander for detector sensitivity, intervention thresholds/weights, abstention thresholds and false-intervention budgets. Pilot tuning remains separate from confirmatory protocol freeze.
+- **Frozen-response / replay bank:** a provider-neutral schema plus deterministic validation for task IDs, prompt conditions, ground truth, response labels, stimulus class, provenance and validation status.
+- **Paired model audit:** a neutral-vs-leading audit-plan schema plus manifest builder and descriptive analyzer that distinguishes stable correct behavior, framing-independent model error, descriptive framing sensitivity and instability. The audit does not manufacture sycophancy and does not infer a psychological trait from a single response pair.
+
+Run the offline helper with `research/Invoke-LfoResearchTooling.ps1`; examples live under `experiments/research/`. These tools create/validate research artifacts only. They do not call Ollama, Codex or a commercial model and do not alter production memory.
+
+**Bootstrap behavior is unchanged apart from the source/runtime version label.** Existing installations do not need migration merely to keep running. Adopt v9.6.5 when the new research tooling or exact versioned source boundary is required.
 
 **v9.6.4 security hardening:** [technical decisions and acceptance evidence](docs/SECURITY_HARDENING_V964.md). The one-off [release publication workflow](.github/workflows/publish-v964.yml) supports its explicit publication commit and manual dispatch; normal source pushes do not trigger publication. GitHub release immutability must be enabled before publishing. The workflow verifies the published release reports `isImmutable=true`.
+
+## Research programme and dissemination
+
+The Human–AI research programme built on LFO is documented separately from the runtime:
+
+- [Balancing the Loop / Human–AI Bias Balancer](docs/HUMAN_AI_BIAS_BALANCER.md) — research questions, staged experimental design and appropriate-reliance framework;
+- [Generic Epistemic Mediator](docs/GENERIC_EPISTEMIC_MEDIATOR.md) — first-stage generic, non-personalized mediation specification;
+- [v9.6.5 research experiment tooling](docs/RESEARCH_TOOLING_V965.md) — parameter sweeps, replay-bank validation and paired model audits;
+- [Project dissemination](docs/DISSEMINATION.md) — departmental and conference dissemination of the research programme.
 
 **Related project:** [Codex Frontier Memory (CFM)](https://github.com/tomasgal/codex-frontier-memory) provides persistent MCP memory for standalone Codex sessions, whereas LFO orchestrates local Qwen and optional frontier escalation with its own L0–L4 memory; these projects are intentionally independent.
 
@@ -14,7 +35,7 @@ Release notes: [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 base
 
 ## v9.6.3: controlled runtime and unattended experiments
 
-v9.6.3 provides one primary Windows entrypoint for ordinary interactive use and reproducible experiments: The new experimental UMA target is described below.
+v9.6.3 provides one primary Windows entrypoint for ordinary interactive use and reproducible experiments:
 
 ~~~powershell
 .\LFO.ps1
@@ -79,12 +100,12 @@ A third `-Profile UMA` is available for the Windows 11 Minisforum / Ryzen AI Max
 The **UMA bootstrap** command is:
 
 ~~~powershell
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/main/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile UMA -SkipLaunch
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/feat/uma-bootstrap-20261123/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile UMA -SourceRef feat/uma-bootstrap-20261123 -SkipLaunch
 ~~~
 
 The initial `-SkipLaunch` keeps the running inference workload unchanged until a deliberate smoke test. The installer still requires the separate LFO/SurrealDB/Codex prerequisites and runs its L4 acceptance suite. Use `Start-LFO-UMA.ps1` (or `LFO.ps1 -Device UMA`) afterwards. **This is a development profile, not an accepted release target.** See [UMA bootstrap and MS-S1 MAX validation](docs/UMA_BOOTSTRAP.md) for prerequisites, feature-branch installation, isolation, tests and GPU-placement acceptance.
 
-The **CPU and GPU bootstrap paths** install/reuse the same LFO runtime and prepare **both** 4B model aliases and launchers in one shared Ollama model store. v9.6.3 also installs the primary `LFO.ps1` entrypoint and uses **High** inference priority by default; `-Priority Normal` remains an explicit override. CPU/GPU selection changes execution parameters only; it does not split model storage, LFO memory, logs, or L2–L4 state. `-Profile` selects the default profile recorded for the installation and the profile that is launched automatically at the end. Windows Explorer still opens the installed `launch` directory so the user can create shortcuts wherever desired; `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain explicit overrides. The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` only when you intentionally need a separate installation, such as an isolated acceptance tree. `-SkipLaunch` suppresses only the final automatic Qwen launch; `-SkipL4Acceptance` is for explicit troubleshooting only and is not part of the normal install path.
+The **CPU and GPU bootstrap paths** install/reuse the same LFO runtime and prepare **both** CPU and GPU model aliases and launchers in one shared Ollama model store. v9.6.3 also installs the primary `LFO.ps1` entrypoint and uses **High** inference priority by default; `-Priority Normal` remains an explicit override. CPU/GPU selection changes execution parameters only; it does not split model storage, LFO memory, logs, or L2–L4 state. `-Profile` selects the default profile recorded for the installation and the profile that is launched automatically at the end. Windows Explorer still opens the installed `launch` directory so the user can create shortcuts wherever desired; `Start-LFO-CPU.ps1` and `Start-LFO-GPU.ps1` remain explicit overrides. The default install root is `%LOCALAPPDATA%\LFO`. Use `-InstallRoot` only when you intentionally need a separate installation, such as an isolated acceptance tree. `-SkipLaunch` suppresses only the final automatic Qwen launch; `-SkipL4Acceptance` is for explicit troubleshooting only and is not part of the normal install path.
 
 ## macOS users: AI-assisted porting guidance
 
@@ -538,7 +559,7 @@ The transport path is working:
 local model -> ask_codex -> native Codex frontier -> local model
 ```
 
-**v9.6.4 is the security-maintenance source on `main`.** LOCAL/FRONTIER routing, synthesis, persistent memory and conservative L4 recording retain their accepted v9.6.3 semantics. Newly bootstrapped sources report v9.6.4; existing v9.6.3 installations continue working without reinstall.
+**The v9.6.6-dev UMA branch incorporates the v9.6.5 research baseline.** LOCAL/FRONTIER routing, synthesis, persistent memory and conservative L4 recording retain their accepted v9.6.3 semantics. Newly bootstrapped development sources report v9.6.6-dev; existing v9.6.3 installations continue working without reinstall.
 
 **v9.6.2 remains a historical tagged and Zenodo-archived release boundary.** The v9.6.3 promotion does not reopen the frozen L2/L3 baselines or enable P1/P2 response intervention.
 
