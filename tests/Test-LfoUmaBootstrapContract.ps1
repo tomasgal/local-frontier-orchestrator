@@ -73,7 +73,7 @@ try{
     if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
     Remove-Item -LiteralPath $old
     if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
-    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer')){
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy')){
         $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
         if($fn.Count -ne 1){throw "Missing helper $name"}
         . ([scriptblock]::Create($fn[0].Extent.Text))
@@ -134,6 +134,9 @@ try{
     if((Get-LfoPartialJsonAnswer '{"memory_ops":[{"answer":"secret"}]') -ne ''){throw 'Nested answer exposed'}
     if((Get-LfoPartialJsonAnswer '{"answer":"escaped \"quote\" and \u00') -ne 'escaped "quote" and'){throw 'Partial escape recovery failed'}
     if((Get-LfoPartialJsonAnswer '{"answer":"Complete","memory_ops":[') -ne 'Complete'){throw 'Complete answer prefix lost'}
+    if((Add-LfoStructuredAnswerPolicy 'base' 'GPU') -cne 'base'){throw 'Legacy answer policy changed'}
+    $answerPolicy=Add-LfoStructuredAnswerPolicy 'base' 'UMA'
+    if(-not $answerPolicy.StartsWith('base') -or -not $answerPolicy.Contains('\"') -or -not $answerPolicy.Contains('verbatim')){throw 'UMA structured answer policy missing'}
     Write-Host 'PASS: UMA generation ceilings, context estimate and partial JSON isolation.'
     Write-Host 'PASS: singleton experiment prompt arrays and batch input validation.'
     Write-Host 'PASS: aligned table layout, width, wrapping, multiline import and 1000-entry splitting.'

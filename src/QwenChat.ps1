@@ -115,8 +115,20 @@ function Expand-RuntimePolicy([string]$Template) {
     return $Template.Replace('{{CURRENT_DATE}}', $currentLocalDate)
 }
 
+# UMA-only mitigation for premature closure of JSON answer strings.
+# It is not a completeness detector and must not alter verbatim user data.
+function Add-LfoStructuredAnswerPolicy([string]$SystemText,[string]$Device){
+    if($Device -ne 'UMA'){return $SystemText}
+    return $SystemText+[Environment]::NewLine+[Environment]::NewLine+@'
+Structured answer writing:
+- Finish every requested section and complete the final sentence before closing the JSON answer string.
+- Avoid decorative quotation marks around ordinary terms in explanatory prose; write the term directly instead.
+- When quotation marks are necessary (verbatim quotations, source text, code or requested formatting), preserve the exact intended content. Inside the JSON answer string, encode literal ASCII double quotes as \" and backslashes as \\. Do not replace punctuation in verbatim material.
+- Closing the JSON answer string is the end of the user-facing response. Do not close it merely because a quoted phrase or example ends.
+'@
+}
 function Get-OrchestratorSystemPrompt {
-    return Expand-RuntimePolicy $script:OrchestratorSystemTemplate
+    return Add-LfoStructuredAnswerPolicy (Expand-RuntimePolicy $script:OrchestratorSystemTemplate) $env:LFO_RUNTIME_DEVICE
 }
 
 function Reset-Messages {
@@ -805,7 +817,7 @@ function Invoke-QwenLocalApi {
 function Invoke-QwenAnswerRecovery([string]$Prompt) {
     # A rare answer-only retry. The first pass remains the sole source of
     # memory_note, and this call cannot route or invoke Codex.
-    $systemText = 'Provide a complete user-facing answer to the most recent user message. Return only the answer field. If uncertain, say so plainly.'
+    $systemText = Add-LfoStructuredAnswerPolicy 'Provide a complete user-facing answer to the most recent user message. Return only the answer field. If uncertain, say so plainly.' $env:LFO_RUNTIME_DEVICE
     $memoryBlock = Get-LfoTurnMemoryBlock $Prompt
     if (-not [string]::IsNullOrWhiteSpace($memoryBlock)) {
         $systemText += [Environment]::NewLine + [Environment]::NewLine +
@@ -834,7 +846,7 @@ function Invoke-QwenAnswerRecovery([string]$Prompt) {
 }
 
 function Invoke-QwenSynthesis([string]$OriginalPrompt, [string]$FrontierResult) {
-    $synthesisSystem = Expand-RuntimePolicy $script:SynthesisSystemTemplate
+    $synthesisSystem = Add-LfoStructuredAnswerPolicy (Expand-RuntimePolicy $script:SynthesisSystemTemplate) $env:LFO_RUNTIME_DEVICE
     $l2EvidenceScope = @'
 The evidence for L2 is the ORIGINAL USER REQUEST plus the FRONTIER RESULT supplied to this synthesis pass.
 Treat the frontier as an external brain/input: interpret it, reconcile it with the request, and emit only durable factual state that you accept after synthesis.
