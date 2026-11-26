@@ -1521,7 +1521,7 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.6.7-dev. Commands: /exit, /clear, /paste, /think on, /think off, /analyze, /files, /import, /export, /export-log, /route, /stream"
+Write-Host "Qwen local chat v9.6.7-dev. Commands: /exit, /clear, /paste, /think on, /think off, /analyze, /files, /import, /export, /export-log, /route, /stream, /help"
 Write-Host ("Streaming: {0}; routing mode: {1}. /stream on|off; /route auto|local|frontier" -f $script:LfoStreamEnabled,$script:LfoRouteMode)
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
@@ -1540,6 +1540,62 @@ $script:LfoImportDir=if($env:LFO_IMPORT_DIR){$env:LFO_IMPORT_DIR}else{Join-Path 
 $script:LfoExportDir=if($env:LFO_EXPORT_DIR){$env:LFO_EXPORT_DIR}else{Join-Path $transferRoot 'export'}
 $script:LfoLastExportAnswer=''
 $script:LfoImportQueue=$null
+# Reserve slash-prefixed interactive entries for the local command UI.
+# Invalid commands must not reach routing, inference, memory or Codex.
+function Get-LfoSlashCommands {
+    return [ordered]@{
+        '/help'=@{Usage='/help [command]';Pattern='\A/help(?:[ \t]+/?[a-z-]+)?\z'}
+        '/think'=@{Usage='/think on | /think off';Pattern='\A/think[ \t]+(?:on|off)\z'}
+        '/route'=@{Usage='/route auto | /route local | /route frontier';Pattern='\A/route[ \t]+(?:auto|local|frontier)\z'}
+        '/stream'=@{Usage='/stream on | /stream off';Pattern='\A/stream[ \t]+(?:on|off)\z'}
+        '/analyze'=@{Usage='/analyze [1..100 turns] (default: 8)';Pattern='\A/analyze(?:[ \t]+(?:0{0,2}[1-9]|0?[1-9][0-9]|100))?\z'}
+        '/files'=@{Usage='/files';Pattern='\A/files\z'}
+        '/import'=@{Usage='/import <filename>';Pattern='\A/import[ \t]+[^\r\n]+\z'}
+        '/export'=@{Usage='/export [filename]';Pattern='\A/export(?:[ \t]+[^\r\n]+)?\z'}
+        '/export-log'=@{Usage='/export-log';Pattern='\A/export-log\z'}
+        '/paste'=@{Usage='/paste';Pattern='\A/paste\z'}
+        '/clear'=@{Usage='/clear';Pattern='\A/clear\z'}
+        '/exit'=@{Usage='/exit';Pattern='\A/exit\z'}
+    }
+}
+function Get-LfoSlashCommandState([string]$Prompt){
+    $trimmed=$Prompt.Trim()
+    if(-not $trimmed.StartsWith('/')){return 'PROMPT'}
+    $key=($trimmed -split '\s+',2)[0].ToLowerInvariant()
+    $commands=Get-LfoSlashCommands
+    if(-not $commands.Contains($key)){return 'UNKNOWN'}
+    if($trimmed -notmatch $commands[$key].Pattern){return 'USAGE'}
+    return 'VALID'
+}
+function Show-LfoSlashHelp([string]$Command,[switch]$ExplicitHelp){
+    $commands=Get-LfoSlashCommands
+    $key=($Command.Trim() -split '\s+',2)[0].ToLowerInvariant()
+    if($ExplicitHelp -and $key -and -not $key.StartsWith('/')){$key='/'+$key}
+    if($ExplicitHelp -and -not $key){
+        Write-Host 'Available commands:' -ForegroundColor Cyan
+        foreach($entry in $commands.Values){Write-Host ('  '+$entry.Usage)}
+        return
+    }
+    if($commands.Contains($key)){
+        if($key -eq '/think'){
+            Write-Host ('Thinking: '+$(if($script:ThinkEnabled){'ON'}else{'OFF'})) -ForegroundColor Cyan
+        }elseif($key -eq '/route'){
+            Write-Host ('Routing mode: '+$script:LfoRouteMode) -ForegroundColor Cyan
+        }elseif($key -eq '/stream'){
+            Write-Host ('Streaming: '+$(if($script:LfoStreamEnabled){'ON'}else{'OFF'})) -ForegroundColor Cyan
+        }
+        Write-Host ('Usage: '+$commands[$key].Usage) -ForegroundColor Yellow
+        return
+    }
+    Write-Host ('Unknown command: '+(ConvertTo-LfoSafeConsoleText $key)) -ForegroundColor Yellow
+    foreach($candidate in $commands.Keys){
+        if($candidate.StartsWith($key,[StringComparison]::OrdinalIgnoreCase)){
+            Write-Host ('  '+$commands[$candidate].Usage) -ForegroundColor Cyan
+        }
+    }
+    Write-Host 'Use /help to list available commands.' -ForegroundColor Cyan
+}
+
 while ($true) {
     if($script:LfoImportQueue -and $script:LfoImportQueue.Count -gt 0){
         $prompt=$script:LfoImportQueue.Dequeue()
@@ -1552,7 +1608,17 @@ while ($true) {
     }
     if ($null -eq $prompt) { continue }
 
+    $commandState=Get-LfoSlashCommandState $prompt
+    if($commandState -in @('USAGE','UNKNOWN')){
+        Show-LfoSlashHelp $prompt
+        continue
+    }
+
     switch -Regex ($prompt.Trim()) {
+        '^/help(?:\s+(.+))?$' {
+            Show-LfoSlashHelp ([string]$Matches[1]) -ExplicitHelp
+            continue
+        }
         '^/analyze(?:\s|$)' {
             if($script:LfoL4Loaded){
                 Invoke-LfoL4AnalyzeCommand -Command $prompt -Epoch ([int]$script:RuntimeState.epoch) -LastTurn ([int]$script:RuntimeState.next_turn_id-1)
@@ -1646,7 +1712,7 @@ while ($true) {
             continue
         }
         default {
-            Invoke-Qwen $prompt
+            if($commandState -eq 'PROMPT'){Invoke-Qwen $prompt}else{Show-LfoSlashHelp $prompt}
         }
     }
 }

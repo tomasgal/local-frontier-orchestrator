@@ -73,7 +73,7 @@ try{
     if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
     Remove-Item -LiteralPath $old
     if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
-    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Read-LfoChatNdjson','Write-LfoStreamThinkingChunk','Show-QwenThinking','Wait-LfoCodexExit')){
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Read-LfoChatNdjson','Write-LfoStreamThinkingChunk','Show-QwenThinking','Wait-LfoCodexExit','Get-LfoSlashCommands','Get-LfoSlashCommandState','Show-LfoSlashHelp')){
         $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
         if($fn.Count -ne 1){throw "Missing helper $name"}
         . ([scriptblock]::Create($fn[0].Extent.Text))
@@ -213,6 +213,25 @@ try{
     $heartbeatMessage=$heartbeatRecords[0].MessageData
     if(-not ([string]$heartbeatMessage).StartsWith([string][char]13) -or -not $heartbeatMessage.NoNewLine){throw 'Codex heartbeat did not overwrite current line'}
     if($heartbeatRecords[1].MessageData.NoNewLine){throw 'Codex heartbeat left terminal line open'}
+    # Every documented command has a valid form; every invalid slash entry
+    # stays in the local UI. Optional arguments preserve their defaults.
+    $validCommands=@('/help','/help think','/help /route','/think on','/THINK OFF','/route auto','/route local','/route frontier','/stream on','/stream off','/analyze','/analyze 001','/analyze 100','/files','/import prompt file.txt','/export','/export answer.md','/export-log','/paste','/clear','/exit')
+    foreach($cmd in $validCommands){if((Get-LfoSlashCommandState $cmd) -ne 'VALID'){throw "Valid command rejected: $cmd"}}
+    $invalidCommands=@('/think','/think maybe','/route','/route web','/stream','/stream yes','/analyze 0','/analyze 101','/analyze x','/import','/files x','/export-log x','/paste x','/clear x','/exit x','/help two words')
+    foreach($cmd in $invalidCommands){if((Get-LfoSlashCommandState $cmd) -ne 'USAGE'){throw "Invalid command bypassed help: $cmd"}}
+    foreach($cmd in @('/th','/thnik','/unknown','/')){if((Get-LfoSlashCommandState $cmd) -ne 'UNKNOWN'){throw "Unknown slash command accepted: $cmd"}}
+    if((Get-LfoSlashCommandState 'Explain /think on') -ne 'PROMPT'){throw 'Ordinary prompt mistaken for command'}
+    $helpOutput=@(Show-LfoSlashHelp '/think' 6>&1)
+    if(($helpOutput -join ' ') -notmatch '/think on.*?/think off'){throw 'Missing thinking parameter help'}
+    $helpOutput=@(Show-LfoSlashHelp '' -ExplicitHelp 6>&1)
+    foreach($key in (Get-LfoSlashCommands).Keys){if(($helpOutput -join ' ') -notmatch [regex]::Escape($key)){throw "Help missing $key"}}
+    # Check actual dispatcher contains the guard before routing, including
+    # queued interactive imports. Experiment adapter still calls Invoke-Qwen directly.
+    $chatSource=Get-Content -LiteralPath (Join-Path $root 'src/QwenChat.ps1') -Raw -Encoding UTF8
+    $loop=$chatSource.Substring($chatSource.LastIndexOf('while ($true) {'))
+    if($loop.IndexOf('$commandState=Get-LfoSlashCommandState $prompt') -lt 0 -or $loop.IndexOf('$commandState=Get-LfoSlashCommandState $prompt') -gt $loop.IndexOf('switch -Regex')){throw 'Missing pre-dispatch command guard'}
+    if(-not $loop.Contains("if("+ '$commandState' +" -eq 'PROMPT'){Invoke-Qwen "+'$prompt'+"}")){throw 'Default dispatcher can send slash commands to inference'}
+    Write-Host 'PASS: all slash-command parameter validation, help and inference guard.'
     Write-Host 'PASS: thinking preview, answer continuation, no duplicate reasoning, and Codex wait modes.'
     Write-Host 'PASS: AUTO preview independent of final route.'
     Write-Host 'PASS: explicit routing, Markdown stream boundaries, NDJSON assembly and incomplete transport rejection.'
