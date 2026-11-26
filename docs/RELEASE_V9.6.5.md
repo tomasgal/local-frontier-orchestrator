@@ -20,3 +20,7 @@ The research layer explicitly separates spontaneous model error from framing-ind
 ## Validation
 
 Release acceptance requires Windows PowerShell 5.1 parser acceptance, deterministic `Test-ResearchToolingV965.ps1` PASS, and the inherited Codex installer-integrity regression PASS. No debiasing-efficacy claim follows from these tooling tests.
+
+## Pre-publication acceptance
+
+The promoted `main` source at commit `3ff327eec39f049bb9369abed87b45fc858a304f` passed the Windows v9.6.5 research-tooling gate on 2026-11-26: changed PowerShell parsed successfully, the deterministic research-tooling suite passed, and the inherited v9.6.4 Codex installer-integrity regression passed. The publication workflow repeats these gates against the exact release commit before tagging.
