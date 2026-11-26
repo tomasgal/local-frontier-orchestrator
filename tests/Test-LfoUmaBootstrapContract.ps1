@@ -1,7 +1,7 @@
 # Offline UMA contract and PowerShell AST checks; no model inference or service lifecycle.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$paths = @('install/Install-LFO.ps1','LFO.ps1','launch/Start-LFO.ps1','launch/Start-LFO-UMA.ps1','src/QwenChat.ps1')
+$paths = @('install/Install-LFO.ps1','LFO.ps1','launch/Start-LFO.ps1','launch/Start-LFO-UMA.ps1','src/QwenChat.ps1','src/QwenMemory.ps1')
 $asts = @{}
 foreach ($path in $paths) {
     $full = Join-Path $root ($path -replace '/','\')
@@ -83,7 +83,7 @@ try{
     if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
     Remove-Item -LiteralPath $old
     if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
-    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Read-LfoChatNdjson','Write-LfoStreamThinkingChunk','Show-QwenThinking','Wait-LfoCodexExit','Get-LfoSlashCommands','Get-LfoSlashCommandState','Show-LfoSlashHelp','Add-LfoLocalEvidencePolicy')){
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Read-LfoChatNdjson','Write-LfoStreamThinkingChunk','Show-QwenThinking','Wait-LfoCodexExit','Get-LfoSlashCommands','Get-LfoSlashCommandState','Show-LfoSlashHelp','Add-LfoLocalEvidencePolicy','Expand-RuntimePolicy','Get-OrchestratorSystemPrompt','Get-QwenLocalOutputFormat')){
         $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
         if($fn.Count -ne 1){throw "Missing helper $name"}
         . ([scriptblock]::Create($fn[0].Extent.Text))
@@ -244,6 +244,43 @@ try{
     $evidencePolicy=Add-LfoLocalEvidencePolicy 'base' 'LOCAL'
     if($evidencePolicy -notmatch 'no live external lookup' -or $evidencePolicy -notmatch 'LOCAL is explicitly enforced' -or $evidencePolicy -notmatch 'not fresh verification'){throw 'Missing local evidence boundary'}
     if((Add-LfoLocalEvidencePolicy 'base' 'AUTO') -match 'LOCAL is explicitly enforced'){throw 'AUTO incorrectly forced local'}
+    # Actual template and output format, with batch/auto controls unchanged.
+    $script:OrchestratorSystemTemplate=Get-Content -LiteralPath (Join-Path $root 'policy/orchestrator-system.txt') -Raw -Encoding UTF8
+    $script:LocalOnlySystemTemplate=Get-Content -LiteralPath (Join-Path $root 'policy/orchestrator-local-system.txt') -Raw -Encoding UTF8
+    $oldBatch=$env:LFO_RUNTIME_BATCH
+    $oldDevice=$env:LFO_RUNTIME_DEVICE
+    $oldRoute=$script:LfoTurnRouteMode
+    function Test-LfoDev5CompactReadEligible { return $script:testCompact }
+    function Get-LfoStructuredMemoryOperationSchema([int]$MaxOps) { return @{type='array'} }
+    $script:MemoryNoteMaxChars=40
+    try{
+        $env:LFO_RUNTIME_BATCH='0'
+        $env:LFO_RUNTIME_DEVICE='UMA'
+        $script:LfoTurnRouteMode='LOCAL'
+        $localPolicy=Get-OrchestratorSystemPrompt
+        if($localPolicy -match '(?i)FRONTIER|leave answer empty'){throw 'Forced LOCAL retains delegation instruction'}
+        $maxim='Unknown does not mean false. Unchecked does not mean verified. Failure to recall does not establish nonexistence.'
+        if(-not $localPolicy.Contains($maxim) -or $maxim -match '[^\x20-\x7E]'){throw 'ASCII epistemic policy missing'}
+        if(-not $localPolicy.Contains('Apply these rules silently; do not recite them or change the required answer format.')){throw 'Missing output-format protection'}
+        foreach($script:testCompact in @($false,$true)){
+            $schema=Get-QwenLocalOutputFormat
+            if(@($schema.properties.route.enum).Count -ne 1 -or $schema.properties.route.enum[0] -cne 'LOCAL' -or $schema.properties.answer.description -match 'FRONTIER'){throw 'Forced LOCAL schema contains delegation'}
+            $expectedFields=if($script:testCompact){2}else{4}
+            if($schema.required.Count -ne $expectedFields){throw 'LOCAL schema fields changed'}
+        }
+        $script:LfoTurnRouteMode='AUTO'
+        if((Get-OrchestratorSystemPrompt) -notmatch 'For FRONTIER, leave answer empty'){throw 'AUTO routing policy removed'}
+        $schema=Get-QwenLocalOutputFormat
+        if(@($schema.properties.route.enum).Count -ne 2){throw 'AUTO schema restricted'}
+        $env:LFO_RUNTIME_BATCH='1'
+        $script:LfoTurnRouteMode='LOCAL'
+        if((Get-OrchestratorSystemPrompt) -notmatch 'For FRONTIER, leave answer empty'){throw 'Batch policy changed'}
+        Write-Host 'PASS: forced LOCAL template and schema; ASCII epistemic guidance; AUTO/batch policy preserved.'
+    }finally{
+        $env:LFO_RUNTIME_BATCH=$oldBatch
+        $env:LFO_RUNTIME_DEVICE=$oldDevice
+        $script:LfoTurnRouteMode=$oldRoute
+    }
     . (Join-Path $root 'src/LfoTurnTelemetry.ps1')
     $testPhases=@(
         [pscustomobject]@{kind='model';phase='local_generation';prompt_eval_count=100;eval_count=20;decode_seconds=0.5},

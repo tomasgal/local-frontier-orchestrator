@@ -1042,11 +1042,16 @@ When historical values conflict, prefer explicit later corrections and state unc
     } else {
         # Validated extraction policy stays completely unchanged for ordinary
         # full-schema writes AND for candidate A-only control trials.
-        $l2EvidenceScope = @'
+        $l2EvidenceScope = if($env:LFO_RUNTIME_BATCH -ne '1' -and $script:LfoTurnRouteMode -eq 'LOCAL'){@'
+The L2 evidence is the CURRENT USER TURN as interpreted by this Qwen pass.
+Do not derive L2 operations from old STATE, PENDING, RELEVANT OLD DATA, CURRENT STRUCTURED FACTS (L2), or older turns unless the current turn explicitly re-establishes the fact.
+'@
+        }else{@'
 For route LOCAL, the L2 evidence is the CURRENT USER TURN as interpreted by this Qwen pass.
 For route FRONTIER, emit memory_ops=[] because the post-frontier synthesis pass owns L2 memory for the turn.
 Do not derive L2 operations from old STATE, PENDING, RELEVANT OLD DATA, CURRENT STRUCTURED FACTS (L2), or older turns unless the current turn explicitly re-establishes the fact.
 '@
+        }
         $systemText += [Environment]::NewLine + [Environment]::NewLine +
             $script:L2StructuredMemoryTemplate.Replace('{{L2_EVIDENCE_SCOPE}}', $l2EvidenceScope.Trim())
     }
@@ -1196,6 +1201,7 @@ function Get-PolicyFingerprint {
     $parts = @()
     foreach ($name in @(
         'orchestrator-system.txt',
+        'orchestrator-local-system.txt',
         'synthesis-system.txt',
         'frontier-subagent.txt',
         'memory-compaction-system.txt'

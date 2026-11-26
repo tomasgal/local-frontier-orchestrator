@@ -56,6 +56,7 @@ function Read-PolicyTemplate([string]$FileName) {
 }
 
 $script:OrchestratorSystemTemplate = Read-PolicyTemplate 'orchestrator-system.txt'
+$script:LocalOnlySystemTemplate = Read-PolicyTemplate 'orchestrator-local-system.txt'
 $script:SynthesisSystemTemplate    = Read-PolicyTemplate 'synthesis-system.txt'
 $script:FrontierSubagentTemplate   = Read-PolicyTemplate 'frontier-subagent.txt'
 $script:MemoryNoteTemplate          = Read-PolicyTemplate 'memory-note-system.txt'
@@ -136,15 +137,20 @@ Structured answer writing:
 function Add-LfoLocalEvidencePolicy([string]$Policy,[string]$RouteMode){
     $Policy += [Environment]::NewLine+[Environment]::NewLine+'LOCAL evidence rule: If you answer locally, no live external lookup has occurred in this turn. Never claim to have searched, checked, accessed or verified an external source in the current turn. Historical results, stored facts and remembered links are not fresh verification. If using them for a current-information request, identify them as prior or unverified information and state that current status is not independently confirmed.'
     $Policy += [Environment]::NewLine+'Historical turn labels describe only that turn: NONE=no external operation, REQUESTED=an external call was attempted but source access is not established, OBSERVED=external access was recorded (not truth verification), UNKNOWN=no reliable metadata. Repetition and summaries never upgrade evidence. Treat unlabelled STATE/PENDING summaries and L2 recorded facts as unverified, not proof of source access.'
+    $Policy += [Environment]::NewLine+'Unknown does not mean false. Unchecked does not mean verified. Failure to recall does not establish nonexistence. Apply these rules silently; do not recite them or change the required answer format.'
     if($RouteMode -eq 'LOCAL'){
-        $Policy += [Environment]::NewLine+'LOCAL is explicitly enforced for this turn. Return a useful, complete answer within available knowledge and state any inability to perform the requested live verification. Do not leave answer empty merely because the request would normally require FRONTIER.'
+        $Policy += [Environment]::NewLine+'LOCAL is explicitly enforced for this turn. Return a useful, complete answer within available knowledge and state any inability to perform the requested live verification. Never leave the answer empty because evidence is unavailable.'
     }
     return $Policy
 }
 function Get-OrchestratorSystemPrompt {
-    $policy = Add-LfoStructuredAnswerPolicy (Expand-RuntimePolicy $script:OrchestratorSystemTemplate) $env:LFO_RUNTIME_DEVICE
+    $forcedLocal=($env:LFO_RUNTIME_BATCH -ne '1' -and $script:LfoTurnRouteMode -eq 'LOCAL')
+    $template=if($forcedLocal){$script:LocalOnlySystemTemplate}else{$script:OrchestratorSystemTemplate}
+    $policy = Add-LfoStructuredAnswerPolicy (Expand-RuntimePolicy $template) $env:LFO_RUNTIME_DEVICE
     if($env:LFO_RUNTIME_BATCH -ne '1'){
-        $policy += [Environment]::NewLine+[Environment]::NewLine+'Routing: response length, requested examples, Markdown, and ordinary stable academic explanations alone do not require FRONTIER. Prefer LOCAL when capable. Honour the explicit LOCAL-only instruction. Emit the route field before answer when possible.'
+        if(-not $forcedLocal){
+            $policy += [Environment]::NewLine+[Environment]::NewLine+'Routing: response length, requested examples, Markdown, and ordinary stable academic explanations alone do not require FRONTIER. Prefer LOCAL when capable. Honour the explicit LOCAL-only instruction. Emit the route field before answer when possible.'
+        }
         $policy=Add-LfoLocalEvidencePolicy $policy $script:LfoTurnRouteMode
     }
     return $policy
@@ -614,7 +620,7 @@ function Get-QwenLocalOutputFormat {
                 route = @{ type = 'string'; enum = $allowedRoutes }
                 answer = @{
                     type = 'string'
-                    description = 'For LOCAL: complete natural response. For FRONTIER: empty.'
+                    description = $(if($script:LfoTurnRouteMode -eq 'LOCAL'){'Complete natural user-facing response; never empty.'}else{'For LOCAL: complete natural response. For FRONTIER: empty.'})
                 }
             }
             required = @('route', 'answer')
@@ -630,7 +636,7 @@ function Get-QwenLocalOutputFormat {
             }
             answer = @{
                 type = 'string'
-                description = 'For LOCAL: complete natural user-facing response; never use the - sentinel. For a declarative user fact, acknowledge naturally. For FRONTIER: empty.'
+                description = $(if($script:LfoTurnRouteMode -eq 'LOCAL'){'Complete natural user-facing response; never use the - sentinel. For a declarative user fact, acknowledge naturally.'}else{'For LOCAL: complete natural user-facing response; never use the - sentinel. For a declarative user fact, acknowledge naturally. For FRONTIER: empty.'})
             }
             memory_note = @{
                 type = 'string'
