@@ -44,7 +44,7 @@ L3  retrieval and resolution
 L4  event-scoped epistemic observations / bounded analytics
 ```
 
-The operational v9.6.2 line preserves conservative post-L0 L4 recording and explicit `/analyze` reads. P1/P2 response intervention remains disconnected/OFF in the normal runtime.
+The current LFO source line preserves conservative post-L0 L4 recording and explicit `/analyze` reads. P1/P2 response intervention remains disconnected/OFF in the normal runtime. The current v9.6.5 research-tooling release adds offline experiment support without changing this runtime boundary.
 
 This distinction is important: the **research substrate exists**, while the epistemic-balancing policy, its parameters, and its empirical efficacy remain research questions.
 
@@ -244,6 +244,8 @@ The controlled apparatus should record or archive, as applicable:
 
 A public code/protocol release is useful but is a dissemination output, not evidence of efficacy. Where appropriate, a GitHub release can be archived through Zenodo to obtain a persistent DOI.
 
+Current public/academic dissemination is tracked in [Project dissemination](DISSEMINATION.md), including departmental presentation through the Comenius University Cognitive Science seminar programme and the *Informačné interakcie* conference poster archived on Zenodo.
+
 ## 11. Minimum defensible result
 
 A bounded empirical project can be complete with:
@@ -273,3 +275,4 @@ Personalization, a full longitudinal extension, live-frontier replication, and p
 - [L4 recording and manual analysis](L4_RECORDING_MANUAL_ANALYSIS.md)
 - [LFO architecture](ARCHITECTURE.md)
 - [Roadmap](ROADMAP.md)
+- [Project dissemination](DISSEMINATION.md)

@@ -18,6 +18,15 @@ Run the offline helper with `research/Invoke-LfoResearchTooling.ps1`; examples l
 
 **v9.6.4 security hardening:** [technical decisions and acceptance evidence](docs/SECURITY_HARDENING_V964.md). The one-off [release publication workflow](.github/workflows/publish-v964.yml) supports its explicit publication commit and manual dispatch; normal source pushes do not trigger publication. GitHub release immutability must be enabled before publishing. The workflow verifies the published release reports `isImmutable=true`.
 
+## Research programme and dissemination
+
+The Human–AI research programme built on LFO is documented separately from the runtime:
+
+- [Balancing the Loop / Human–AI Bias Balancer](docs/HUMAN_AI_BIAS_BALANCER.md) — research questions, staged experimental design and appropriate-reliance framework;
+- [Generic Epistemic Mediator](docs/GENERIC_EPISTEMIC_MEDIATOR.md) — first-stage generic, non-personalized mediation specification;
+- [v9.6.5 research experiment tooling](docs/RESEARCH_TOOLING_V965.md) — parameter sweeps, replay-bank validation and paired model audits;
+- [Project dissemination](docs/DISSEMINATION.md) — departmental and conference dissemination of the research programme.
+
 **Related project:** [Codex Frontier Memory (CFM)](https://github.com/tomasgal/codex-frontier-memory) provides persistent MCP memory for standalone Codex sessions, whereas LFO orchestrates local Qwen and optional frontier escalation with its own L0–L4 memory; these projects are intentionally independent.
 
 **Previous baseline release:** [`v9.6.3`](https://github.com/tomasgal/local-frontier-orchestrator/tree/v9.6.3), published 2026-10-20 with annotated tag object `bfd0e6b482a1c4819fca39c68f3a32bf62921709` resolving to commit `4f89badcd1a3f91ecdf32666566e9d81efff0cda`. Its accepted runtime behavior is retained in v9.6.4. GitHub's separate immutable-release protection is required for cryptographic release/tag immutability guarantees.
