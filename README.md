@@ -1,8 +1,20 @@
 # Local Frontier Orchestrator
 
-**Current source version: v9.6.4 (2026-11-13) — security maintenance.** v9.6.4 retains the accepted v9.6.3 Windows runtime, L0–L4 memory semantics and High-priority inference profile. The patch hardens the Codex bootstrap installer and GitHub Actions dependency integrity; no existing installation needs migration to keep functioning.
+**Current source version: v9.6.5 (2026-11-26) — research experiment tooling.** v9.6.5 retains the accepted v9.6.4 security hardening, v9.6.3 Windows runtime behavior, L0–L4 memory semantics and High-priority inference profile. It adds provider-neutral offline tooling for mediator parameter sweeps, frozen-response/replay-bank validation and paired neutral-vs-leading model audits; it does not promote P1/P2 into the normal response path.
 
-Release notes: [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 baseline](docs/RELEASE_V9.6.3.md).
+Release notes: [v9.6.5 research tooling](docs/RELEASE_V9.6.5.md) · [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 runtime baseline](docs/RELEASE_V9.6.3.md).
+
+## v9.6.5: controlled Human–AI research tooling
+
+v9.6.5 adds three deliberately narrow experiment-layer capabilities without reopening the accepted L0–L4 semantics:
+
+- **Mediator parameter sweeps:** a versioned schema and offline expander for detector sensitivity, intervention thresholds/weights, abstention thresholds and false-intervention budgets. Pilot tuning remains separate from confirmatory protocol freeze.
+- **Frozen-response / replay bank:** a provider-neutral schema plus deterministic validation for task IDs, prompt conditions, ground truth, response labels, stimulus class, provenance and validation status.
+- **Paired model audit:** a neutral-vs-leading audit-plan schema plus manifest builder and descriptive analyzer that distinguishes stable correct behavior, framing-independent model error, descriptive framing sensitivity and instability. The audit does not manufacture sycophancy and does not infer a psychological trait from a single response pair.
+
+Run the offline helper with `research/Invoke-LfoResearchTooling.ps1`; examples live under `experiments/research/`. These tools create/validate research artifacts only. They do not call Ollama, Codex or a commercial model and do not alter production memory.
+
+**Bootstrap behavior is unchanged apart from the source/runtime version label.** Existing installations do not need migration merely to keep running. Adopt v9.6.5 when the new research tooling or exact versioned source boundary is required.
 
 **v9.6.4 security hardening:** [technical decisions and acceptance evidence](docs/SECURITY_HARDENING_V964.md). The one-off [release publication workflow](.github/workflows/publish-v964.yml) supports its explicit publication commit and manual dispatch; normal source pushes do not trigger publication. GitHub release immutability must be enabled before publishing. The workflow verifies the published release reports `isImmutable=true`.
 

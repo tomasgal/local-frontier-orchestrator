@@ -1,0 +1,1 @@
+{"schema":"lfo-mediator-parameter-sweep-v1","name":"generic-framing-pilot","phenomenon":"leading-framing","referenceCondition":"neutral","parameters":{"detectorSensitivity":[0.35,0.55],"interventionThreshold":[0.4,0.6],"interventionWeight":[0.5,1.0],"abstentionThreshold":[0.2],"falseInterventionBudget":[0.05,0.1]}}
