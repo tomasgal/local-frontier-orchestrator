@@ -48,15 +48,15 @@ function Write-LfoResearchJsonLines {
 }
 function Read-LfoResearchJsonLines {
     param([Parameter(Mandatory = $true)][string]$Path)
-    $rows = New-Object 'System.Collections.Generic.List[object]'
+    $rows = @()
     $lineNumber = 0
     foreach ($line in @(Get-Content -LiteralPath $Path -Encoding UTF8)) {
         $lineNumber++
         if ([string]::IsNullOrWhiteSpace([string]$line)) { continue }
-        try { [void]$rows.Add(($line | ConvertFrom-Json)) }
+        try { $rows += ($line | ConvertFrom-Json)) }
         catch { throw "Invalid JSONL at line $lineNumber in '$Path': $($_.Exception.Message)" }
     }
-    return @($rows)
+    return @($rows
 }
 function Assert-LfoResearchProperty {
     param([Parameter(Mandatory = $true)]$Object,[Parameter(Mandatory = $true)][string]$Name,[Parameter(Mandatory = $true)][string]$Context)
@@ -93,7 +93,7 @@ function Invoke-LfoResearchExpandParameterSweep {
     $rows = New-Object 'System.Collections.Generic.List[object]'
     foreach ($s in $sensitivities) { foreach ($t in $thresholds) { foreach ($w in $weights) { foreach ($a in $abstentions) { foreach ($b in $budgets) {
         $canonical = [ordered]@{sweep=$name;phenomenon=$phenomenon;referenceCondition=$reference;detectorSensitivity=$s;interventionThreshold=$t;interventionWeight=$w;abstentionThreshold=$a;falseInterventionBudget=$b} | ConvertTo-Json -Compress
-        [void]$rows.Add([pscustomobject][ordered]@{schema='lfo-mediator-parameter-config-v1';sweepName=$name;configId=('cfg-' + (Get-LfoResearchSha256 $canonical).Substring(0,12));phenomenon=$phenomenon;referenceCondition=$reference;detectorSensitivity=$s;interventionThreshold=$t;interventionWeight=$w;abstentionThreshold=$a;falseInterventionBudget=$b;status='pilot_candidate'})
+        $rows += [pscustomobject][ordered]@{schema='lfo-mediator-parameter-config-v1';sweepName=$name;configId=('cfg-' + (Get-LfoResearchSha256 $canonical).Substring(0,12));phenomenon=$phenomenon;referenceCondition=$reference;detectorSensitivity=$s;interventionThreshold=$t;interventionWeight=$w;abstentionThreshold=$a;falseInterventionBudget=$b;status='pilot_candidate'}
     }}}}}
     $output = if ([string]::IsNullOrWhiteSpace($RequestedOutput)) { Get-LfoResearchDefaultOutput -InputPath $ResolvedInput -Suffix '.expanded.jsonl' } else { $RequestedOutput }
     Write-LfoResearchJsonLines -Path $output -Rows @($rows)
@@ -139,11 +139,11 @@ function Invoke-LfoResearchBuildModelAuditManifest {
         $taskId=[string](Assert-LfoResearchProperty $task 'taskId' 'Model audit task');$groundTruth=[string](Assert-LfoResearchProperty $task 'groundTruth' "Model audit task '$taskId'");$neutral=[string](Assert-LfoResearchProperty $task 'neutralPrompt' "Model audit task '$taskId'");$leading=[string](Assert-LfoResearchProperty $task 'leadingPrompt' "Model audit task '$taskId'")
         for($rep=1;$rep -le $repetitions;$rep++){
             $conditions=if(($rep%2)-eq 1){@('neutral','leading')}else{@('leading','neutral')};$order=0
-            foreach($condition in $conditions){$order++;$prompt=if($condition -eq 'neutral'){$neutral}else{$leading};$canonical="$auditId|$taskId|$rep|$condition";[void]$rows.Add([pscustomobject][ordered]@{schema='lfo-model-audit-row-v1';auditId=$auditId;rowId=('audit-'+(Get-LfoResearchSha256 $canonical).Substring(0,12));taskId=$taskId;repetition=$rep;pairOrder=$order;promptCondition=$condition;groundTruth=$groundTruth;prompt=$prompt;observedAnswer=$null;rawResponse=$null;provider=$null;model=$null;capturedAtUtc=$null})}
+            foreach($condition in $conditions){$order++;$prompt=if($condition -eq 'neutral'){$neutral}else{$leading};$canonical="$auditId|$taskId|$rep|$condition";$rows += [pscustomobject][ordered]@{schema='lfo-model-audit-row-v1';auditId=$auditId;rowId=('audit-'+(Get-LfoResearchSha256 $canonical).Substring(0,12));taskId=$taskId;repetition=$rep;pairOrder=$order;promptCondition=$condition;groundTruth=$groundTruth;prompt=$prompt;observedAnswer=$null;rawResponse=$null;provider=$null;model=$null;capturedAtUtc=$null})}
         }
     }
     $output=if([string]::IsNullOrWhiteSpace($RequestedOutput)){Get-LfoResearchDefaultOutput -InputPath $ResolvedInput -Suffix '.manifest.jsonl'}else{$RequestedOutput}
-    Write-LfoResearchJsonLines -Path $output -Rows @($rows)
+    Write-LfoResearchJsonLines -Path $output -Rows @($rows
     [pscustomobject]@{PASS=$true;Mode='BuildModelAuditManifest';AuditId=$auditId;Tasks=$tasks.Count;Repetitions=$repetitions;Rows=$rows.Count;OutputPath=[IO.Path]::GetFullPath($output);ModelCalls=0;ProductionMemoryTouched=$false}|Format-List
 }
 function Get-LfoResearchDistributionSignature {
@@ -154,7 +154,7 @@ function Invoke-LfoResearchAnalyzeModelAudit {
     param([string]$ResolvedInput,[string]$RequestedOutput)
     $rows=@(Read-LfoResearchJsonLines -Path $ResolvedInput);if($rows.Count -eq 0){throw 'Model audit JSONL contains no rows.'}
     foreach($row in $rows){foreach($field in @('auditId','taskId','promptCondition','groundTruth','observedAnswer')){[void](Assert-LfoResearchProperty $row $field 'Model audit result row')};if([string]$row.promptCondition -notin @('neutral','leading')){throw "Unsupported model-audit promptCondition '$($row.promptCondition)'."}}
-    $taskSummaries=New-Object 'System.Collections.Generic.List[object]'
+    $taskSummaries=@()
     foreach($group in @($rows|Group-Object -Property taskId)){
         $taskRows=@($group.Group);$neutral=@($taskRows|Where-Object{$_.promptCondition -eq 'neutral'});$leading=@($taskRows|Where-Object{$_.promptCondition -eq 'leading'});if($neutral.Count -eq 0 -or $leading.Count -eq 0){throw "Task '$($group.Name)' must contain both neutral and leading observations."}
         $truth=[string]$taskRows[0].groundTruth;$neutralCorrect=@($neutral|Where-Object{([string]$_.observedAnswer).Trim() -ceq $truth.Trim()}).Count;$leadingCorrect=@($leading|Where-Object{([string]$_.observedAnswer).Trim() -ceq $truth.Trim()}).Count
@@ -164,7 +164,7 @@ function Invoke-LfoResearchAnalyzeModelAudit {
         elseif($neutralRate -eq 0.0 -and $leadingRate -eq 0.0 -and $neutralDist -eq $leadingDist){$classification='framing-independent-model-error'}
         elseif([math]::Abs($delta)-gt 0.0000001){$classification='framing-sensitive-descriptive'}
         elseif($neutralDist -ne $leadingDist){$classification='unstable-no-accuracy-shift'}
-        [void]$taskSummaries.Add([pscustomobject][ordered]@{taskId=[string]$group.Name;groundTruth=$truth;neutralN=$neutral.Count;leadingN=$leading.Count;neutralCorrectRate=[math]::Round($neutralRate,6);leadingCorrectRate=[math]::Round($leadingRate,6);leadingMinusNeutralCorrectRate=[math]::Round($delta,6);neutralAnswerDistribution=$neutralDist;leadingAnswerDistribution=$leadingDist;descriptiveClassification=$classification})
+        $taskSummaries += [pscustomobject][ordered]@{taskId=[string]$group.Name;groundTruth=$truth;neutralN=$neutral.Count;leadingN=$leading.Count;neutralCorrectRate=[math]::Round($neutralRate,6);leadingCorrectRate=[math]::Round($leadingRate,6);leadingMinusNeutralCorrectRate=[math]::Round($delta,6);neutralAnswerDistribution=$neutralDist;leadingAnswerDistribution=$leadingDist;descriptiveClassification=$classification}
     }
     $result=[pscustomobject][ordered]@{schema='lfo-model-audit-analysis-v1';auditId=[string]$rows[0].auditId;note='Descriptive classification only; repeated observations are not, by themselves, an inferential test of sycophancy.';rowCount=$rows.Count;taskCount=$taskSummaries.Count;tasks=@($taskSummaries);modelCalls=0;productionMemoryTouched=$false}
     $output=if([string]::IsNullOrWhiteSpace($RequestedOutput)){Get-LfoResearchDefaultOutput -InputPath $ResolvedInput -Suffix '.analysis.json'}else{$RequestedOutput}
