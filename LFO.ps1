@@ -67,7 +67,7 @@ function Resolve-LfoInstallRoot {
         ". Pass -InstallRoot <path> if your LFO bootstrap root is elsewhere.")
 }
 
-$script:Lfo963Version = '9.6.4'
+$script:Lfo963Version = '9.6.5'
 
 function Get-LfoInstallState {
     param([Parameter(Mandatory=$true)][string]$InstallRoot)
@@ -520,7 +520,7 @@ if (-not [string]::IsNullOrWhiteSpace($BaseUriOverride)) {
     $lfo963FrontierSuppressed = $false
     if ($BatchLocalOnly -and $route -eq 'FRONTIER') {
         $lfo963FrontierSuppressed = $true
-        $finalContent = '[LFO 9.6.4 benchmark: Qwen requested FRONTIER; frontier call suppressed.]'
+        $finalContent = '[LFO 9.6.5 benchmark: Qwen requested FRONTIER; frontier call suppressed.]'
         $finalProducer = 'WRAPPER'
         $finalPhase = 'benchmark_frontier_suppressed'
         Write-Host "[batch LOCAL-ONLY] Qwen requested FRONTIER; Codex call suppressed." -ForegroundColor Yellow

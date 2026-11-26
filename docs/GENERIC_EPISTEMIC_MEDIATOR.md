@@ -4,7 +4,9 @@
 
 **Status:** first-stage research specification under [Balancing the Loop](HUMAN_AI_BIAS_BALANCER.md).
 
-**Implementation boundary:** LFO v9.6.2 provides a reproducible L0–L4 substrate. The mediator policy and its efficacy remain experimental. P1/P2 intervention is not enabled in the normal runtime.
+**Implementation boundary:** the current LFO source line provides a reproducible L0–L4 substrate. The mediator policy and its efficacy remain experimental. P1/P2 intervention is not enabled in the normal runtime.
+
+**v9.6.5 research tooling:** [`research/Invoke-LfoResearchTooling.ps1`](../research/Invoke-LfoResearchTooling.ps1) provides provider-neutral offline support for (1) mediator parameter sweeps, (2) frozen-response/replay-bank validation and (3) paired neutral-vs-leading model-audit manifests and descriptive analysis. The helper does not call a model or mutate production memory. Example inputs are under [`experiments/research/`](../experiments/research/).
 
 ## 1. Scope
 
