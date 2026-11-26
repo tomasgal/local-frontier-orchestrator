@@ -61,8 +61,8 @@ foreach($name in @('Get-OllamaLibraryManifestPath','Test-OllamaStoreHasModel','G
     . ([scriptblock]::Create($fn[0].Extent.Text))
 }
 $archiveBase='https://codeload.github.com/tomasgal/local-frontier-orchestrator/zip/'
-foreach($ref in @('v9.6.6','refs/tags/v9.6.6')){
-    if((Get-LfoSourceArchiveUrl $ref) -cne ($archiveBase+'refs/tags/v9.6.6')){throw 'Release tag archive URL incorrect'}
+foreach($ref in @('v9.6.7','refs/tags/v9.6.7')){
+    if((Get-LfoSourceArchiveUrl $ref) -cne ($archiveBase+'refs/tags/v9.6.7')){throw 'Release tag archive URL incorrect'}
 }
 if((Get-LfoSourceArchiveUrl 'main') -cne ($archiveBase+'refs/heads/main')){throw 'Branch archive URL incorrect'}
 if((Get-LfoSourceArchiveUrl 'refs/heads/feat/example') -cne ($archiveBase+'refs/heads/feat/example')){throw 'Explicit branch archive URL incorrect'}
@@ -83,7 +83,7 @@ try{
     if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
     Remove-Item -LiteralPath $old
     if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
-    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy')){
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts','Get-LfoGenerationBudget','Get-LfoPartialJsonAnswer','Add-LfoStructuredAnswerPolicy','Get-LfoRequestedRouteMode','Get-LfoStreamBlockBoundary','Read-LfoChatNdjson','Write-LfoStreamThinkingChunk','Show-QwenThinking','Wait-LfoCodexExit','Get-LfoSlashCommands','Get-LfoSlashCommandState','Show-LfoSlashHelp','Add-LfoLocalEvidencePolicy')){
         $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
         if($fn.Count -ne 1){throw "Missing helper $name"}
         . ([scriptblock]::Create($fn[0].Extent.Text))
@@ -147,6 +147,120 @@ try{
     if((Add-LfoStructuredAnswerPolicy 'base' 'GPU') -cne 'base'){throw 'Legacy answer policy changed'}
     $answerPolicy=Add-LfoStructuredAnswerPolicy 'base' 'UMA'
     if(-not $answerPolicy.StartsWith('base') -or -not $answerPolicy.Contains('\"') -or -not $answerPolicy.Contains('verbatim')){throw 'UMA structured answer policy missing'}
+    if((Get-LfoRequestedRouteMode 'Bez pouzitia FRONTIER vysvetli RAM.' 'AUTO') -ne 'LOCAL'){throw 'Explicit local-only instruction not enforced'}
+    if((Get-LfoRequestedRouteMode 'Translate the phrase without using FRONTIER.' 'AUTO') -ne 'AUTO'){throw 'Embedded phrase changed route'}
+    if((Get-LfoRequestedRouteMode 'Search the web' 'LOCAL') -ne 'LOCAL'){throw 'Session LOCAL override lost'}
+    if((Get-LfoRequestedRouteMode 'Explain RAM' 'FRONTIER') -ne 'FRONTIER'){throw 'Session FRONTIER override lost'}
+    if((Get-LfoPartialJsonAnswer '{"answer":"LOCAL","route":"LOC' 'route' -RequireComplete) -ne ''){throw 'Incomplete route accepted'}
+    if((Get-LfoPartialJsonAnswer '{"memory_ops":[{"route":"LOCAL"}],"route":"FRONTIER"}' 'route' -RequireComplete) -ne 'FRONTIER'){throw 'Nested route confused with root'}
+    $fence='~'*3
+    $blocks='First'+$nl+$nl+$fence+'python'+$nl+'x = 1'+$nl+$nl+'y = 2'
+    if((Get-LfoStreamBlockBoundary $blocks) -ne 7){throw 'Preview flushed incomplete fence'}
+    $blocks+=$nl+$fence+$nl+$nl+'Next'
+    if((Get-LfoStreamBlockBoundary $blocks) -ne ($blocks.Length-4)){throw 'Closed fence not flushed'}
+    $chunks=@(
+        (@{message=@{content='{"route":"LOCAL","answer":"A';thinking='reason '};done=$false}|ConvertTo-Json -Depth 8 -Compress),
+        (@{message=@{content='\nB","memory_note":"-","memory_ops":[]}';thinking='end'};done=$false}|ConvertTo-Json -Depth 8 -Compress),
+        (@{message=@{content=''};done=$true;done_reason='stop';eval_count=7;prompt_eval_count=3}|ConvertTo-Json -Depth 8 -Compress)
+    )
+    $reader=New-Object IO.StringReader(($chunks -join $nl))
+    try{$result=Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $false 'AUTO' $false}finally{$reader.Dispose()}
+    $envelope=$result.message.content|ConvertFrom-Json
+    if($envelope.answer -ne ('A'+$nl+'B') -or $result.message.thinking -ne 'reason end' -or $result.eval_count -ne 7 -or $result.done_reason -ne 'stop' -or -not $result.lfo_streamed){throw 'NDJSON assembly lost content or metrics'}
+    $reader=New-Object IO.StringReader($chunks[0]);$rejected=$false
+    try{Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $false 'AUTO' $false|Out-Null}catch{$rejected=$true}finally{$reader.Dispose()}
+    if(-not $rejected){throw 'Missing final stream chunk accepted'}
+    # AUTO may display the answer before the route field arrives, even if
+    # the final route is FRONTIER. No memory side channel is displayed.
+    $script:previewCalls=New-Object 'System.Collections.Generic.List[string]'
+    function Write-LfoStreamPreview([string]$Answer){
+        [void]$script:previewCalls.Add($Answer)
+        return $true
+    }
+    $previewChunks=@(
+        (@{message=@{content='{"answer":"Provisional\n\nNext'};done=$false}|ConvertTo-Json -Depth 8 -Compress),
+        (@{message=@{content='","memory_note":"private marker","memory_ops":[],"route":"FRONTIER"}'};done=$true;done_reason='stop'}|ConvertTo-Json -Depth 8 -Compress)
+    )
+    $reader=New-Object IO.StringReader(($previewChunks -join $nl))
+    try{$result=Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $true 'AUTO' $false}finally{$reader.Dispose()}
+    if($script:previewCalls.Count -lt 2 -or $script:previewCalls[0] -ne ('Provisional'+$nl+$nl+'Next')){throw 'AUTO preview waited for route'}
+    if(($script:previewCalls -join ' ') -match 'private marker'){throw 'Memory bookkeeping leaked into preview'}
+    if(($result.message.content|ConvertFrom-Json).route -ne 'FRONTIER'){throw 'Preview changed final routing'}
+    # Thinking is independently streamed when explicitly enabled. The
+    # final response keeps the original text, and the final renderer must
+    # not replay the thinking already displayed.
+    $thinkChunks=@(
+        (@{message=@{thinking='Reasoning first';content=''};done=$false}|ConvertTo-Json -Depth 8 -Compress),
+        (@{message=@{thinking=' and last';content=''};done=$false}|ConvertTo-Json -Depth 8 -Compress),
+        (@{message=@{thinking='';content='{"answer":"Visible answer\n\nNext","route":"LOCAL"}'};done=$true;done_reason='stop'}|ConvertTo-Json -Depth 8 -Compress)
+    )
+    $script:previewCalls.Clear()
+    $reader=New-Object IO.StringReader(($thinkChunks -join $nl))
+    try{$captured=@(Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $true 'AUTO' $false $true 6>&1)}finally{$reader.Dispose()}
+    $result=@($captured|Where-Object {$_ -isnot [Management.Automation.InformationRecord]})[0]
+    $shown=($captured|Where-Object {$_ -is [Management.Automation.InformationRecord]}|ForEach-Object {[string]$_.MessageData}) -join ''
+    if($result.message.thinking -ne 'Reasoning first and last' -or -not $result.lfo_thinking_previewed -or $null -eq $result.lfo_first_thinking_seconds){throw 'Thinking stream assembly failed'}
+    if($shown -notmatch '--- thinking ---.*Reasoning first and last.*--- answer ---'){throw 'Thinking display sequence failed'}
+    if($script:previewCalls.Count -lt 1 -or $script:previewCalls[0] -notmatch '^Visible answer'){throw 'Thinking blocked answer preview'}
+    $script:ThinkEnabled=$true
+    if(@(Show-QwenThinking $result 6>&1).Count -ne 0){throw 'Thinking replayed after streaming'}
+    $script:ThinkEnabled=$false
+    $reader=New-Object IO.StringReader(($thinkChunks -join $nl))
+    try{$captured=@(Read-LfoChatNdjson $reader ([Diagnostics.Stopwatch]::StartNew()) 'local_generation' $false 'AUTO' $false $false 6>&1)}finally{$reader.Dispose()}
+    if(@($captured|Where-Object {$_ -is [Management.Automation.InformationRecord]}).Count -ne 0){throw 'Disabled thinking leaked to console'}
+    $fake=[pscustomobject]@{Waits=(New-Object 'System.Collections.Generic.List[int]')}
+    $fake|Add-Member ScriptMethod WaitForExit {param([int]$Milliseconds);[void]$this.Waits.Add($Milliseconds);return $true}
+    if(-not (Wait-LfoCodexExit $fake 30 $true) -or $fake.Waits[0] -gt 5000){throw 'Interactive Codex wait interval incorrect'}
+    $fake.Waits.Clear()
+    if(-not (Wait-LfoCodexExit $fake 30 $false) -or $fake.Waits[0] -ne 30000){throw 'Benchmark Codex wait changed'}
+    # A fake process returns immediately after one unsuccessful wait.
+    # This exercises overwrite and newline cleanup without sleeping five seconds.
+    $fakeHeartbeat=[pscustomobject]@{Calls=0}
+    $fakeHeartbeat|Add-Member ScriptMethod WaitForExit {param([int]$Milliseconds);$this.Calls++;return ($this.Calls -gt 1)}
+    $heartbeatOutput=@(Wait-LfoCodexExit $fakeHeartbeat 30 $true 6>&1)
+    $heartbeatRecords=@($heartbeatOutput|Where-Object {$_ -is [Management.Automation.InformationRecord]})
+    if($heartbeatRecords.Count -ne 2){throw 'Codex heartbeat did not produce status and final newline'}
+    $heartbeatMessage=$heartbeatRecords[0].MessageData
+    if(-not ([string]$heartbeatMessage).StartsWith([string][char]13) -or -not $heartbeatMessage.NoNewLine){throw 'Codex heartbeat did not overwrite current line'}
+    if($heartbeatRecords[1].MessageData.NoNewLine){throw 'Codex heartbeat left terminal line open'}
+    # Every documented command has a valid form; every invalid slash entry
+    # stays in the local UI. Optional arguments preserve their defaults.
+    $validCommands=@('/help','/help think','/help /route','/think on','/THINK OFF','/route auto','/route local','/route frontier','/stream on','/stream off','/analyze','/analyze 001','/analyze 100','/files','/import prompt file.txt','/export','/export answer.md','/export-log','/paste','/clear','/exit')
+    foreach($cmd in $validCommands){if((Get-LfoSlashCommandState $cmd) -ne 'VALID'){throw "Valid command rejected: $cmd"}}
+    $invalidCommands=@('/think','/think maybe','/route','/route web','/stream','/stream yes','/analyze 0','/analyze 101','/analyze x','/import','/files x','/export-log x','/paste x','/clear x','/exit x','/help two words')
+    foreach($cmd in $invalidCommands){if((Get-LfoSlashCommandState $cmd) -ne 'USAGE'){throw "Invalid command bypassed help: $cmd"}}
+    foreach($cmd in @('/th','/thnik','/unknown','/')){if((Get-LfoSlashCommandState $cmd) -ne 'UNKNOWN'){throw "Unknown slash command accepted: $cmd"}}
+    if((Get-LfoSlashCommandState 'Explain /think on') -ne 'PROMPT'){throw 'Ordinary prompt mistaken for command'}
+    $helpOutput=@(Show-LfoSlashHelp '/think' 6>&1)
+    if(($helpOutput -join ' ') -notmatch '/think on.*?/think off'){throw 'Missing thinking parameter help'}
+    $helpOutput=@(Show-LfoSlashHelp '' -ExplicitHelp 6>&1)
+    foreach($key in (Get-LfoSlashCommands).Keys){if(($helpOutput -join ' ') -notmatch [regex]::Escape($key)){throw "Help missing $key"}}
+    # Check actual dispatcher contains the guard before routing, including
+    # queued interactive imports. Experiment adapter still calls Invoke-Qwen directly.
+    $chatSource=Get-Content -LiteralPath (Join-Path $root 'src/QwenChat.ps1') -Raw -Encoding UTF8
+    $loop=$chatSource.Substring($chatSource.LastIndexOf('while ($true) {'))
+    if($loop.IndexOf('$commandState=Get-LfoSlashCommandState $prompt') -lt 0 -or $loop.IndexOf('$commandState=Get-LfoSlashCommandState $prompt') -gt $loop.IndexOf('switch -Regex')){throw 'Missing pre-dispatch command guard'}
+    if(-not $loop.Contains("if("+ '$commandState' +" -eq 'PROMPT'){Invoke-Qwen "+'$prompt'+"}")){throw 'Default dispatcher can send slash commands to inference'}
+    $evidencePolicy=Add-LfoLocalEvidencePolicy 'base' 'LOCAL'
+    if($evidencePolicy -notmatch 'no live external lookup' -or $evidencePolicy -notmatch 'LOCAL is explicitly enforced' -or $evidencePolicy -notmatch 'not fresh verification'){throw 'Missing local evidence boundary'}
+    if((Add-LfoLocalEvidencePolicy 'base' 'AUTO') -match 'LOCAL is explicitly enforced'){throw 'AUTO incorrectly forced local'}
+    . (Join-Path $root 'src/LfoTurnTelemetry.ps1')
+    $testPhases=@(
+        [pscustomobject]@{kind='model';phase='local_generation';prompt_eval_count=100;eval_count=20;decode_seconds=0.5},
+        [pscustomobject]@{kind='model';phase='answer_recovery';prompt_eval_count=200;eval_count=180;decode_seconds=4.5},
+        [pscustomobject]@{kind='frontier';phase='frontier_handoff';prompt_eval_count=$null;eval_count=$null;decode_seconds=$null},
+        [pscustomobject]@{kind='model';phase='memory_recovery';prompt_eval_count=50;eval_count=10;decode_seconds=1.0}
+    )
+    $totals=Get-LfoAnswerGenerationTotals $testPhases
+    if($totals.calls -ne 2 -or $totals.prompt_tokens -ne 300 -or $totals.generated_tokens -ne 200 -or $totals.decode_tokens_per_second -ne 40){throw 'Answer telemetry totals incorrect'}
+    $testPhases[1].eval_count=$null
+    $totals=Get-LfoAnswerGenerationTotals $testPhases
+    if($null -ne $totals.generated_tokens -or $null -ne $totals.decode_tokens_per_second){throw 'Unknown token metrics treated as zero'}
+    Write-Host 'PASS: local evidence policy and answer-generation telemetry aggregation.'
+    Write-Host 'PASS: all slash-command parameter validation, help and inference guard.'
+    Write-Host 'PASS: thinking preview, answer continuation, no duplicate reasoning, and Codex wait modes.'
+    Write-Host 'PASS: AUTO preview independent of final route.'
+    Write-Host 'PASS: explicit routing, Markdown stream boundaries, NDJSON assembly and incomplete transport rejection.'
     Write-Host 'PASS: UMA generation ceilings, context estimate and partial JSON isolation.'
     Write-Host 'PASS: singleton experiment prompt arrays and batch input validation.'
     Write-Host 'PASS: aligned table layout, width, wrapping, multiline import and 1000-entry splitting.'

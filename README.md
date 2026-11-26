@@ -1,8 +1,8 @@
 # Local Frontier Orchestrator
 
-**v9.6.6 — Windows UMA support, Ollama manifest v2 compatibility, console Markdown and file exchange, incorporating v9.6.5 research tooling.** v9.6.5 retains the accepted v9.6.4 security hardening, v9.6.3 Windows runtime behavior, L0–L4 memory semantics and High-priority inference profile. It adds provider-neutral offline tooling for mediator parameter sweeps, frozen-response/replay-bank validation and paired neutral-vs-leading model audits; it does not promote P1/P2 into the normal response path.
+**v9.6.7 — interactive answer and reasoning streaming, explicit routing, local command validation and phase telemetry, on the stable v9.6.6 Windows UMA baseline.** v9.6.5 retains the accepted v9.6.4 security hardening, v9.6.3 Windows runtime behavior, L0–L4 memory semantics and High-priority inference profile. It adds provider-neutral offline tooling for mediator parameter sweeps, frozen-response/replay-bank validation and paired neutral-vs-leading model audits; it does not promote P1/P2 into the normal response path.
 
-Release notes: [v9.6.6 UMA](docs/RELEASE_V9.6.6.md) · [v9.6.5 research tooling](docs/RELEASE_V9.6.5.md) · [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 runtime baseline](docs/RELEASE_V9.6.3.md).
+Release notes: [v9.6.7 interactive runtime](docs/RELEASE_V9.6.7.md) · [v9.6.6 UMA](docs/RELEASE_V9.6.6.md) · [v9.6.5 research tooling](docs/RELEASE_V9.6.5.md) · [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 runtime baseline](docs/RELEASE_V9.6.3.md).
 
 ## v9.6.5: controlled Human–AI research tooling
 
@@ -84,13 +84,13 @@ From Windows PowerShell 5.1, choose the bootstrap command for the profile you wa
 **CPU bootstrap** — selects the CPU model profile (`num_gpu 0`, 5120-token context) and automatically starts Qwen with that profile after a successful install:
 
 ~~~powershell
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.6/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile CPU -SourceRef refs/tags/v9.6.6
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.7/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile CPU -SourceRef refs/tags/v9.6.7
 ~~~
 
 **GPU bootstrap** — selects the GPU model profile (`num_gpu 99`, 8192-token context; Ollama performs the actual supported GPU offload) and automatically starts Qwen with that profile after a successful install:
 
 ~~~powershell
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.6/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile GPU -SourceRef refs/tags/v9.6.6
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.7/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile GPU -SourceRef refs/tags/v9.6.7
 ~~~
 
 ### UMA bootstrap (AMD unified-memory host)
@@ -100,7 +100,7 @@ A third `-Profile UMA` is available for the Windows 11 Minisforum / Ryzen AI Max
 The **UMA bootstrap** command is:
 
 ~~~powershell
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.6/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile UMA -SourceRef refs/tags/v9.6.6 -SkipLaunch
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.7/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile UMA -SourceRef refs/tags/v9.6.7 -SkipLaunch
 ~~~
 
 The initial `-SkipLaunch` keeps the running inference workload unchanged until a deliberate smoke test. The installer still requires the separate LFO/SurrealDB/Codex prerequisites and runs its L4 acceptance suite. Use `Start-LFO-UMA.ps1` (or `LFO.ps1 -Device UMA`) afterwards. **The reference AMD host passed the documented UMA integration acceptance; other UMA hosts require their own placement verification.** See [UMA bootstrap and MS-S1 MAX validation](docs/UMA_BOOTSTRAP.md) for prerequisites, stable installation, isolation, tests and GPU-placement acceptance.
@@ -559,7 +559,7 @@ The transport path is working:
 local model -> ask_codex -> native Codex frontier -> local model
 ```
 
-**v9.6.6 incorporates the v9.6.5 research baseline.** LOCAL/FRONTIER routing, synthesis, persistent memory and conservative L4 recording retain their accepted architecture. Existing v9.6.3 installations continue working without reinstall. The v9.6.6 source passed reference-host integration testing and is the stable Windows runtime boundary. See the [versioned release](https://github.com/tomasgal/local-frontier-orchestrator/releases/tag/v9.6.6) for the publication status.
+**v9.6.6 incorporates the v9.6.5 research baseline.** LOCAL/FRONTIER routing, synthesis, persistent memory and conservative L4 recording retain their accepted architecture. Existing v9.6.3 installations continue working without reinstall. The v9.6.6 source passed reference-host integration testing and remains an immutable historical release. v9.6.7 is the next stable runtime boundary; see [release notes](docs/RELEASE_V9.6.7.md) for acceptance scope and limitations.
 
 **v9.6.2 remains a historical tagged and Zenodo-archived release boundary.** The v9.6.3 promotion does not reopen the frozen L2/L3 baselines or enable P1/P2 response intervention.
 
@@ -568,3 +568,11 @@ Further detector coverage, automatic analytics scheduling and response intervent
 ## License
 
 No open-source license has been selected yet. Until a license is added, normal copyright rules apply.
+
+## v9.6.7 interactive transport
+
+On UMA, interactive streaming is enabled by default; `/stream on` and `/stream off` toggle it for the session. Complete Markdown blocks of the provisional answer are rendered as they arrive. AUTO previews answer blocks immediately, regardless of when the route is emitted. A provisional preview may precede a FRONTIER handoff; the next synthesis is displayed as a separate phase. Only the final validated response enters normal persistence and export. `/route local` enforces local-only inference even when a freshness gate would normally escalate; `/route frontier` explicitly requests Codex for every subsequent turn; `/route auto` restores ordinary policy. A narrow, leading explicit no-frontier instruction also selects LOCAL for that turn. With thinking enabled, the dedicated Ollama thinking channel streams in dark gray and is followed by the same block-level Markdown answer preview; completed thinking is not printed a second time. Phase telemetry includes first visible thinking time. During interactive Codex calls, one elapsed-time status line is refreshed in place approximately every five seconds until the result is available; this is a heartbeat, not a stream of Codex tool events or private reasoning. Streamed transport is off for unattended benchmark children; phase telemetry separates model, frontier, synthesis and observed first-answer/first-visible timings. Reference-host streaming, routing and isolated benchmark smoke tests passed; see the release notes for limitations.
+
+The interactive command UI reserves leading slash entries for local commands, including queued `/import` entries. `/help` lists all commands; `/help think` (or `/help /think`) shows command-specific usage. Missing or invalid parameters show usage instead of invoking Qwen or Codex. Bare `/think`, `/route` and `/stream` show the current state and accepted values. Optional defaults (`/analyze`, `/export`) remain operational. Ordinary prompts containing a slash elsewhere are unchanged; use `/paste` for literal text starting with a slash. Experiment workload prompts remain literal input.
+
+Forced LOCAL requests that would normally match a frontier hard gate receive a deterministic no-live-verification notice in the console and final answer, including exported text. Local initial generation and answer-only recovery distinguish historical references from new external verification. Model compliance with the instruction is not guaranteed. Interactive multi-call turns sum prompt/generated tokens and calculate a decode-duration-weighted throughput for answer generation only (not Codex or post-answer memory calls). Missing metrics are shown as n/a, and legacy per-response trace fields and benchmark output remain unchanged.

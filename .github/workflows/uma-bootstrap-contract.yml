@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - feat/uma-bootstrap-20261123
+      - feat/streaming-routing-v967
+      - main
   pull_request:
     paths:
       - 'install/Install-LFO.ps1'

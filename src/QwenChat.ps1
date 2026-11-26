@@ -21,6 +21,10 @@ if (-not (Test-Path -LiteralPath $ConfigPath)) {
 }
 
 $script:Config = Import-PowerShellDataFile -LiteralPath $ConfigPath
+$script:LfoRouteMode = 'AUTO'
+$script:LfoTurnRouteMode = 'AUTO'
+$script:LfoStreamEnabled = ($env:LFO_RUNTIME_DEVICE -eq 'UMA' -and $env:LFO_RUNTIME_BATCH -ne '1')
+$script:LfoStreamShownPrefix = ''
 
 if ([string]::IsNullOrWhiteSpace($Model)) {
     $Model = [string]$script:Config.Model
@@ -127,8 +131,22 @@ Structured answer writing:
 - Closing the JSON answer string is the end of the user-facing response. Do not close it merely because a quoted phrase or example ends.
 '@
 }
+# Distinguish current tool evidence from retrieved historical context.
+# This is a generation instruction, not a proof of model compliance.
+function Add-LfoLocalEvidencePolicy([string]$Policy,[string]$RouteMode){
+    $Policy += [Environment]::NewLine+[Environment]::NewLine+'LOCAL evidence rule: If you answer locally, no live external lookup has occurred in this turn. Never claim to have searched, checked, accessed or verified an external source in the current turn. Historical results, stored facts and remembered links are not fresh verification. If using them for a current-information request, identify them as prior or unverified information and state that current status is not independently confirmed.'
+    if($RouteMode -eq 'LOCAL'){
+        $Policy += [Environment]::NewLine+'LOCAL is explicitly enforced for this turn. Return a useful, complete answer within available knowledge and state any inability to perform the requested live verification. Do not leave answer empty merely because the request would normally require FRONTIER.'
+    }
+    return $Policy
+}
 function Get-OrchestratorSystemPrompt {
-    return Add-LfoStructuredAnswerPolicy (Expand-RuntimePolicy $script:OrchestratorSystemTemplate) $env:LFO_RUNTIME_DEVICE
+    $policy = Add-LfoStructuredAnswerPolicy (Expand-RuntimePolicy $script:OrchestratorSystemTemplate) $env:LFO_RUNTIME_DEVICE
+    if($env:LFO_RUNTIME_BATCH -ne '1'){
+        $policy += [Environment]::NewLine+[Environment]::NewLine+'Routing: response length, requested examples, Markdown, and ordinary stable academic explanations alone do not require FRONTIER. Prefer LOCAL when capable. Honour the explicit LOCAL-only instruction. Emit the route field before answer when possible.'
+        $policy=Add-LfoLocalEvidencePolicy $policy $script:LfoTurnRouteMode
+    }
+    return $policy
 }
 
 function Reset-Messages {
@@ -171,6 +189,13 @@ function Trim-Messages {
 }
 
 
+# Explicit user control, not a broad negation classifier. Only an anchored
+# prohibition or the session command changes the normal routing policy.
+function Get-LfoRequestedRouteMode([string]$Prompt,[string]$Mode){
+    if($Prompt -match '(?i)^\s*(?:bez\s+pou[žz]itia\s+(?:frontier|extern[ýy]ch\s+zdrojov)|without\s+(?:using\s+)?(?:the\s+)?(?:frontier|external\s+sources))\b'){return 'LOCAL'}
+    if($Mode -in @('LOCAL','FRONTIER')){return $Mode.ToUpperInvariant()}
+    return 'AUTO'
+}
 function Get-FrontierPolicyReason([string]$Prompt) {
     if ([string]::IsNullOrWhiteSpace($Prompt)) { return $null }
 
@@ -266,6 +291,32 @@ function Get-CodexProcessSpec {
     }
 }
 
+# Status is elapsed time, not invented Codex activity. Keep draining both
+# redirected pipes asynchronously and retain the original absolute wait budget.
+function Wait-LfoCodexExit($Process,[int]$TimeoutSeconds,[bool]$Progress){
+    if(-not $Progress){return $Process.WaitForExit($TimeoutSeconds*1000)}
+    $clock=[Diagnostics.Stopwatch]::StartNew()
+    $deadline=[long]$TimeoutSeconds*1000
+    $shown=$false;$statusWidth=0
+    try {
+        while($clock.ElapsedMilliseconds -lt $deadline){
+            $wait=[int][Math]::Min(5000,($deadline-$clock.ElapsedMilliseconds))
+            if($wait -le 0){break}
+            if($Process.WaitForExit($wait)){return $true}
+            if($clock.ElapsedMilliseconds -lt $deadline){
+                $status=("[ask_codex: {0:0}s; awaiting frontier result]" -f $clock.Elapsed.TotalSeconds)
+                $statusWidth=[Math]::Max($statusWidth,$status.Length)
+                # CR works without cursor APIs or ANSI support on a VT/SSH terminal.
+                Write-Host (([string][char]13)+$status.PadRight($statusWidth)) -ForegroundColor DarkCyan -NoNewline
+                $shown=$true
+            }
+        }
+        return $Process.WaitForExit(0)
+    } finally {
+        if($shown){Write-Host ''}
+    }
+}
+
 function Invoke-CodexReadOnly([string]$Prompt) {
     if ([string]::IsNullOrWhiteSpace($Prompt)) {
         throw 'ask_codex received an empty prompt.'
@@ -316,7 +367,7 @@ function Invoke-CodexReadOnly([string]$Prompt) {
         $p.StandardInput.BaseStream.Flush()
         $p.StandardInput.Close()
 
-        if (-not $p.WaitForExit($CodexTimeoutSec * 1000)) {
+        if (-not (Wait-LfoCodexExit $p $CodexTimeoutSec ($script:LfoStreamEnabled -and $env:LFO_RUNTIME_BATCH -ne '1'))) {
             try { & taskkill.exe /PID $p.Id /T /F 2>$null | Out-Null } catch { }
             throw "codex exec exceeded the ${CodexTimeoutSec}s timeout."
         }
@@ -551,13 +602,15 @@ function Write-LfoTransferExport([string]$Path,[string]$Content){
 }
 
 function Get-QwenLocalOutputFormat {
+    $allowedRoutes = if($script:LfoTurnRouteMode -eq 'LOCAL'){@('LOCAL')}else{@('LOCAL','FRONTIER')}
+    $allowedRoutes = @($allowedRoutes)
     if (Test-LfoDev5CompactReadEligible) {
         # Dev4 already makes this exact LOCAL read mode non-persistent.
         # Drop redundant model-generated side-channels, keeping Qwen routing.
         return @{
             type = 'object'
             properties = @{
-                route = @{ type = 'string'; enum = @('LOCAL', 'FRONTIER') }
+                route = @{ type = 'string'; enum = $allowedRoutes }
                 answer = @{
                     type = 'string'
                     description = 'For LOCAL: complete natural response. For FRONTIER: empty.'
@@ -572,7 +625,7 @@ function Get-QwenLocalOutputFormat {
         properties = @{
             route = @{
                 type = 'string'
-                enum = @('LOCAL', 'FRONTIER')
+                enum = $allowedRoutes
             }
             answer = @{
                 type = 'string'
@@ -721,14 +774,149 @@ function ConvertFrom-QwenStructuredContent(
     }
 }
 
+# Render only complete Markdown blocks. Blank lines inside fenced code
+# do not terminate a block. The ordinary renderer handles tables and colors.
+function Get-LfoStreamBlockBoundary([string]$Text){
+    $boundary=0;$fence='';$fenceLength=0
+    foreach($m in [regex]::Matches($Text,'[^\r\n]*\r?\n')){
+        $line=$m.Value.TrimEnd([char[]]@([char]13,[char]10))
+        if($line -match '^\s*(\x60{3,}|~{3,})(.*)$'){
+            $marker=$Matches[1];$rest=$Matches[2].Trim()
+            if(-not $fence){$fence=$marker.Substring(0,1);$fenceLength=$marker.Length}
+            elseif($marker.Substring(0,1) -eq $fence -and $marker.Length -ge $fenceLength -and -not $rest){$fence='';$fenceLength=0}
+            continue
+        }
+        if(-not $fence -and [string]::IsNullOrWhiteSpace($line)){$boundary=$m.Index+$m.Length}
+    }
+    return $boundary
+}
+function Write-LfoStreamPreview([string]$Answer){
+    $prior=[string]$script:LfoStreamShownPrefix
+    if(-not $Answer.StartsWith($prior,[StringComparison]::Ordinal)){return $false}
+    $boundary=Get-LfoStreamBlockBoundary $Answer
+    if($boundary -le $prior.Length){return $false}
+    if(-not $prior){Write-Host '[stream: provisional answer; final JSON validation pending]' -ForegroundColor DarkGray}
+    $delta=$Answer.Substring($prior.Length,$boundary-$prior.Length)
+    Write-LfoMarkdown $delta.TrimEnd([char[]]@([char]13,[char]10))
+    Write-Host ''
+    $script:LfoStreamShownPrefix=$Answer.Substring(0,$boundary)
+    return $true
+}
+function Write-LfoFinalAnswer([string]$Answer){
+    $prior=[string]$script:LfoStreamShownPrefix
+    if($prior -and $Answer.StartsWith($prior,[StringComparison]::Ordinal)){
+        $tail=$Answer.Substring($prior.Length)
+        if(-not [string]::IsNullOrWhiteSpace($tail)){Write-LfoMarkdown $tail}
+    }else{
+        if($prior){Write-Host '[Stream preview superseded; definitive answer follows.]' -ForegroundColor Yellow}
+        Write-LfoMarkdown $Answer
+    }
+    $script:LfoStreamShownPrefix=''
+}
+# Ollama's streaming response is newline-delimited JSON. Reassemble only
+# message.content/thinking, retaining final-chunk performance and done_reason.
+function Write-LfoStreamThinkingChunk([string]$Text){
+    $safe=ConvertTo-LfoSafeConsoleText $Text
+    # Prevent a stray carriage return from rewriting earlier terminal output.
+    $safe=$safe.Replace([string][char]13,'')
+    if($safe){Write-Host $safe -ForegroundColor DarkGray -NoNewline}
+}
+function Read-LfoChatNdjson([IO.TextReader]$Reader,[Diagnostics.Stopwatch]$Clock,[string]$Phase,[bool]$Preview,[string]$RouteMode,[bool]$Progress,[bool]$ShowThinking=$false){
+    $content=New-Object Text.StringBuilder
+    $thinking=New-Object Text.StringBuilder
+    $final=$null;$firstChunk=$null;$firstAnswer=$null;$firstVisible=$null
+    $nextInspect=0.0;$nextProgress=5.0
+    $thinkingPrinted=0;$thinkingOpen=$false;$firstThinking=$null
+    while($null -ne ($line=$Reader.ReadLine())){
+        if([string]::IsNullOrWhiteSpace($line)){continue}
+        $chunk=$line|ConvertFrom-Json -ErrorAction Stop
+        if($chunk.error){throw ('Ollama stream error: '+[string]$chunk.error)}
+        if($null -eq $firstChunk){$firstChunk=$Clock.Elapsed.TotalSeconds}
+        if($null -ne $chunk.message){
+            [void]$content.Append([string]$chunk.message.content)
+            [void]$thinking.Append([string]$chunk.message.thinking)
+        }
+        $elapsed=$Clock.Elapsed.TotalSeconds
+        if($elapsed -ge $nextInspect -or $chunk.done -eq $true){
+            $nextInspect=$elapsed+0.20
+            $raw=$content.ToString()
+            $answer=Get-LfoPartialJsonAnswer $raw
+            if($answer -and $null -eq $firstAnswer){$firstAnswer=$elapsed}
+            # Display only the dedicated thinking channel, never raw JSON.
+            # Flush it before the answer preview and before the final done.
+            if($ShowThinking -and $thinking.Length -gt $thinkingPrinted){
+                if(-not $thinkingOpen){
+                    $label=if($thinkingPrinted -gt 0){'--- thinking (continued) ---'}else{'--- thinking ---'}
+                    Write-Host ''
+                    Write-Host $label -ForegroundColor DarkGray
+                    $thinkingOpen=$true
+                }
+                Write-LfoStreamThinkingChunk ($thinking.ToString($thinkingPrinted,$thinking.Length-$thinkingPrinted))
+                $thinkingPrinted=$thinking.Length
+                if($null -eq $firstThinking){$firstThinking=$Clock.Elapsed.TotalSeconds}
+            }
+            if($thinkingOpen -and ($answer -or $chunk.done -eq $true)){
+                Write-Host ''
+                Write-Host '--- answer ---' -ForegroundColor DarkGray
+                $thinkingOpen=$false
+            }
+            # Preview is explicitly provisional; routing may follow the answer.
+            if($Preview -and $answer -and (Write-LfoStreamPreview $answer)){
+                if($null -eq $firstVisible){$firstVisible=$Clock.Elapsed.TotalSeconds}
+            }
+            if($Progress -and $elapsed -ge $nextProgress -and $null -eq $firstVisible -and -not $thinkingOpen -and $chunk.done -ne $true){
+                Write-Host ("[stream: {0:n0}s; awaiting complete answer block]" -f $elapsed) -ForegroundColor DarkGray
+                $nextProgress=$elapsed+5
+            }
+        }
+        if($chunk.done -eq $true){$final=$chunk;break}
+    }
+    if($null -eq $final){throw 'Ollama stream ended without a final done chunk; preview was not committed.'}
+    $final | Add-Member -NotePropertyName message -NotePropertyValue ([pscustomobject]@{role='assistant';content=$content.ToString();thinking=$thinking.ToString()}) -Force
+    $final | Add-Member -NotePropertyName lfo_streamed -NotePropertyValue $true -Force
+    $final | Add-Member -NotePropertyName lfo_thinking_previewed -NotePropertyValue ($thinkingPrinted -gt 0) -Force
+    $final | Add-Member -NotePropertyName lfo_first_thinking_seconds -NotePropertyValue $firstThinking -Force
+    $final | Add-Member -NotePropertyName lfo_first_chunk_seconds -NotePropertyValue $firstChunk -Force
+    $final | Add-Member -NotePropertyName lfo_first_answer_seconds -NotePropertyValue $firstAnswer -Force
+    $final | Add-Member -NotePropertyName lfo_first_visible_seconds -NotePropertyValue $firstVisible -Force
+    return $final
+}
+function Invoke-LfoStreamChatApi([string]$Phase,[string]$Body,[Diagnostics.Stopwatch]$Clock){
+    $obj=$Body|ConvertFrom-Json -ErrorAction Stop
+    $obj.stream=$true
+    $bytes=[Text.Encoding]::UTF8.GetBytes(($obj|ConvertTo-Json -Depth 20 -Compress))
+    $request=[Net.WebRequest]::Create("$BaseUri/api/chat")
+    $request.Method='POST';$request.ContentType='application/json; charset=utf-8'
+    $request.Timeout=600000;$request.ReadWriteTimeout=600000
+    $request.AllowAutoRedirect=$false;$request.ContentLength=$bytes.Length
+    $http=$null;$reader=$null
+    try{
+        $output=$request.GetRequestStream()
+        try{$output.Write($bytes,0,$bytes.Length)}finally{$output.Dispose()}
+        $http=$request.GetResponse()
+        $reader=New-Object IO.StreamReader($http.GetResponseStream(),[Text.Encoding]::UTF8)
+        return Read-LfoChatNdjson $reader $Clock $Phase $true $script:LfoTurnRouteMode $true ([bool]$script:ThinkEnabled)
+    }catch{
+        if($script:LfoStreamShownPrefix -or $script:ThinkEnabled){Write-Host '';Write-Host '[Stream interrupted; provisional output was not committed.]' -ForegroundColor Yellow}
+        throw
+    }finally{
+        if($null -ne $reader){$reader.Dispose()}
+        if($null -ne $http){$http.Dispose()}
+        $request.Abort()
+    }
+}
+
 # Measure the existing request, never add a second model call.
 function Invoke-LfoChatApi([string]$Phase, [string]$Body) {
     $phaseSw = [Diagnostics.Stopwatch]::StartNew()
     $response = $null
     $success = $false
     try {
-        $response = Invoke-RestMethod -Uri "$BaseUri/api/chat" -Method Post `
-            -ContentType 'application/json; charset=utf-8' -Body $Body -TimeoutSec 600
+        if($script:LfoStreamEnabled -and $env:LFO_RUNTIME_BATCH -ne '1' -and $Phase -in @('local_generation','frontier_synthesis','answer_recovery')){
+            $response=Invoke-LfoStreamChatApi $Phase $Body $phaseSw
+        }else{
+            $response=Invoke-RestMethod -Uri "$BaseUri/api/chat" -Method Post -ContentType 'application/json; charset=utf-8' -Body $Body -TimeoutSec 600
+        }
         $success = $true
         return $response
     } finally {
@@ -752,7 +940,7 @@ function Get-LfoGenerationBudget($Generation,[bool]$Thinking,[string]$Device,[in
     return [int][Math]::Min($target,[Math]::Min([Math]::Max(128,[Math]::Floor($Context/2)),$remaining))
 }
 # Extract only the top-level answer string; drop incomplete trailing escapes.
-function Get-LfoPartialJsonAnswer([string]$Content){
+function Get-LfoPartialJsonAnswer([string]$Content,[string]$Field='answer',[switch]$RequireComplete){
     if([string]::IsNullOrWhiteSpace($Content)){return ''}
     $s=$Content.TrimStart()
     if(-not $s.StartsWith('{')){return ''}
@@ -764,13 +952,13 @@ function Get-LfoPartialJsonAnswer([string]$Content){
             $token=$stringToken.Match($s,$i)
             if(-not $token.Success -or -not $token.Groups['close'].Success){return ''}
             $i+=$token.Length
-            if($depth -eq 1 -and $token.Groups['body'].Value -ceq 'answer'){
+            if($depth -eq 1 -and $token.Groups['body'].Value -ceq $Field){
                 $colon=[regex]::Match($s.Substring($i),'^\s*:\s*')
                 if($colon.Success){
                     $valueStart=$i+$colon.Length
                     if($valueStart -ge $s.Length){return ''}
                     $value=$stringToken.Match($s,$valueStart)
-                    if(-not $value.Success){return ''}
+                    if(-not $value.Success -or ($RequireComplete -and -not $value.Groups['close'].Success)){return ''}
                     try{
                         $decoded=('{"answer":"'+$value.Groups['body'].Value+'"}'|ConvertFrom-Json -ErrorAction Stop).answer
                         return ([string]$decoded).Trim()
@@ -818,6 +1006,7 @@ function Invoke-QwenAnswerRecovery([string]$Prompt) {
     # A rare answer-only retry. The first pass remains the sole source of
     # memory_note, and this call cannot route or invoke Codex.
     $systemText = Add-LfoStructuredAnswerPolicy 'Provide a complete user-facing answer to the most recent user message. Return only the answer field. If uncertain, say so plainly.' $env:LFO_RUNTIME_DEVICE
+    if($env:LFO_RUNTIME_BATCH -ne '1'){$systemText=Add-LfoLocalEvidencePolicy $systemText 'LOCAL'}
     $memoryBlock = Get-LfoTurnMemoryBlock $Prompt
     if (-not [string]::IsNullOrWhiteSpace($memoryBlock)) {
         $systemText += [Environment]::NewLine + [Environment]::NewLine +
@@ -895,9 +1084,9 @@ $FrontierResult
 
 function Show-QwenThinking($Response) {
     $thinking = [string]$Response.message.thinking
-    if ($script:ThinkEnabled -and $thinking) {
+    if ($script:ThinkEnabled -and $thinking -and -not $Response.lfo_thinking_previewed) {
         Write-Host "`n--- thinking ---" -ForegroundColor DarkGray
-        Write-Host $thinking -ForegroundColor DarkGray
+        Write-Host (ConvertTo-LfoSafeConsoleText $thinking) -ForegroundColor DarkGray
         Write-Host "--- answer ---" -ForegroundColor DarkGray
     }
 }
@@ -960,6 +1149,8 @@ function Test-UnfinishedSynthesis($Response, [string]$Content) {
 }
 
 function Invoke-Qwen([string]$Prompt) {
+    $script:LfoStreamShownPrefix=''
+    $script:LfoTurnRouteMode=if($env:LFO_RUNTIME_BATCH -eq '1'){'AUTO'}else{Get-LfoRequestedRouteMode $Prompt $script:LfoRouteMode}
     Refresh-SystemPrompt
 
     # Capture context before appending the current user turn.
@@ -972,7 +1163,13 @@ function Invoke-Qwen([string]$Prompt) {
     Start-LfoTurnTelemetry
     $script:LfoTurnContext = $null
     Start-LfoTurnContext $Prompt
-    $policyReason = Get-FrontierPolicyReason $Prompt
+    $localLookupBlocked=($script:LfoTurnRouteMode -eq 'LOCAL' -and -not [string]::IsNullOrWhiteSpace((Get-FrontierPolicyReason $Prompt)))
+    if($localLookupBlocked){Write-Host '[LOCAL-only: external verification disabled for this request.]' -ForegroundColor DarkCyan}
+    $policyReason = switch($script:LfoTurnRouteMode){
+        'LOCAL' {'user-route-local'}
+        'FRONTIER' {'user-route-frontier'}
+        default {Get-FrontierPolicyReason $Prompt}
+    }
     $route = $null
     $r = $null
     $frontierResult = $null
@@ -996,7 +1193,7 @@ function Invoke-Qwen([string]$Prompt) {
     $finalPhase = 'wrapper'
     Add-LfoL0StageSource $stageSources 'USER' 'INPUT' 'input' 'USER' $Prompt 'received' 'user'
 
-    if (-not [string]::IsNullOrWhiteSpace($policyReason)) {
+    if ($script:LfoTurnRouteMode -ne 'LOCAL' -and -not [string]::IsNullOrWhiteSpace($policyReason)) {
         $route = 'FRONTIER'
         Write-Host ("`n[policy -> FRONTIER; reason={0}]" -f $policyReason) -ForegroundColor DarkCyan
     } else {
@@ -1010,7 +1207,12 @@ function Invoke-Qwen([string]$Prompt) {
         Add-LfoL0StageSource $stageSources 'LOCAL' 'LOCAL_RESPONSE' 'initial' 'LOCAL' $candidate
         $structured = ConvertFrom-QwenStructuredContent $candidate -ExpectRoute
 
-        if ([string]$r.done_reason -eq 'length') {
+        if ($script:LfoTurnRouteMode -eq 'LOCAL' -and $structured.Success -and $structured.Route -ne 'LOCAL') {
+            $route='LOCAL'
+            $finalContent='[Local-only route enforced; the model returned an invalid route. Please retry.]'
+            $finalProducer='WRAPPER'
+            $finalPhase='local_route_rejected'
+        } elseif ([string]$r.done_reason -eq 'length') {
             # No frontier routing or model-generated memory from a capped envelope.
             $route = 'LOCAL'
             $finalContent = if($structured.Success -and $structured.Route -eq 'LOCAL'){[string]$structured.Answer}else{Get-LfoPartialJsonAnswer $candidate}
@@ -1060,6 +1262,10 @@ function Invoke-Qwen([string]$Prompt) {
                         $answerRecoverySuccess = $false
                         Write-Host "[Qwen answer invalid; trying one LOCAL answer-only recovery.]" -ForegroundColor Yellow
                         try {
+                            if($script:LfoStreamShownPrefix){
+                                Write-Host '[Initial preview superseded; answer recovery follows.]' -ForegroundColor Yellow
+                                $script:LfoStreamShownPrefix=''
+                            }
                             $recoveryResponse = Invoke-QwenAnswerRecovery $Prompt
                             Show-QwenThinking $recoveryResponse
                             $recoveryContent = Get-CleanQwenContent $recoveryResponse
@@ -1098,6 +1304,10 @@ function Invoke-Qwen([string]$Prompt) {
     }
 
     if ($route -eq 'FRONTIER') {
+        if($script:LfoStreamShownPrefix){
+            Write-Host '[Initial LOCAL-model preview ended; FRONTIER synthesis follows.]' -ForegroundColor DarkCyan
+            $script:LfoStreamShownPrefix=''
+        }
         $memoryBlock = Get-LfoTurnMemoryBlock $Prompt
         $recentConversation = Get-RecentConversationText -ExcludeLastUser
 
@@ -1191,7 +1401,7 @@ $recentContext
     # Explicit storage requests are a wrapper-level invariant. Normal implicit
     # memory remains single-pass; only an explicit request with an empty note
     # gets one bounded memory-only extraction retry.
-    if ($finalPhase -notin @('generation_limit','malformed_output') -and $script:MemoryEnabled -and $explicitMemoryIntent -and
+    if ($finalPhase -notin @('generation_limit','malformed_output','local_route_rejected') -and $script:MemoryEnabled -and $explicitMemoryIntent -and
         ($null -eq $inlineMemoryNote -or
             [string]::IsNullOrWhiteSpace([string]$inlineMemoryNote.Text))) {
         $memoryRecoveryUsed = $true
@@ -1234,13 +1444,18 @@ $recentContext
         $finalPhase = 'raw_sentinel'
     }
 
+    # Keep a deterministic evidence boundary in the delivered/exported answer
+    # even if the model fails to follow its epistemic instruction.
+    if($localLookupBlocked -and $route -eq 'LOCAL' -and -not [string]::IsNullOrWhiteSpace($finalContent)){
+        $finalContent += [Environment]::NewLine+[Environment]::NewLine+'[LFO: No external lookup was performed in this turn. Current facts and cited sources have not been independently reverified.]'
+    }
     $sw.Stop()
 
     if ([string]::IsNullOrWhiteSpace($finalContent)) {
         Write-Host "`n[The model did not produce final content within the token limit.]" -ForegroundColor Yellow
     } else {
         Write-Host ""
-        Write-LfoMarkdown $finalContent
+        Write-LfoFinalAnswer $finalContent
         $script:LfoLastExportAnswer=$finalContent
         # Keep the routing protocol visible in internal conversation history.
         # The marker is hidden from the user-facing output above, but storing it
@@ -1251,7 +1466,13 @@ $recentContext
         Trim-Messages
     }
 
-    if ($null -ne $r) {
+    $answerTotals=Get-LfoAnswerGenerationTotals @(Get-LfoTurnPhases)
+    if($env:LFO_RUNTIME_BATCH -ne '1' -and $answerTotals.calls -gt 1){
+        $promptDisplay=if($null -eq $answerTotals.prompt_tokens){'n/a'}else{$answerTotals.prompt_tokens}
+        $generatedDisplay=if($null -eq $answerTotals.generated_tokens){'n/a'}else{$answerTotals.generated_tokens}
+        $rateDisplay=if($null -eq $answerTotals.decode_tokens_per_second){'n/a'}else{$answerTotals.decode_tokens_per_second}
+        Write-Host ("[{0:n2}s; prompt total {1} tok; generated total {2} tok; {3} tok/s; model calls={4}; think={5}; route={6}]" -f $sw.Elapsed.TotalSeconds,$promptDisplay,$generatedDisplay,$rateDisplay,$answerTotals.calls,$script:ThinkEnabled,$route) -ForegroundColor DarkGray
+    } elseif ($null -ne $r) {
         $tokps = $null
         if ($r.eval_duration -gt 0 -and $r.eval_count) {
             $tokps = [Math]::Round(($r.eval_count * 1e9) / $r.eval_duration, 2)
@@ -1265,6 +1486,16 @@ $recentContext
             $sw.Elapsed.TotalSeconds, $script:ThinkEnabled, $route) -ForegroundColor DarkGray
     }
 
+    if($env:LFO_RUNTIME_BATCH -ne '1'){
+        $phaseLabels=@(Get-LfoTurnPhases|Where-Object {$_.kind -in @('model','frontier')}|ForEach-Object{
+            $label=('{0}={1:n2}s' -f $_.phase,$_.wall_seconds)
+            if($null -ne $_.first_thinking_seconds){$label+=(' (first thinking {0:n2}s)' -f $_.first_thinking_seconds)}
+            if($null -ne $_.first_visible_seconds){$label+=(' (first visible {0:n2}s)' -f $_.first_visible_seconds)}
+            elseif($null -ne $_.first_answer_seconds){$label+=(' (answer detected {0:n2}s)' -f $_.first_answer_seconds)}
+            $label
+        })
+        if($phaseLabels.Count -gt 0){Write-Host ('[phases: '+($phaseLabels -join '; ')+']') -ForegroundColor DarkGray}
+    }
     if (-not [string]::IsNullOrWhiteSpace($finalContent)) {
         Add-LfoL0StageSource $stageSources 'FINAL' 'FINAL_RESPONSE' $finalPhase $finalProducer $finalContent 'delivered' 'assistant'
         Persist-TurnAndMemory `
@@ -1314,7 +1545,8 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.6.6. Commands: /exit, /clear, /paste, /think on, /think off, /analyze, /files, /import, /export, /export-log"
+Write-Host "Qwen local chat v9.6.7. Commands: /exit, /clear, /paste, /think on, /think off, /analyze, /files, /import, /export, /export-log, /route, /stream, /help"
+Write-Host ("Streaming: {0}; routing mode: {1}. /stream on|off; /route auto|local|frontier" -f $script:LfoStreamEnabled,$script:LfoRouteMode)
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
 Write-Host ("Thinking is now: {0} (controlled by the Ollama API think parameter)" -f $ThinkEnabled)
@@ -1332,6 +1564,62 @@ $script:LfoImportDir=if($env:LFO_IMPORT_DIR){$env:LFO_IMPORT_DIR}else{Join-Path 
 $script:LfoExportDir=if($env:LFO_EXPORT_DIR){$env:LFO_EXPORT_DIR}else{Join-Path $transferRoot 'export'}
 $script:LfoLastExportAnswer=''
 $script:LfoImportQueue=$null
+# Reserve slash-prefixed interactive entries for the local command UI.
+# Invalid commands must not reach routing, inference, memory or Codex.
+function Get-LfoSlashCommands {
+    return [ordered]@{
+        '/help'=@{Usage='/help [command]';Pattern='\A/help(?:[ \t]+/?[a-z-]+)?\z'}
+        '/think'=@{Usage='/think on | /think off';Pattern='\A/think[ \t]+(?:on|off)\z'}
+        '/route'=@{Usage='/route auto | /route local | /route frontier';Pattern='\A/route[ \t]+(?:auto|local|frontier)\z'}
+        '/stream'=@{Usage='/stream on | /stream off';Pattern='\A/stream[ \t]+(?:on|off)\z'}
+        '/analyze'=@{Usage='/analyze [1..100 turns] (default: 8)';Pattern='\A/analyze(?:[ \t]+(?:0{0,2}[1-9]|0?[1-9][0-9]|100))?\z'}
+        '/files'=@{Usage='/files';Pattern='\A/files\z'}
+        '/import'=@{Usage='/import <filename>';Pattern='\A/import[ \t]+[^\r\n]+\z'}
+        '/export'=@{Usage='/export [filename]';Pattern='\A/export(?:[ \t]+[^\r\n]+)?\z'}
+        '/export-log'=@{Usage='/export-log';Pattern='\A/export-log\z'}
+        '/paste'=@{Usage='/paste';Pattern='\A/paste\z'}
+        '/clear'=@{Usage='/clear';Pattern='\A/clear\z'}
+        '/exit'=@{Usage='/exit';Pattern='\A/exit\z'}
+    }
+}
+function Get-LfoSlashCommandState([string]$Prompt){
+    $trimmed=$Prompt.Trim()
+    if(-not $trimmed.StartsWith('/')){return 'PROMPT'}
+    $key=($trimmed -split '\s+',2)[0].ToLowerInvariant()
+    $commands=Get-LfoSlashCommands
+    if(-not $commands.Contains($key)){return 'UNKNOWN'}
+    if($trimmed -notmatch $commands[$key].Pattern){return 'USAGE'}
+    return 'VALID'
+}
+function Show-LfoSlashHelp([string]$Command,[switch]$ExplicitHelp){
+    $commands=Get-LfoSlashCommands
+    $key=($Command.Trim() -split '\s+',2)[0].ToLowerInvariant()
+    if($ExplicitHelp -and $key -and -not $key.StartsWith('/')){$key='/'+$key}
+    if($ExplicitHelp -and -not $key){
+        Write-Host 'Available commands:' -ForegroundColor Cyan
+        foreach($entry in $commands.Values){Write-Host ('  '+$entry.Usage)}
+        return
+    }
+    if($commands.Contains($key)){
+        if($key -eq '/think'){
+            Write-Host ('Thinking: '+$(if($script:ThinkEnabled){'ON'}else{'OFF'})) -ForegroundColor Cyan
+        }elseif($key -eq '/route'){
+            Write-Host ('Routing mode: '+$script:LfoRouteMode) -ForegroundColor Cyan
+        }elseif($key -eq '/stream'){
+            Write-Host ('Streaming: '+$(if($script:LfoStreamEnabled){'ON'}else{'OFF'})) -ForegroundColor Cyan
+        }
+        Write-Host ('Usage: '+$commands[$key].Usage) -ForegroundColor Yellow
+        return
+    }
+    Write-Host ('Unknown command: '+(ConvertTo-LfoSafeConsoleText $key)) -ForegroundColor Yellow
+    foreach($candidate in $commands.Keys){
+        if($candidate.StartsWith($key,[StringComparison]::OrdinalIgnoreCase)){
+            Write-Host ('  '+$commands[$candidate].Usage) -ForegroundColor Cyan
+        }
+    }
+    Write-Host 'Use /help to list available commands.' -ForegroundColor Cyan
+}
+
 while ($true) {
     if($script:LfoImportQueue -and $script:LfoImportQueue.Count -gt 0){
         $prompt=$script:LfoImportQueue.Dequeue()
@@ -1344,7 +1632,17 @@ while ($true) {
     }
     if ($null -eq $prompt) { continue }
 
+    $commandState=Get-LfoSlashCommandState $prompt
+    if($commandState -in @('USAGE','UNKNOWN')){
+        Show-LfoSlashHelp $prompt
+        continue
+    }
+
     switch -Regex ($prompt.Trim()) {
+        '^/help(?:\s+(.+))?$' {
+            Show-LfoSlashHelp ([string]$Matches[1]) -ExplicitHelp
+            continue
+        }
         '^/analyze(?:\s|$)' {
             if($script:LfoL4Loaded){
                 Invoke-LfoL4AnalyzeCommand -Command $prompt -Epoch ([int]$script:RuntimeState.epoch) -LastTurn ([int]$script:RuntimeState.next_turn_id-1)
@@ -1414,6 +1712,16 @@ while ($true) {
             Invoke-Qwen $clip
             continue
         }
+        '^/route(?:\s+(auto|local|frontier))?$' {
+            if($Matches[1]){$script:LfoRouteMode=$Matches[1].ToUpperInvariant()}
+            Write-Host ("Routing mode: {0} (session only)." -f $script:LfoRouteMode) -ForegroundColor Cyan
+            continue
+        }
+        '^/stream(?:\s+(on|off))?$' {
+            if($Matches[1]){$script:LfoStreamEnabled=($Matches[1] -eq 'on')}
+            Write-Host ("Streaming: {0} (session only; benchmarks remain non-streaming)." -f $script:LfoStreamEnabled) -ForegroundColor Cyan
+            continue
+        }
         '^/think\s+on$' {
             $ThinkEnabled = $true
             Write-Host "Thinking enabled."
@@ -1428,7 +1736,7 @@ while ($true) {
             continue
         }
         default {
-            Invoke-Qwen $prompt
+            if($commandState -eq 'PROMPT'){Invoke-Qwen $prompt}else{Show-LfoSlashHelp $prompt}
         }
     }
 }
