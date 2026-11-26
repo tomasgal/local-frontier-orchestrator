@@ -1,5 +1,6 @@
 # Persistent conversation memory, exact-data retrieval, and research logging for QwenChat.
 # Dot-sourced by src/QwenChat.ps1. Qwen receives no filesystem tool.
+. (Join-Path $PSScriptRoot 'LfoEvidenceProvenance.ps1')
 
 function Initialize-QwenMemoryConfiguration(
     [Nullable[int]]$ContextLengthHint,
@@ -644,7 +645,8 @@ function Get-RelevantDataContext([string]$Query) {
         $aBudget = [Math]::Max(80, $perItem - $uBudget - 30)
         $uText = Get-BoundedText ([string]$row.user) $uBudget
         $aText = Get-BoundedText ([string]$row.assistant) $aBudget
-        $snippet = "T$($hit.turn_id) U:$uText A:$aText"
+        $label=Get-LfoHistoricalTurnLabel $row
+        $snippet = "T$($hit.turn_id) $label U:$uText A:$aText"
 
         if (($used + $snippet.Length) -gt $budget) {
             $remaining = $budget - $used
@@ -859,7 +861,7 @@ function Start-LfoTurnContext([string]$Query) {
 
     $recentChars = 0
     foreach ($item in $recent) { $recentChars += ([string]$item.content).Length }
-    $oldItems = @([regex]::Matches([string]$memory.RetrievedOldData, '(?m)^T\d+\s+U:')).Count
+    $oldItems = @([regex]::Matches([string]$memory.RetrievedOldData, '(?m)^T\d+\s+(?:\[route=(?:LOCAL|FRONTIER|UNKNOWN); external_evidence=(?:NONE|REQUESTED|OBSERVED|UNKNOWN)\]\s+)?U:')).Count
     $stats = [pscustomobject][ordered]@{
         l1_core_chars = ([string]$memory.Core).Length
         l0_old_data_chars = ([string]$memory.RetrievedOldData).Length
@@ -1218,7 +1220,8 @@ function Load-RecentConversationFromDisk {
             content = [string]$t.user
         }
 
-        $assistantStored = "ROUTE: $([string]$t.route)`n$([string]$t.assistant)"
+        $label=Get-LfoHistoricalTurnLabel $t
+        $assistantStored = "ROUTE: $([string]$t.route)`n$label`n$([string]$t.assistant)"
         $script:Messages += @{
             role = 'assistant'
             content = $assistantStored
@@ -1405,7 +1408,8 @@ function Persist-TurnAndMemory(
     $MemoryRecoverySuccess,
     [string]$MemoryNoteSource,
     [object[]]$StageSources = @(),
-    [scriptblock]$PostL0 = $null
+    [scriptblock]$PostL0 = $null,
+    [ValidateSet('NONE','REQUESTED','OBSERVED','UNKNOWN')][string]$ExternalEvidenceStatus='UNKNOWN'
 ) {
     if (-not $script:MemoryEnabled -and
         -not [bool]$script:Config.ResearchLogging.Enabled) {
@@ -1479,6 +1483,7 @@ function Persist-TurnAndMemory(
             turn_id = $turnId
             epoch = $epoch
             route = $Route
+            external_evidence_status = $ExternalEvidenceStatus
             user = $Prompt
             assistant = $FinalContent
         }
@@ -1685,6 +1690,7 @@ function Persist-TurnAndMemory(
             context_length_hint = $script:ContextLengthHint
             route = $Route
             route_reason = $PolicyReason
+            external_evidence_status = $ExternalEvidenceStatus
             answer_seconds = [Math]::Round($AnswerSeconds, 3)
             answer_recovery_used = $AnswerRecoveryUsed
             answer_recovery_reason = if ($AnswerRecoveryUsed) { $AnswerRecoveryReason } else { $null }

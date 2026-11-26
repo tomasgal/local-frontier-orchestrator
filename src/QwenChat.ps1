@@ -135,6 +135,7 @@ Structured answer writing:
 # This is a generation instruction, not a proof of model compliance.
 function Add-LfoLocalEvidencePolicy([string]$Policy,[string]$RouteMode){
     $Policy += [Environment]::NewLine+[Environment]::NewLine+'LOCAL evidence rule: If you answer locally, no live external lookup has occurred in this turn. Never claim to have searched, checked, accessed or verified an external source in the current turn. Historical results, stored facts and remembered links are not fresh verification. If using them for a current-information request, identify them as prior or unverified information and state that current status is not independently confirmed.'
+    $Policy += [Environment]::NewLine+'Historical turn labels describe only that turn: NONE=no external operation, REQUESTED=an external call was attempted but source access is not established, OBSERVED=external access was recorded (not truth verification), UNKNOWN=no reliable metadata. Repetition and summaries never upgrade evidence. Treat unlabelled STATE/PENDING summaries and L2 recorded facts as unverified, not proof of source access.'
     if($RouteMode -eq 'LOCAL'){
         $Policy += [Environment]::NewLine+'LOCAL is explicitly enforced for this turn. Return a useful, complete answer within available knowledge and state any inability to perform the requested live verification. Do not leave answer empty merely because the request would normally require FRONTIER.'
     }
@@ -1173,6 +1174,7 @@ function Invoke-Qwen([string]$Prompt) {
     $route = $null
     $r = $null
     $frontierResult = $null
+    $externalEvidenceStatus='NONE'
     $finalContent = $null
     $localRaw = $null
     $inlineMemoryNote = $null
@@ -1334,6 +1336,8 @@ $recentContext
         $frontierSw = [Diagnostics.Stopwatch]::StartNew()
         $frontierSuccess = $false
         try {
+            # A call attempt is not evidence that Codex opened a source.
+            $externalEvidenceStatus='REQUESTED'
             $frontierResult = Invoke-CodexReadOnly $codexPrompt
             $frontierSuccess = $true
             Write-Host ("[ask_codex -> Qwen; {0} characters]" -f $frontierResult.Length) -ForegroundColor DarkCyan
@@ -1461,7 +1465,8 @@ $recentContext
         # The marker is hidden from the user-facing output above, but storing it
         # prevents previous assistant turns from becoming counterexamples to the
         # system instruction that every normal turn must start with ROUTE: ...
-        $historyContent = "ROUTE: $route`n$finalContent"
+        $label=Get-LfoHistoricalTurnLabel ([pscustomobject]@{route=$route;external_evidence_status=$externalEvidenceStatus})
+        $historyContent = "ROUTE: $route`n$label`n$finalContent"
         $script:Messages += @{ role = 'assistant'; content = $historyContent }
         Trim-Messages
     }
@@ -1501,6 +1506,7 @@ $recentContext
         Persist-TurnAndMemory `
             -PostL0 $script:LfoL4PostL0 `
             -StageSources $stageSources.ToArray() `
+            -ExternalEvidenceStatus $externalEvidenceStatus `
             -Prompt $Prompt `
             -FinalContent $finalContent `
             -Route $route `
@@ -1545,7 +1551,7 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.6.7. Commands: /exit, /clear, /paste, /think on, /think off, /analyze, /files, /import, /export, /export-log, /route, /stream, /help"
+Write-Host "Qwen local chat v9.6.8-dev. Commands: /exit, /clear, /paste, /think on, /think off, /analyze, /files, /import, /export, /export-log, /route, /stream, /help"
 Write-Host ("Streaming: {0}; routing mode: {1}. /stream on|off; /route auto|local|frontier" -f $script:LfoStreamEnabled,$script:LfoRouteMode)
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"

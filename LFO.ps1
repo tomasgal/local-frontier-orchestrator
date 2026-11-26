@@ -67,7 +67,7 @@ function Resolve-LfoInstallRoot {
         ". Pass -InstallRoot <path> if your LFO bootstrap root is elsewhere.")
 }
 
-$script:Lfo963Version = '9.6.7'
+$script:Lfo963Version = '9.6.8-dev'
 
 function Get-LfoInstallState {
     param([Parameter(Mandatory=$true)][string]$InstallRoot)
@@ -538,7 +538,7 @@ if (-not [string]::IsNullOrWhiteSpace($BaseUriOverride)) {
     $lfo963FrontierSuppressed = $false
     if ($BatchLocalOnly -and $route -eq 'FRONTIER') {
         $lfo963FrontierSuppressed = $true
-        $finalContent = '[LFO 9.6.7 benchmark: Qwen requested FRONTIER; frontier call suppressed.]'
+        $finalContent = '[LFO 9.6.8-dev benchmark: Qwen requested FRONTIER; frontier call suppressed.]'
         $finalProducer = 'WRAPPER'
         $finalPhase = 'benchmark_frontier_suppressed'
         Write-Host "[batch LOCAL-ONLY] Qwen requested FRONTIER; Codex call suppressed." -ForegroundColor Yellow
@@ -588,7 +588,7 @@ if (-not [string]::IsNullOrWhiteSpace($BatchInputPath)) {
         $content = $content.Insert($loopPos, $batchBlock)
     }
 
-    $content = $content.Replace('Qwen local chat v9.6.2.', 'Qwen local chat v9.6.7.')
+    $content = $content.Replace('Qwen local chat v9.6.2.', 'Qwen local chat v9.6.8-dev.')
     $utf8 = New-Object System.Text.UTF8Encoding($false)
     [IO.File]::WriteAllText($DestinationPath, $content, $utf8)
     return $DestinationPath
@@ -1052,7 +1052,7 @@ function Invoke-LfoExperiment {
     $localOnly = $(if ($null -ne $plan.localOnly) { [bool]$plan.localOnly } else { $true })
 
     $resolved = [ordered]@{
-        runtime = 'LFO 9.6.7'
+        runtime = 'LFO 9.6.8-dev'
         base_runtime = 'v9.6.3 production launcher over accepted QwenChat semantics'
         experiment = [string]$plan.name
         definition = $experimentPathResolved
@@ -1084,7 +1084,7 @@ function Invoke-LfoExperiment {
     $measuredPrompts = @(Get-LfoPromptArray $plan.workload.prompts)
 
     try {
-        Write-Host ("LFO 9.6.7 experiment: {0}" -f [string]$plan.name) -ForegroundColor Cyan
+        Write-Host ("LFO 9.6.8-dev experiment: {0}" -f [string]$plan.name) -ForegroundColor Cyan
         Write-Host ("Device: {0}; model: {1}; repetitions: {2}" -f $device,[string]$modelSpec.Model,[int]$plan.repetitions)
         Write-Host ("Results: {0}" -f $runDir)
         Write-LfoExperimentProgress ("resolved install root: {0}" -f $InstallRoot) 'OK'
@@ -1472,8 +1472,8 @@ try {
         $env:LFO_L4_OBSERVABILITY = '1'
 
         Write-Host ''
-        Write-Host 'Local Frontier Orchestrator (LFO) 9.6.7' -ForegroundColor Cyan
-        Write-Host 'Runtime contract: v9.6.7 | UMA, manifest compatibility and console Markdown.'
+        Write-Host 'Local Frontier Orchestrator (LFO) 9.6.8-dev' -ForegroundColor Cyan
+        Write-Host 'Runtime contract: v9.6.8-dev | UMA, manifest compatibility and console Markdown.'
         Write-Host ("Install root: {0}" -f $resolvedInstallRoot)
         Write-Host ("Device:      {0} (requested: {1})" -f $resolvedDevice,$requestedDevice)
         Write-Host ("Model:       {0}" -f [string]$modelSpec.Model)
@@ -1512,7 +1512,7 @@ try {
     exit 0
 } catch {
     Write-Host ''
-    Write-Host 'LFO 9.6.7 FAILED' -ForegroundColor Red
+    Write-Host 'LFO 9.6.8-dev FAILED' -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
     if ($VerbosePreference -ne 'SilentlyContinue' -and $_.ScriptStackTrace) {
         Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray

@@ -5,12 +5,16 @@ on:
     branches:
       - feat/uma-bootstrap-20261123
       - feat/streaming-routing-v967
+      - feat/epistemic-provenance-v968
       - main
   pull_request:
     paths:
       - 'install/Install-LFO.ps1'
       - 'LFO.ps1'
       - 'src/QwenChat.ps1'
+      - 'src/QwenMemory.ps1'
+      - 'src/LfoEvidenceProvenance.ps1'
+      - 'src/LfoL3Runtime.ps1'
       - 'launch/Start-LFO.ps1'
       - 'launch/Start-LFO-UMA.ps1'
       - 'tests/Test-LfoUmaBootstrapContract.ps1'

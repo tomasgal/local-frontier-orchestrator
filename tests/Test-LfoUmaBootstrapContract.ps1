@@ -256,6 +256,27 @@ try{
     $testPhases[1].eval_count=$null
     $totals=Get-LfoAnswerGenerationTotals $testPhases
     if($null -ne $totals.generated_tokens -or $null -ne $totals.decode_tokens_per_second){throw 'Unknown token metrics treated as zero'}
+    . (Join-Path $root 'src/LfoEvidenceProvenance.ps1')
+    foreach($status in @('NONE','REQUESTED','OBSERVED','UNKNOWN')){
+        $row=[pscustomobject]@{route='LOCAL';external_evidence_status=$status;assistant='unchanged'}
+        if((Get-LfoExternalEvidenceStatus $row) -cne $status){throw 'Historical evidence status not preserved'}
+        if((Get-LfoHistoricalTurnLabel $row) -cne "[route=LOCAL; external_evidence=$status]"){throw 'Incorrect historical evidence label'}
+        if($row.assistant -cne 'unchanged'){throw 'Historical content changed'}
+    }
+    foreach($row in @([pscustomobject]@{route='FRONTIER'},[pscustomobject]@{route='FRONTIER';external_evidence_status='VERIFIED'},[pscustomobject]@{route='FRONTIER';external_evidence_status='requested'})){
+        if((Get-LfoExternalEvidenceStatus $row) -cne 'UNKNOWN'){throw 'Missing or invalid metadata promoted'}
+    }
+    # Real L3 fallback reads a synthetic historical row from a temp JSONL.
+    . (Join-Path $root 'src/LfoL3Runtime.ps1')
+    $evidenceDir=Join-Path $temp 'evidence-fixtures'
+    New-Item -ItemType Directory -Force -Path $evidenceDir|Out-Null
+    $row=[ordered]@{event='turn';epoch=1;turn_id=7;route='FRONTIER';external_evidence_status='REQUESTED';user='question';assistant='claim'}
+    $row|ConvertTo-Json -Compress|Set-Content -LiteralPath (Join-Path $evidenceDir 'conversation-2026-01.jsonl') -Encoding UTF8
+    $candidate=[pscustomobject]@{Id=1;SourceLayer='L0';SourceRef='turn:7'}
+    $found=@(Get-LfoL3RuntimeL0Evidence @($candidate) $evidenceDir 1)
+    if($found.Count -ne 1 -or $found[0].Text -cne 'T7 [route=FRONTIER; external_evidence=REQUESTED] U:question A:claim'){throw 'L3 provenance inheritance failed'}
+    if(-not $chatSource.Contains("-ExternalEvidenceStatus "+'$externalEvidenceStatus')){throw 'Runtime evidence status not passed to persistence'}
+    Write-Host 'PASS: additive turn evidence metadata, legacy UNKNOWN and L3 provenance inheritance.'
     Write-Host 'PASS: local evidence policy and answer-generation telemetry aggregation.'
     Write-Host 'PASS: all slash-command parameter validation, help and inference guard.'
     Write-Host 'PASS: thinking preview, answer continuation, no duplicate reasoning, and Codex wait modes.'

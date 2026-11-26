@@ -1,5 +1,6 @@
 # L3 read-side runtime adapter.
 # Resolves L3 source references back to L0/L2 evidence without exposing L3 metadata.
+. (Join-Path $PSScriptRoot 'LfoEvidenceProvenance.ps1')
 
 function Get-LfoL3RuntimeBoundedText([string]$Text, [int]$MaxChars) {
     if ([string]::IsNullOrWhiteSpace($Text) -or $MaxChars -le 0) { return '' }
@@ -94,7 +95,7 @@ function Get-LfoL3RuntimeL0Evidence(
                                     $out += [pscustomobject]@{
                                         SourceLayer = 'L0'
                                         SourceRef = $ref
-                                        Text = ("T{0} U:{1} A:{2}" -f $turnId,$u,$a)
+                                        Text = ("T{0} {1} U:{2} A:{3}" -f $turnId,(Get-LfoHistoricalTurnLabel $row),$u,$a)
                                     }
                                     $resolved = $true
                                 }
@@ -132,7 +133,7 @@ function Get-LfoL3RuntimeL0Evidence(
             $out += [pscustomobject]@{
                 SourceLayer = 'L0'
                 SourceRef = [string]$wanted[$turnId]
-                Text = ("T{0} U:{1} A:{2}" -f $turnId,$u,$a)
+                Text = ("T{0} {1} U:{2} A:{3}" -f $turnId,(Get-LfoHistoricalTurnLabel $row),$u,$a)
             }
             [void]$wanted.Remove($turnId)
             if ($wanted.Count -eq 0) { break }
