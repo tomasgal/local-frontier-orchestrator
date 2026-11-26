@@ -107,3 +107,5 @@ Optional bootstrap parameters -ImportDirectory and -ExportDirectory select exist
 Host smoke testing has demonstrated 100% GPU residency, 16k context, LOCAL and FRONTIER transport, and L4 recording/analysis on an AMD unified-memory host. A local installer workaround was required for the v2 manifest layout; this branch includes the correction. Some schema-constrained responses ended prematurely despite valid JSON; short quote-copy tests did not reproduce the issue consistently. This remains an open quality issue, not a confirmed quote parser defect. Reinstall and unattended experiment validation remain required before production promotion.
 
 Markdown tables with a header separator are laid out using visible column widths and word wrapping within the terminal window, with Unicode borders and a colored header. Extremely narrow terminals or irregular tables fall back to ordinary text. Display widths are approximate for complex emoji and Unicode sequences.
+
+The renderer also accepts Markdown tables with optional leading or trailing pipe characters, including mixed forms in the same table. A valid header separator is required.

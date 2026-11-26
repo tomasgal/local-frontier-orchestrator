@@ -440,6 +440,26 @@ function Get-LfoTableLayout([string[]]$Lines,[int]$Width){
     }
     return [pscustomobject]@{Rows=$rows;Widths=$widths;Align=$align}
 }
+# Outer pipe delimiters are optional. Require a real header separator before
+# consuming adjacent rows; leave unrelated or irregular lines to the normal renderer.
+function Get-LfoMarkdownTableBlock([string[]]$Lines,[int]$Start,[int]$Width){
+    if(($Start+1) -ge $Lines.Count -or $Lines[$Start] -notmatch '(?<!\\)\|'){return $null}
+    $header=@(Get-LfoTableCells $Lines[$Start])
+    $separator=@(Get-LfoTableCells $Lines[$Start+1])
+    if($header.Count -lt 2 -or $separator.Count -ne $header.Count){return $null}
+    foreach($cell in $separator){if($cell -notmatch '^:?-{3,}:?$'){return $null}}
+    $end=$Start+2
+    while($end -lt $Lines.Count -and $Lines[$end] -match '(?<!\\)\|'){
+        $cells=@(Get-LfoTableCells $Lines[$end])
+        if($cells.Count -ne $header.Count){break}
+        if($Lines[$end] -match '^\s*(?:\x60{3,}|~{3,}|#{1,6}\s|>)'){break}
+        $end++
+    }
+    $layout=Get-LfoTableLayout $Lines[$Start..($end-1)] $Width
+    if($null -eq $layout){return $null}
+    return [pscustomobject]@{Layout=$layout;EndIndex=($end-1)}
+}
+
 function Write-LfoTableBorder($Widths,[int]$Left,[int]$Middle,[int]$Right){
     $parts=@(foreach($w in $Widths){([string][char]0x2500)*($w+2)})
     Write-Host (([string][char]$Left)+($parts -join ([string][char]$Middle))+([string][char]$Right)) -ForegroundColor DarkCyan
@@ -502,12 +522,8 @@ function Write-LfoMarkdown([AllowEmptyString()][string]$Text){
             if($body -match '^\[([ xX])\]\s+(.*)$'){$bullet=if($Matches[1] -eq ' '){'[ ]'}else{'[x]'};$body=$Matches[2]}
             Write-Host ($indent+$bullet+' ') -ForegroundColor Green -NoNewline;Write-LfoMarkdownInline $body;continue
         }
-        if($line -match '^\s*\|.*\|\s*$' -and ($rowIndex+1) -lt $lines.Count -and $lines[$rowIndex+1] -match '^\s*\|.*\|\s*$'){
-            $end=$rowIndex+2
-            while($end -lt $lines.Count -and $lines[$end] -match '^\s*\|.*\|\s*$'){$end++}
-            $layout=Get-LfoTableLayout $lines[$rowIndex..($end-1)] $terminalWidth
-            if($null -ne $layout){Write-LfoMarkdownTable $layout;$rowIndex=$end-1;continue}
-        }
+        $table=Get-LfoMarkdownTableBlock $lines $rowIndex $terminalWidth
+        if($null -ne $table){Write-LfoMarkdownTable $table.Layout;$rowIndex=$table.EndIndex;continue}
         Write-LfoMarkdownInline $line
     }
 }

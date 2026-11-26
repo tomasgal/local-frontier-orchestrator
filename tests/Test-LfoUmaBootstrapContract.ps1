@@ -73,7 +73,7 @@ try{
     if((Get-OllamaLibraryManifestPath $temp 'test-model:latest') -ne $new){throw 'v2 manifest not preferred'}
     Remove-Item -LiteralPath $old
     if(-not (Test-OllamaStoreHasModel $temp 'test-model:latest')){throw 'v2-only manifest not detected'}
-    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Split-LfoImportPrompts')){
+    foreach($name in @('ConvertTo-LfoSafeConsoleText','Get-LfoMarkdownInlineSpans','Get-LfoTransferFile','Write-LfoTransferExport','Get-LfoTableCells','Get-LfoVisibleWidth','Split-LfoTableCell','Get-LfoTableLayout','Get-LfoMarkdownTableBlock','Split-LfoImportPrompts')){
         $fn=@($asts['src/QwenChat.ps1'].FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
         if($fn.Count -ne 1){throw "Missing helper $name"}
         . ([scriptblock]::Create($fn[0].Extent.Text))
@@ -92,6 +92,13 @@ try{
     $layout=Get-LfoTableLayout @('| Name | Description |','| --- | ---: |','| **RAM** | Long text that wraps correctly |','| GPU | Compute |') 28
     if($null -eq $layout -or $layout.Rows.Count -ne 3 -or $layout.Rows[1][0] -ne 'RAM' -or $layout.Align[1] -ne 'right'){throw 'Table layout failed'}
     if((($layout.Widths|Measure-Object -Sum).Sum+7) -gt 28){throw 'Table exceeds width'}
+    $block=Get-LfoMarkdownTableBlock @('| Column 1 | Column 2 | Description','| :--- | :--- | :--- |','| A | X | Long description that must wrap across several lines |','B | Y | More words without outer pipes','Paragraph outside the table') 32
+    if($null -eq $block -or $block.EndIndex -ne 3 -or $block.Layout.Rows.Count -ne 3){throw 'Optional outer pipes not recognized'}
+    if((($block.Layout.Widths|Measure-Object -Sum).Sum+10) -gt 32){throw 'Optional-pipe table exceeds width'}
+    $wrapped=@(Split-LfoTableCell $block.Layout.Rows[1][2] $block.Layout.Widths[2])
+    if($wrapped.Count -lt 2){throw 'Long table cell did not wrap'}
+    foreach($part in $wrapped){if((Get-LfoVisibleWidth $part) -gt $block.Layout.Widths[2]){throw 'Wrapped table cell exceeds column width'}}
+    if($null -ne (Get-LfoMarkdownTableBlock @('A | B','Not a separator') 32)){throw 'Non-table misclassified'}
     $pieces=@(Split-LfoTableCell 'a verylongunbrokenword and more text' 5)
     foreach($piece in $pieces){if((Get-LfoVisibleWidth $piece) -gt 5){throw 'Cell wrap exceeds width'}}
     $nl=[string][char]10;$crlf=[string][char]13+$nl
