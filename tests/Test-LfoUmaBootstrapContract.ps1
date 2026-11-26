@@ -27,7 +27,7 @@ foreach ($required in @(
 )) {
     if (-not $installer.Contains($required)) { throw "Missing UMA installer contract: $required" }
 }
-$fnNames = @('Resolve-LfoDevice','Get-LfoModelSpec')
+$fnNames = @('Resolve-LfoDevice','Get-LfoModelSpec','Get-LfoPromptArray','New-LfoBatchInputFile')
 foreach ($name in $fnNames) {
     $found = @($asts['LFO.ps1'].FindAll({
         param($node)
@@ -92,13 +92,13 @@ try{
     $layout=Get-LfoTableLayout @('| Name | Description |','| --- | ---: |','| **RAM** | Long text that wraps correctly |','| GPU | Compute |') 28
     if($null -eq $layout -or $layout.Rows.Count -ne 3 -or $layout.Rows[1][0] -ne 'RAM' -or $layout.Align[1] -ne 'right'){throw 'Table layout failed'}
     if((($layout.Widths|Measure-Object -Sum).Sum+7) -gt 28){throw 'Table exceeds width'}
-    $block=Get-LfoMarkdownTableBlock @('| Column 1 | Column 2 | Description','| :--- | :--- | :--- |','| A | X | Long description that must wrap across several lines |','B | Y | More words without outer pipes','Paragraph outside the table') 32
+    $block=Get-LfoMarkdownTableBlock @('| Column 1 | Column 2 | Description','| :--- | :--- | :--- |','| A | X | Long description that must wrap across several lines |','B | Y | More words without outer pipes','Paragraph outside the table') 0 32
     if($null -eq $block -or $block.EndIndex -ne 3 -or $block.Layout.Rows.Count -ne 3){throw 'Optional outer pipes not recognized'}
     if((($block.Layout.Widths|Measure-Object -Sum).Sum+10) -gt 32){throw 'Optional-pipe table exceeds width'}
     $wrapped=@(Split-LfoTableCell $block.Layout.Rows[1][2] $block.Layout.Widths[2])
     if($wrapped.Count -lt 2){throw 'Long table cell did not wrap'}
     foreach($part in $wrapped){if((Get-LfoVisibleWidth $part) -gt $block.Layout.Widths[2]){throw 'Wrapped table cell exceeds column width'}}
-    if($null -ne (Get-LfoMarkdownTableBlock @('A | B','Not a separator') 32)){throw 'Non-table misclassified'}
+    if($null -ne (Get-LfoMarkdownTableBlock @('A | B','Not a separator') 0 32)){throw 'Non-table misclassified'}
     $pieces=@(Split-LfoTableCell 'a verylongunbrokenword and more text' 5)
     foreach($piece in $pieces){if((Get-LfoVisibleWidth $piece) -gt 5){throw 'Cell wrap exceeds width'}}
     $nl=[string][char]10;$crlf=[string][char]13+$nl
@@ -107,6 +107,23 @@ try{
     if(@(Split-LfoImportPrompts 'literal ||| inline').Count -ne 1){throw 'Inline separator was split'}
     $many=@(Split-LfoImportPrompts ((1..1000|ForEach-Object{"Prompt $_"}) -join ($nl+'|||'+$nl)))
     if($many.Count -ne 1000 -or $many[999] -ne 'Prompt 1000'){throw 'Large import split failed'}
+    # Exercise exact array-capture expressions from the real experiment runner.
+    $source=Get-Content -LiteralPath (Join-Path $root 'LFO.ps1') -Raw -Encoding UTF8
+    $plan='{"warmup":{"prompts":["Warmup"]},"workload":{"setupPrompts":["Setup"],"prompts":["Measured"]}}' | ConvertFrom-Json
+    foreach($variable in @('warmupPrompts','setupPrompts','measuredPrompts')){
+        $pattern='(?m)\$'+$variable+' = @\(Get-LfoPromptArray \$plan\.[\w.]+\)'
+        $match=[regex]::Match($source,$pattern)
+        if(-not $match.Success){throw "Missing array capture: $variable"}
+        . ([scriptblock]::Create($match.Value))
+    }
+    if($measuredPrompts.Count -ne 1 -or $measuredPrompts[0] -isnot [string] -or $measuredPrompts[0] -ne 'Measured'){throw 'Single measured prompt collapsed'}
+    $batch=Join-Path $temp 'batch.json'
+    New-LfoBatchInputFile $batch @($setupPrompts + @($measuredPrompts[0]))
+    $items=@((Get-Content $batch -Raw -Encoding UTF8|ConvertFrom-Json).prompts)
+    if($items.Count -ne 2 -or $items[0].text -ne 'Setup' -or $items[1].text -ne 'Measured'){throw 'Single setup/measured prompt batch corrupted'}
+    $rejected=$false;try{New-LfoBatchInputFile $batch @('')}catch{$rejected=$true}
+    if(-not $rejected){throw 'Empty batch prompt accepted'}
+    Write-Host 'PASS: singleton experiment prompt arrays and batch input validation.'
     Write-Host 'PASS: aligned table layout, width, wrapping, multiline import and 1000-entry splitting.'
     Write-Host 'PASS: v1/v2 manifests, Markdown spans, control stripping, raw export, path and overwrite guards.'
 }finally{Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue}

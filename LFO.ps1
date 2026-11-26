@@ -599,6 +599,9 @@ function New-LfoBatchInputFile {
             }
         }
     }
+    foreach ($item in $items) {
+        if ([string]::IsNullOrWhiteSpace([string]$item.text)) { throw 'Batch input contains an empty or invalid prompt.' }
+    }
     $obj = [ordered]@{ prompts = $items }
     $json = $obj | ConvertTo-Json -Depth 8
     $utf8 = New-Object System.Text.UTF8Encoding($false)
@@ -1062,11 +1065,11 @@ function Invoke-LfoExperiment {
     $resolved | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $runDir 'experiment.resolved.json') -Encoding UTF8
 
     $warmupPrompts = @()
-    if ($null -ne $plan.warmup -and $null -ne $plan.warmup.prompts) { $warmupPrompts = Get-LfoPromptArray $plan.warmup.prompts }
+    if ($null -ne $plan.warmup -and $null -ne $plan.warmup.prompts) { $warmupPrompts = @(Get-LfoPromptArray $plan.warmup.prompts) }
     if ($warmupPrompts.Count -eq 0) { $warmupPrompts = @($plan.workload.prompts | Select-Object -First 1) }
     $setupPrompts = @()
-    if ($null -ne $plan.workload.setupPrompts) { $setupPrompts = Get-LfoPromptArray $plan.workload.setupPrompts }
-    $measuredPrompts = Get-LfoPromptArray $plan.workload.prompts
+    if ($null -ne $plan.workload.setupPrompts) { $setupPrompts = @(Get-LfoPromptArray $plan.workload.setupPrompts) }
+    $measuredPrompts = @(Get-LfoPromptArray $plan.workload.prompts)
 
     try {
         Write-Host ("LFO 9.6.6-dev experiment: {0}" -f [string]$plan.name) -ForegroundColor Cyan
