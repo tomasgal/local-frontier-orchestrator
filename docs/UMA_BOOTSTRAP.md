@@ -1,12 +1,12 @@
 # Windows UMA bootstrap — AMD Ryzen AI Max+ / Radeon 8060S
 
-Status: **experimental implementation (2026-11-23), not yet validated on the MS-S1 MAX host**. This extends the v9.6.4 source without altering the frozen v9.6.3 or v9.6.4 release tags.
+Status: **reference-host integration accepted on 2026-11-26; v9.6.6 release candidate**. Historical release tags remain unchanged.
 
 ## Intent and boundaries
 
 `-Profile UMA` is a third **LFO execution profile** for a Windows host with large unified CPU/GPU memory. It retains the existing orchestration, L0–L4 logging/memory, optional Codex frontier and experiment runner.
 
-Reference host: Ryzen AI Max+ 395, Radeon 8060S, 128 GB LPDDR5X, Windows 11 Pro. The existing Ollama instance at `127.0.0.1:11434` already hosts `qwen3.5:35b-a3b-q8_0`. Its reported 100% GPU placement and 16,384-token context were measured in the host's separate text runtime; **that does not yet validate LFO's UMA profile**.
+Reference host: Ryzen AI Max+ 395, Radeon 8060S, 128 GB LPDDR5X, Windows 11 Pro. The existing Ollama instance at `127.0.0.1:11434` already hosts `qwen3.5:35b-a3b-q8_0`. The subsequent LFO integration tests independently confirmed full reported GPU residency and a 16,384-token context.
 
 UMA explicitly:
 - requires a *running* compatible native Windows Ollama and the locally installed 35B Q8 model; it does not download a model or install/restart a second Ollama;
@@ -77,7 +77,7 @@ Invoke-RestMethod 'http://127.0.0.1:11434/api/ps' |
     Select-Object name,size,size_vram,expires_at
 ```
 
-Expected evidence (to be measured): `lfo-qwen3.5-35b-uma16k:latest` is loaded; `size_vram` is positive and ideally close to the loaded model size; the runtime reports a 16,384-token context. If the model is CPU-placed, the UMA acceleration requirement is **not** met even if a prompt succeeds.
+Placement acceptance criteria: `lfo-qwen3.5-35b-uma16k:latest` is loaded; `size_vram` is positive and ideally close to the loaded model size; the runtime reports a 16,384-token context. If the model is CPU-placed, the UMA acceleration requirement is **not** met even if a prompt succeeds.
 
 Run the offline source-contract checks first, on the checkout:
 
@@ -98,13 +98,13 @@ Then verify interactive LOCAL answer, `/analyze`/L4 configured, `/exit`, and opt
 **Acceptance gate:** do not merge or designate UMA as production-supported until the Windows PowerShell parser/static tests, install/reinstall idempotency, real AMD GPU model placement, L4 recording and one interactive/experiment smoke test pass on MS-S1 MAX.
 
 
-## v9.6.6-dev compatibility and file exchange
+## v9.6.6 compatibility and file exchange
 
 The development branch incorporates v9.6.5 research tooling. The installer recognizes both legacy Ollama manifests and the newer manifests-v2/ollama.com layout, preferring v2 when both are present. It can reuse a previously created UMA alias with -SkipModelPull. The console renders common Markdown constructs using native PowerShell console colors (headings, emphasis, links, lists, task lists, blockquotes, rules, tables and code fences); this is a terminal-oriented subset, not a browser/CommonMark engine. Set LFO_MARKDOWN_PLAIN=1 or NO_COLOR to preserve plain output. Raw Markdown remains the persisted and exported response.
 
 Optional bootstrap parameters -ImportDirectory and -ExportDirectory select existing or newly created exchange directories; defaults are import and export under the install root. These paths persist on reinstall. /files lists import files and both paths. /import NAME reads a UTF-8 text file (up to 64 MiB). A line containing only ||| (optional surrounding spaces) submits the current entry and starts another. Ordinary newlines remain inside prompts; EOF submits the last entry; blank entries are skipped. Each entry is limited to 32 KiB, and normal routing, slash commands, persistent memory and logging apply. Nested imports are rejected; /exit ends the session and remaining entries are not executed. There is no separate batch mode or automatic resume. Do not import confidential data if frontier routing is enabled. /export [NAME] writes the last response from this session as raw Markdown without overwriting existing files. /export-log explicitly copies the current monthly conversation JSONL, including potentially sensitive historical prompts. No automatic transfer of memory databases or credentials. Configure access to the exchange directories separately.
 
-Host smoke testing has demonstrated 100% GPU residency, 16k context, LOCAL and FRONTIER transport, and L4 recording/analysis on an AMD unified-memory host. A local installer workaround was required for the v2 manifest layout; this branch includes the correction. Some schema-constrained responses ended prematurely despite valid JSON; short quote-copy tests did not reproduce the issue consistently. This remains an open quality issue, not a confirmed quote parser defect. Host reinstall and isolated LOCAL-only UMA smoke tests with L4 OFF and ON have passed. Production promotion remains subject to final generation and safety regression tests.
+Host smoke testing has demonstrated 100% GPU residency, 16k context, LOCAL and FRONTIER transport, and L4 recording/analysis on an AMD unified-memory host. A local installer workaround was required for the v2 manifest layout; this branch includes the correction. Some schema-constrained responses ended prematurely despite valid JSON; short quote-copy tests did not reproduce the issue consistently. This remains an open quality issue, not a confirmed quote parser defect. Host reinstall and isolated LOCAL-only UMA smoke tests with L4 OFF and ON have passed. The reference host subsequently passed a complete long LOCAL response and a multi-example quotation/code response after the UMA-only writing mitigation; this is bounded acceptance, not proof of general model reliability.
 
 Markdown tables with a header separator are laid out using visible column widths and word wrapping within the terminal window, with Unicode borders and a colored header. Extremely narrow terminals or irregular tables fall back to ordinary text. Display widths are approximate for complex emoji and Unicode sequences.
 
