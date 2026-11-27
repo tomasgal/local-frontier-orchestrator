@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$BankPath=(Join-Path $PSScriptRoot 'g2/QualityScreen07.json'),
+    [string]$BankPath,
     [string]$OutputRoot='C:\Transfer\Export\LFO',
     [string]$Model='lfo-qwen3.5-35b-uma16k:latest',
     [ValidateRange(1,3)][int]$Repeat=1,
@@ -11,6 +11,7 @@ param(
     [switch]$DryRun
 )
 $ErrorActionPreference='Stop'
+if(-not $BankPath){$BankPath=Join-Path $PSScriptRoot 'g2/QualityScreen07.json'}
 $base='http://127.0.0.1:11434'
 $utf8=New-Object Text.UTF8Encoding($false)
 $bank=Get-Content -LiteralPath $BankPath -Raw -Encoding UTF8|ConvertFrom-Json

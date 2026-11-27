@@ -64,3 +64,9 @@ jobs:
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2QualityScreen.ps1 -DryRun -OutputRoot $env:RUNNER_TEMP
           if($LASTEXITCODE -ne 0){throw 'Quality screen contract failed'}
+
+      - name: Revision screen patch contract
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2RevisionScreen.ps1 -SelfTest
+          if($LASTEXITCODE -ne 0){throw 'Revision screen contract failed'}
