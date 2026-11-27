@@ -28,7 +28,7 @@ for($i=0;$i -lt 8;$i++){
 }
 Assert-Case ($bank.schemaVersion -eq 1 -and $bank.cases.Count -eq 44 -and $planned -eq 352 -and @($bank.cases.id|Sort-Object -Unique).Count -eq 44) 'Bank cardinality'
 function Assert-Relations($Case){
-    foreach($r in @($Case.relations)){
+    foreach($r in @($Case.relations|Where-Object{$null -ne $_})){
         $src=@($Case.segments|Where-Object id -eq $r.source_id)
         Assert-Case ($src.Count -eq 1 -and $src[0].role -ceq 'EVIDENCE') ('Relation source invalid '+$Case.id)
         foreach($v in @($r.subject,$r.attribute,$r.value)){
@@ -74,22 +74,26 @@ function Compose-Ces($Case,[string]$Profile){
     $removed=@($Case.segments|Where-Object{$mask -and $_.role -ceq 'STANCE'})
     Assert-Case (@($removed|Where-Object{$_.role -cne 'STANCE' -or $_.role -cin $config.composition.maskProtectedRoles}).Count -eq 0) 'Protected segment removed'
     $user=($kept|ForEach-Object text)-join ''
-    $relActive=($p.relations -and @($Case.relations).Count -gt 0)
+    $relationRows=@($Case.relations|Where-Object{$null -ne $_})
+    $relActive=($p.relations -and $relationRows.Count -gt 0)
+    $removedIds=@($removed|ForEach-Object{$_.id})
+    $keptIds=@($kept|ForEach-Object{$_.id})
+    Assert-Case ($removedIds.Count -eq $removed.Count -and $keptIds.Count -eq $kept.Count) ('ID cardinality mismatch '+$Case.id+' '+$Profile)
     $messages=@(@{role='system';content=($commonSystem+$(if($p.preserve){$preserve}else{''}))},@{role='user';content=$user})
     $relJson=''
     if($relActive){
         # A separate data-only message, not a rewrite. Source IDs refer to original author segments.
-        $relJson=ConvertTo-Json -InputObject ([ordered]@{derived_from='same original user text; not additional evidence';relations=@($Case.relations)}) -Depth 12 -Compress
+        $relJson=ConvertTo-Json -InputObject ([ordered]@{derived_from='same original user text; not additional evidence';relations=$relationRows}) -Depth 12 -Compress
         $decoded=ConvertFrom-Json -InputObject $relJson -ErrorAction Stop
-        $items=@($decoded.relations)
-        Assert-Case ($items.Count -eq @($Case.relations).Count) 'Relation count changed'
+        $items=@($decoded.relations|Where-Object{$null -ne $_})
+        Assert-Case ($items.Count -eq $relationRows.Count) 'Relation count changed'
         for($k=0;$k -lt $items.Count;$k++){
-            $r=$items[$k];$e=$Case.relations[$k]
-            Assert-Case ($r.source_id -eq $e.source_id -and [string]::Equals($r.subject,$e.subject,[StringComparison]::Ordinal) -and [string]::Equals($r.attribute,$e.attribute,[StringComparison]::Ordinal) -and [string]::Equals($r.value,$e.value,[StringComparison]::Ordinal) -and $r.source_id -in $kept.id) 'Relation integrity failure'
+            $r=$items[$k];$e=$relationRows[$k]
+            Assert-Case ($r.source_id -eq $e.source_id -and [string]::Equals($r.subject,$e.subject,[StringComparison]::Ordinal) -and [string]::Equals($r.attribute,$e.attribute,[StringComparison]::Ordinal) -and [string]::Equals($r.value,$e.value,[StringComparison]::Ordinal) -and $r.source_id -in $keptIds) 'Relation integrity failure'
         }
         $messages+=@{role='user';content=$relJson}
     }
-    [pscustomobject]@{user=$user;messages=$messages;requested=@($p.operators);maskApplied=$mask;maskInhibited=($p.mask -and -not $mask);relationsApplied=$relActive;relationsInhibited=($p.relations -and -not $relActive);preserveApplied=[bool]$p.preserve;removedIds=@($removed.id);keptIds=@($kept.id);extraModelCalls=0}
+    [pscustomobject]@{user=$user;messages=$messages;requested=@($p.operators);maskApplied=$mask;maskInhibited=($p.mask -and -not $mask);relationsApplied=$relActive;relationsInhibited=($p.relations -and -not $relActive);preserveApplied=[bool]$p.preserve;removedIds=$removedIds;keptIds=$keptIds;extraModelCalls=0}
 }
 $answerSchema=@{type='object';properties=@{answer=@{type='string'}};required=@('answer');additionalProperties=$false}
 foreach($c in $bank.cases){
@@ -99,10 +103,21 @@ foreach($c in $bank.cases){
         $expectedMask=($profile.mask -and $c.safeMask)
         $expectedText=($c.segments|Where-Object{-not ($expectedMask -and $_.role -ceq 'STANCE')}|ForEach-Object text)-join ''
         Assert-Case ([string]::Equals($q.user,$expectedText,[StringComparison]::Ordinal) -and [string]::Equals($q.messages[1].content,$expectedText,[StringComparison]::Ordinal)) 'Original content changed'
-        Assert-Case ($q.maskApplied -eq $expectedMask -and $q.preserveApplied -eq $profile.preserve -and $q.relationsApplied -eq ($profile.relations -and @($c.relations).Count -gt 0)) 'Factor mismatch'
+        Assert-Case ($q.maskApplied -eq $expectedMask -and $q.preserveApplied -eq $profile.preserve -and $q.relationsApplied -eq ($profile.relations -and @($c.relations|Where-Object{$null -ne $_}).Count -gt 0)) 'Factor mismatch'
         Assert-Case ($q.messages.Count -eq (2+[int]$q.relationsApplied) -and $q.extraModelCalls -eq 0) 'Message count mismatch'
-        if(-not $expectedMask){Assert-Case ($q.removedIds.Count -eq 0 -and [string]::Equals($q.user,$c.prompt,[StringComparison]::Ordinal)) 'Mask must preserve protected content'}
+        $expectedRemoved=@($c.segments|Where-Object{$expectedMask -and $_.role -ceq 'STANCE'}|ForEach-Object{$_.id})
+        $expectedKept=@($c.segments|Where-Object{-not ($expectedMask -and $_.role -ceq 'STANCE')}|ForEach-Object{$_.id})
+        Assert-Case ($q.removedIds.Count -eq $expectedRemoved.Count -and ($q.removedIds -join ',') -ceq ($expectedRemoved -join ',') -and $q.keptIds.Count -eq $expectedKept.Count -and ($q.keptIds -join ',') -ceq ($expectedKept -join ',')) ('Projection ID mismatch '+$c.id+' '+$arm)
+        if(-not $expectedMask){Assert-Case ($q.removedIds.Count -eq 0 -and [string]::Equals($q.user,$c.prompt,[StringComparison]::Ordinal)) ('Mask must preserve protected content '+$c.id+' '+$arm)}
     }
+}
+# Explicit empty, singleton, and multiple-ID regression for PS 5.1.
+$emptyFixture=[pscustomobject]@{id='SELFTEST-EMPTY';safeMask=$false;segments=@([pscustomobject]@{id=1;role='TASK';text='Keep exact text.'});relations=@()}
+foreach($arm in $arms){
+    $q=Compose-Ces $emptyFixture $arm
+    Assert-Case ($q.removedIds.Count -eq 0 -and $q.keptIds.Count -eq 1 -and $q.keptIds[0] -eq 1 -and -not $q.relationsApplied -and $q.messages.Count -eq 2) ('Empty-array regression '+$arm)
+    $round=ConvertFrom-Json -InputObject (ConvertTo-Json -InputObject $q -Depth 12 -Compress)
+    Assert-Case ($round.removedIds.Count -eq 0 -and $round.keptIds.Count -eq 1) 'Projection JSON array cardinality'
 }
 # Negative regression: a fabricated relation value must fail source validation.
 $fixture=[pscustomobject]@{id='SELFTEST';segments=@([pscustomobject]@{id=1;role='EVIDENCE';text='A cost 3 units.'});relations=@([pscustomobject]@{source_id=1;subject='A';attribute='cost';value='9 units'})}
