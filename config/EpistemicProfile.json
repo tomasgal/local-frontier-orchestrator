@@ -13,5 +13,6 @@
     "verification-claim": true,
     "confirmation-seeking": true,
     "response-stance": false
-  }
+  },
+  "interventionPolicy": "STANDARD"
 }

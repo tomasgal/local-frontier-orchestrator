@@ -20,8 +20,8 @@
     "AUTO uses the device-specific default (streaming on UMA). ON renders provisional answer blocks as they arrive; OFF waits for completion. Streaming does not guarantee validity or completeness of an answer. /stream overrides the current session."
   ],
   "Epistemic.Mode": [
-    "Controls whether the G2 controller records or reports epistemic signals.",
-    "OFF disables the new G2 observer. OBSERVE logs signals after L0 persistence without modifying the answer. ADVISE also prints a post-answer notice. INTERVENE is not implemented. Legacy L4 recording remains independent. No extra inference calls are added by the supplied detectors."
+    "Controls observation, advisory and opt-in intervention.",
+    "OFF disables G2. OBSERVE logs signals without modifying the answer. ADVISE reports signals without changing inference. INTERVENE enables the selected intervention policy; only grounded runtime E1 contradictions can currently trigger corrective calls. Absence of a signal does not establish correctness."
   ],
   "Epistemic.Axis.E1": [
     "Integrity: sensitivity to unsupported evidence or operation claims.",
@@ -122,5 +122,9 @@
   "Chat.L4.Enabled": [
     "Displays the legacy L4 recording configuration.",
     "The production launcher supplies runtime L4 settings. This managed entry is not the G2 mode. Use Epistemic.Mode for the new observer."
+  ],
+  "Epistemic.InterventionPolicy": [
+    "Selects the degree of intervention when Mode is INTERVENE.",
+    "MINIMAL: bounded inline correction and visible flags, no extra calls. STANDARD: also adds preventive guidance for explicit E4 requests. CASCADE: STANDARD plus at most two corrective local calls on a concrete E1 contradiction; partial result and human fallback when unresolved. Does not reduce the configured generation budget or change route. Explicit memory requests are excluded from intervention. The default overall mode remains OBSERVE."
   ]
 }

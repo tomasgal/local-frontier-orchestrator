@@ -8,7 +8,9 @@ function Get-LfoConfigurationRegistry {
     }
     $profile=Get-Content -LiteralPath (Join-Path $RepositoryRoot 'config/EpistemicProfile.json') -Raw -Encoding UTF8|ConvertFrom-Json
     $ep=Import-PowerShellDataFile -LiteralPath (Join-Path $RepositoryRoot 'config/EpistemicRegistry.psd1')
-    AddEntry 'Epistemic.Mode' 'Epistemic' $profile.mode 'enum' @('OFF','OBSERVE','ADVISE') 'Live' 'Observation or post-answer advisory; intervention unavailable.'
+    AddEntry 'Epistemic.Mode' 'Epistemic' $profile.mode 'enum' @('OFF','OBSERVE','ADVISE','INTERVENE') 'Live' 'Observe, advise or intervene.'
+    AddEntry 'Epistemic.InterventionPolicy' 'Epistemic' $profile.interventionPolicy 'enum' @('MINIMAL','STANDARD','CASCADE') 'Live' 'Only active in INTERVENE; maximum two corrective calls.'
+    $r['Epistemic.InterventionPolicy'].DisplayLabel='Intervention policy'
     foreach($axis in @($ep.Axes.Keys|Sort-Object)){
         $prop=$profile.axes.PSObject.Properties[$axis];$level=if($prop){[string]$prop.Value}else{'OFF'}
         $count=@($ep.Detectors|Where-Object Axis -eq $axis).Count
@@ -144,6 +146,7 @@ function Set-LfoChatConfiguration($Config,$Values){
 function Set-LfoEpistemicConfiguration($Controller,$Values){
     if($null -eq $Controller){return}
     if($Values.ContainsKey('Epistemic.Mode')){$Controller.Mode=$Values['Epistemic.Mode']}
+    if($Values.ContainsKey('Epistemic.InterventionPolicy')){$Controller.InterventionPolicy=$Values['Epistemic.InterventionPolicy']}
     foreach($axis in @($Controller.Axes.Keys)){
         $id='Epistemic.Axis.'+$axis
         if($Values.ContainsKey($id)){$Controller.Axes[$axis]=$Values[$id]}

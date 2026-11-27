@@ -69,7 +69,7 @@ function Get-LfoTurnPhases {
 # Sum the answer-generation phases only. Memory work follows the visible
 # answer and is deliberately excluded. Preserve legacy per-response metrics.
 function Get-LfoAnswerGenerationTotals([object[]]$Phases){
-    $modelPhases=@($Phases|Where-Object {$_.kind -eq 'model' -and $_.phase -in @('local_generation','answer_recovery','frontier_synthesis')})
+    $modelPhases=@($Phases|Where-Object {$_.kind -eq 'model' -and $_.phase -in @('local_generation','answer_recovery','frontier_synthesis','g2_revision_1','g2_revision_2')})
     $prompt=[long]0;$generated=[long]0;$decode=[double]0
     $promptKnown=$true;$generatedKnown=$true;$decodeKnown=$true
     foreach($phase in $modelPhases){

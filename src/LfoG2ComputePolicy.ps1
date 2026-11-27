@@ -18,7 +18,7 @@ function Get-LfoG2InterventionPlan {
     $out=[ordered]@{requested=$Requested;eligible=$false;signal=$null;rule=$null;decision='DISABLED';instruction=''}
     if(-not $Requested){return [pscustomobject]$out}
     $out.decision='INELIGIBLE'
-    if($null -eq $Controller -or $Controller.Mode -ne 'OBSERVE' -or $Route -ne 'LOCAL' -or $Controller.Axes.E4 -eq 'OFF'){return [pscustomobject]$out}
+    if($null -eq $Controller -or $Controller.Mode -notin @('OBSERVE','INTERVENE') -or ($Route -ne 'LOCAL' -and -not ($Controller.Mode -eq 'INTERVENE' -and $Route -eq 'AUTO')) -or $Controller.Axes.E4 -eq 'OFF'){return [pscustomobject]$out}
     $m=$Controller.Modules['confirmation-seeking']
     if($null -eq $m -or -not $m.Enabled){return [pscustomobject]$out}
     $ctx=[pscustomobject]@{Text=$Prompt;ExternalEvidence='UNKNOWN';Route=$Route;Stage='USER'}

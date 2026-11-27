@@ -16,7 +16,7 @@ try{
     if($cfg.LocalGeneration.Temperature -ne 0.3){throw 'Chat overlay'}
     $v['Session.Route']='FRONTIER';Save-LfoConfiguration $r $v $p
     if((Read-LfoConfiguration $r $p)['Session.Route'] -ne 'FRONTIER'){throw 'Replacement'}
-    foreach($bad in @(@{'Epistemic.Mode'='INTERVENE'},@{'Models.UMA'='other'},@{'Session.Think'='false'},@{'Chat.LocalGeneration.Temperature'=9})){
+    foreach($bad in @(@{'Epistemic.Mode'='INVALID'},@{'Epistemic.InterventionPolicy'='ADAPTIVE'},@{'Models.UMA'='other'},@{'Session.Think'='false'},@{'Chat.LocalGeneration.Temperature'=9})){
         $rejected=$false;try{Assert-LfoConfiguration $r $bad}catch{$rejected=$true}
         if(-not $rejected){throw 'Invalid setting accepted'}
     }
@@ -59,3 +59,7 @@ foreach($axis in $ep.Axes.Keys){
 }
 foreach($entry in $r.Values){if(-not $entry.DisplayLabel){throw ('Missing display label: '+$entry.Id)}}
 Write-Host 'Axis display labels PASS (canonical registry; stable configuration IDs).'
+
+if($r['Epistemic.InterventionPolicy'].Default -cne 'STANDARD' -or ($r['Epistemic.InterventionPolicy'].Choices -join ',') -cne 'MINIMAL,STANDARD,CASCADE' -or 'INTERVENE' -notin $r['Epistemic.Mode'].Choices){throw 'Intervention policy menu'}
+Assert-LfoConfiguration $r @{'Epistemic.Mode'='INTERVENE';'Epistemic.InterventionPolicy'='CASCADE'}
+Write-Host 'Intervention menu contract PASS.'

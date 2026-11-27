@@ -14,7 +14,9 @@ function Initialize-LfoG2Controller {
     if($registry.SchemaVersion -ne 1){throw 'Unsupported G2 registry version.'}
     if(-not $ProfilePath){$ProfilePath=Join-Path $RepositoryRoot 'config/EpistemicProfile.json'}
     $p=Get-Content -LiteralPath $ProfilePath -Raw -Encoding UTF8|ConvertFrom-Json
-    if($p.schemaVersion -ne 1 -or $p.mode -cnotin @('OFF','OBSERVE','ADVISE') -or $null -eq $p.axes -or $null -eq $p.detectors){throw 'Invalid G2 profile or mode.'}
+    if($p.schemaVersion -ne 1 -or $p.mode -cnotin @('OFF','OBSERVE','ADVISE','INTERVENE') -or $null -eq $p.axes -or $null -eq $p.detectors){throw 'Invalid G2 profile or mode.'}
+    $policy=if($p.PSObject.Properties['interventionPolicy']){[string]$p.interventionPolicy}else{'STANDARD'}
+    if($policy -cnotin @('MINIMAL','STANDARD','CASCADE')){throw 'Invalid G2 intervention policy.'}
     $axes=@{}
     foreach($key in $registry.Axes.Keys){
         if($key -cnotmatch '^E[1-9][0-9]*$'){throw 'Invalid axis ID.'}
@@ -37,7 +39,7 @@ function Initialize-LfoG2Controller {
         $modules[$d.Id]=[pscustomobject]@{Descriptor=$d;Run=$fn.ScriptBlock;Enabled=($null -ne $prop -and $prop.Value -eq $true)}
     }
     foreach($prop in $p.detectors.PSObject.Properties){if(-not $modules.ContainsKey($prop.Name)){throw 'Unknown profile detector.'}}
-    [pscustomobject]@{Mode=[string]$p.mode;Axes=$axes;Modules=$modules;Registry=$registry;ProfilePath=$ProfilePath}
+    [pscustomobject]@{Mode=[string]$p.mode;InterventionPolicy=$policy;Axes=$axes;Modules=$modules;Registry=$registry;ProfilePath=$ProfilePath}
 }
 function Invoke-LfoG2Controller {
     param($Controller,$Row,[string]$SourceFile)
@@ -103,7 +105,7 @@ function Write-LfoG2Turn {
         # Derived detector ledger only; raw evidence stays in L0.
         $path=Join-Path $LogDirectory ('epistemic-'+$SourceFile.Substring(13,7)+'.jsonl')
         Append-JsonLine $path $event
-        if($Controller.Mode -eq 'ADVISE' -and $event.assessment -in @('CONTRADICTED','INSUFFICIENT_EVIDENCE','OBSERVED_SIGNAL')){
+        if($Controller.Mode -in @('ADVISE','INTERVENE') -and $event.assessment -in @('CONTRADICTED','INSUFFICIENT_EVIDENCE','OBSERVED_SIGNAL')){
             Write-Host ('[G2 {0}: {1}; signal only, see detector ledger]' -f $event.detector,$event.assessment) -ForegroundColor Yellow
         }
     }
@@ -113,15 +115,16 @@ function Invoke-LfoG2Command {
     if($null -eq $Controller){Write-Host '[G2 unavailable]';return}
     $parts=$Command.Trim() -split '\s+'
     if($parts.Count -eq 1 -or $parts[1] -eq 'status'){
-        Write-Host ('G2: '+$Controller.Mode+'; additional model calls: 0; legacy L4 independent')
+        Write-Host ('G2: '+$Controller.Mode+'; policy='+$Controller.InterventionPolicy+'; G2 revisions: max 2 in CASCADE; legacy L4 independent')
         foreach($key in @($Controller.Axes.Keys|Sort-Object)){Write-Host ('  {0} {1}: {2}' -f $key,$Controller.Registry.Axes[$key],$Controller.Axes[$key])}
         foreach($key in @($Controller.Modules.Keys|Sort-Object)){Write-Host ('  detector {0}: enabled={1}' -f $key,$Controller.Modules[$key].Enabled)}
         return
     }
-    if($parts[1] -in @('off','observe','advise')){$Controller.Mode=$parts[1].ToUpperInvariant();Write-Host ('G2: '+$Controller.Mode);return}
+    if($parts[1] -in @('off','observe','advise','intervene')){$Controller.Mode=$parts[1].ToUpperInvariant();Write-Host ('G2: '+$Controller.Mode);return}
+    if($parts[1] -eq 'policy' -and $parts.Count -eq 3 -and $parts[2] -in @('minimal','standard','cascade')){$Controller.InterventionPolicy=$parts[2].ToUpperInvariant();Write-Host ('G2 policy: '+$Controller.InterventionPolicy);return}
     if($parts[1] -eq 'set' -and $parts.Count -eq 4){
         $axis=$parts[2].ToUpperInvariant();$level=$parts[3].ToUpperInvariant()
         if($Controller.Axes.ContainsKey($axis) -and $level -in @('OFF','LOW','MEDIUM','HIGH')){$Controller.Axes[$axis]=$level;Write-Host ('G2 '+$axis+': '+$level);return}
     }
-    Write-Host 'Usage: /epistemic status|off|observe|advise|set E1 low|medium|high|off. INTERVENE is not enabled.'
+    Write-Host 'Usage: /epistemic status|off|observe|advise|intervene|policy minimal|standard|cascade|set E1 low|medium|high|off.'
 }
