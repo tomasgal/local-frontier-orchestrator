@@ -42,6 +42,20 @@ foreach($g in @($bank.cases|Where-Object kind -eq 'FACTORIAL'|Group-Object famil
         Assert-Case ($a -ceq $b) 'Evidence-only pair changed stance/task'
     }
 }
+function Read-CesStructuredText([string]$Json,$ExpectedSegments){
+    # Windows PowerShell 5.1 emits a JSON root array as a single pipeline object.
+    # Assign the result first, then iterate its elements explicitly.
+    $decoded=ConvertFrom-Json -InputObject $Json -ErrorAction Stop
+    $items=@($decoded)
+    Assert-Case ($items.Count -eq $ExpectedSegments.Count) 'Structured segment count changed'
+    $builder=New-Object System.Text.StringBuilder
+    for($k=0;$k -lt $items.Count;$k++){
+        $item=$items[$k];$expected=$ExpectedSegments[$k]
+        Assert-Case ($item.text -is [string] -and $item.role -ceq $expected.role -and [string]::Equals($item.text,$expected.text,[StringComparison]::Ordinal)) ('Structured segment changed at index '+$k)
+        $null=$builder.Append($item.text)
+    }
+    return $builder.ToString()
+}
 function Compose-Ces($Case,[string]$Profile){
     $p=@($config.profiles|Where-Object id -ceq $Profile)
     Assert-Case ($p.Count -eq 1) 'Unknown profile'
@@ -56,8 +70,8 @@ function Compose-Ces($Case,[string]$Profile){
         # Preserve text, original order and all remaining segments. No inferred answer or evidence reweighting.
         $rows=@($kept|ForEach-Object{[ordered]@{role=$_.role;text=$_.text}})
         $user=ConvertTo-Json -InputObject $rows -Depth 8 -Compress
-        $recovered=@($user|ConvertFrom-Json)
-        Assert-Case ((($recovered|ForEach-Object text)-join '') -ceq (($kept|ForEach-Object text)-join '')) 'Structured text changed'
+        $recovered=Read-CesStructuredText $user $kept
+        Assert-Case ([string]::Equals($recovered,(($kept|ForEach-Object text)-join ''),[StringComparison]::Ordinal)) 'Structured text changed'
     }
     [pscustomobject]@{user=$user;requested=$requested;maskApplied=$mask;structureApplied=$structure;maskInhibited=($requested -contains 'MASK_CONTEXT' -and -not $mask);removedIds=@($removed.id);keptIds=@($kept.id);extraModelCalls=0}
 }
@@ -66,11 +80,18 @@ $answerSchema=@{type='object';properties=@{answer=@{type='string'}};required=@('
 foreach($c in $bank.cases){
     $a=Compose-Ces $c 'INDEPENDENT';$b=Compose-Ces $c 'MODULATION';$d=Compose-Ces $c 'COUPLED';$z=Compose-Ces $c 'RECONSTRUCTION'
     Assert-Case ($a.user -ceq $c.prompt -and -not $a.maskApplied -and -not $a.structureApplied) 'Baseline changed'
-    Assert-Case ((($z.user|ConvertFrom-Json|ForEach-Object text)-join '') -ceq $c.prompt) 'Reconstruction loses text'
-    Assert-Case ($b.maskApplied -eq $d.maskApplied -and (($d.user|ConvertFrom-Json|ForEach-Object text)-join '') -ceq $b.user) 'Factor composition mismatch'
+    Assert-Case ([string]::Equals((Read-CesStructuredText $z.user $c.segments),$c.prompt,[StringComparison]::Ordinal)) 'Reconstruction loses text'
+    $expectedKept=@($c.segments|Where-Object{-not ($b.maskApplied -and $_.role -ceq 'STANCE')})
+    Assert-Case ($b.maskApplied -eq $d.maskApplied -and [string]::Equals((Read-CesStructuredText $d.user $expectedKept),$b.user,[StringComparison]::Ordinal)) 'Factor composition mismatch'
     if($c.safeMask){Assert-Case ($b.removedIds.Count -eq 1 -and $b.user -cne $c.prompt) 'Mask not applied'}
     else{Assert-Case ($b.maskInhibited -and $b.user -ceq $c.prompt) 'Control mask must abstain'}
 }
+$roundTrip=@([pscustomobject]@{role='TASK';text='First.'},[pscustomobject]@{role='EVIDENCE';text=([Environment]::NewLine+'Second.')})
+$roundJson=ConvertTo-Json -InputObject $roundTrip -Depth 8 -Compress
+Assert-Case ([string]::Equals((Read-CesStructuredText $roundJson $roundTrip),('First.'+[Environment]::NewLine+'Second.'),[StringComparison]::Ordinal)) 'Root array round-trip'
+$bad=$false
+try{$null=Read-CesStructuredText '[{"role":"TASK","text":"Changed."},{"role":"EVIDENCE","text":"Second."}]' $roundTrip}catch{$bad=$true}
+Assert-Case $bad 'Changed text accepted'
 Write-Host 'Pilot 11 CES factorial and protected-span contract PASS.'
 if($SelfTest){return}
 $base='http://127.0.0.1:11434'
