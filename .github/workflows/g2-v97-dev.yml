@@ -15,7 +15,7 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference='Stop'
-          $targets=@('LFO.ps1','install/Install-LFO.ps1','src/QwenChat.ps1','src/LfoEpistemicController.ps1','src/epistemic/VerificationClaim.ps1','src/epistemic/ConfirmationSeeking.ps1','src/epistemic/ResponseStance.ps1','tests/Test-LfoG2Controller.ps1','config/EpistemicRegistry.psd1','src/LfoConfiguration.ps1','src/LfoConfigurationTui.ps1','lfo-config.ps1','tests/Test-LfoConfiguration.ps1')
+          $targets=@('LFO.ps1','install/Install-LFO.ps1','src/QwenChat.ps1','src/LfoEpistemicController.ps1','src/epistemic/VerificationClaim.ps1','src/epistemic/ConfirmationSeeking.ps1','src/epistemic/ResponseStance.ps1','src/LfoG2ComputePolicy.ps1','tests/Test-LfoG2ComputePolicy.ps1','research/Invoke-LfoG2Pilot.ps1','tests/Test-LfoG2Controller.ps1','config/EpistemicRegistry.psd1','src/LfoConfiguration.ps1','src/LfoConfigurationTui.ps1','lfo-config.ps1','tests/Test-LfoConfiguration.ps1')
           foreach($target in $targets){$t=$null;$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $target),[ref]$t,[ref]$e);if($e.Count){$e|Out-Host;throw "Parse failed: $target"}}
       - name: G2 contract
         shell: powershell
@@ -44,5 +44,11 @@ jobs:
       - name: G2 frozen detector robustness and interaction replay
         shell: powershell
         run: |
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2Pilot.ps1 -RepositoryRoot $PWD -OutputRoot $env:RUNNER_TEMP -OfflineOnly -Pilot4
-          if($LASTEXITCODE -ne 0){throw 'G2 Pilot 04 replay export failed'}
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2Pilot.ps1 -RepositoryRoot $PWD -OutputRoot $env:RUNNER_TEMP -OfflineOnly -Pilot5
+          if($LASTEXITCODE -ne 0){throw 'G2 Pilot 05 replay export failed'}
+
+      - name: G2 compute and intervention contract
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Test-LfoG2ComputePolicy.ps1
+          if($LASTEXITCODE -ne 0){throw 'G2 compute contract failed'}

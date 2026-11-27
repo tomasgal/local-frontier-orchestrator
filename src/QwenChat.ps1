@@ -107,6 +107,7 @@ if (-not (Test-Path -LiteralPath $l2ReadModule)) {
 $telemetryModule = Join-Path $PSScriptRoot 'LfoTurnTelemetry.ps1'
 if (-not (Test-Path -LiteralPath $telemetryModule)) { throw "Dev4 telemetry module not found: $telemetryModule" }
 . $telemetryModule
+. (Join-Path $PSScriptRoot 'LfoG2ComputePolicy.ps1')
 
 $memoryModule = Join-Path $PSScriptRoot 'QwenMemory.ps1'
 if (-not (Test-Path -LiteralPath $memoryModule)) {
@@ -173,6 +174,7 @@ function Get-OrchestratorSystemPrompt {
 }
 
 function Reset-Messages {
+    $script:LfoG2PreviousComputeClass='';$script:LfoG2ComputeTurn=0;$script:LfoG2ComputeRecord=$null;$script:LfoG2InterventionPlan=$null
     $script:Messages = @(
         @{ role = 'system'; content = (Get-OrchestratorSystemPrompt) }
     )
@@ -1038,6 +1040,20 @@ function Invoke-QwenLocalApi {
     }
 
     $bodyObj.options.num_predict = Get-LfoGenerationBudget $script:Config.LocalGeneration $script:ThinkEnabled $env:LFO_RUNTIME_DEVICE $script:ContextLengthHint $bodyObj.messages $bodyObj.format
+    if($script:LfoG2ComputeRecord){
+        $script:LfoG2ComputeRecord.baseline_num_predict=$bodyObj.options.num_predict
+        $script:LfoG2ComputeRecord.request_message_count=@($bodyObj.messages).Count
+        if($script:LfoG2InterventionPlan -and $script:LfoG2InterventionPlan.eligible){
+            $bodyObj.messages=@(Add-LfoG2RequestSafeguard $bodyObj.messages $script:LfoG2InterventionPlan)
+            $script:LfoG2ComputeRecord.applied_initial=$true
+            $script:LfoG2ComputeRecord.instruction_chars=$script:LfoG2InterventionPlan.instruction.Length
+            $script:LfoG2ComputeRecord.decision='APPLIED'
+            # Preserve the existing context-headroom guard; no discretionary reduction.
+            $bodyObj.options.num_predict=Get-LfoGenerationBudget $script:Config.LocalGeneration $script:ThinkEnabled $env:LFO_RUNTIME_DEVICE $script:ContextLengthHint $bodyObj.messages $bodyObj.format
+        }
+        $script:LfoG2ComputeRecord.actual_num_predict=$bodyObj.options.num_predict
+        $script:LfoG2ComputeRecord.request_chars=($bodyObj.messages|ForEach-Object{([string]$_.content).Length}|Measure-Object -Sum).Sum
+    }
     $body = $bodyObj | ConvertTo-Json -Depth 12 -Compress
     $prepareSw.Stop()
     Add-LfoTurnPhase -Phase 'local_request_build' -Kind 'prepare' `
@@ -1060,6 +1076,10 @@ function Invoke-QwenAnswerRecovery([string]$Prompt) {
         $recentMessages += @{ role = 'user'; content = $Prompt }
     }
     $messages = @(@{ role = 'system'; content = $systemText }) + $recentMessages
+    if($script:LfoG2ComputeRecord -and $script:LfoG2InterventionPlan -and $script:LfoG2InterventionPlan.eligible){
+        $messages=@(Add-LfoG2RequestSafeguard $messages $script:LfoG2InterventionPlan)
+        $script:LfoG2ComputeRecord.applied_recovery=$true
+    }
     $bodyObj = @{
         model      = $Model
         messages   = $messages
@@ -1195,6 +1215,21 @@ function Invoke-Qwen([string]$Prompt) {
     $script:LfoStreamShownPrefix=''
     $script:LfoTurnRouteMode=if($env:LFO_RUNTIME_BATCH -eq '1'){'AUTO'}else{Get-LfoRequestedRouteMode $Prompt $script:LfoRouteMode}
     Refresh-SystemPrompt
+    $script:LfoG2ComputeRecord=$null;$script:LfoG2InterventionPlan=$null
+    # Explicit, opt-in research policy only. Normal and historical batch runs are unchanged.
+    if($env:LFO_G2_COMPUTE_SHADOW -eq '1' -and $env:LFO_RUNTIME_BATCH -ne '1' -and $env:LFO_EPISTEMIC_PROFILE -and $script:LfoG2Controller -and $script:LfoG2Controller.Mode -eq 'OBSERVE'){
+        try{
+            $rec=Get-LfoG2ComputeRecommendation $Prompt $script:LfoG2ComputeTurn $script:ThinkEnabled $script:LfoG2PreviousComputeClass
+            $script:LfoG2PreviousComputeClass=$rec.recommendation
+            $script:LfoG2ComputeTurn++
+            $plan=Get-LfoG2InterventionPlan $script:LfoG2Controller $Prompt $script:LfoTurnRouteMode ($env:LFO_G2_INTERVENTION -eq '1')
+            $script:LfoG2InterventionPlan=$plan
+            $script:LfoG2ComputeRecord=[ordered]@{schema_version=1;recommendation=$rec.recommendation;recommendation_reason=$rec.reason;continuation=$rec.continuation;session_turn=$script:LfoG2ComputeTurn;requested=$plan.requested;eligible=$plan.eligible;decision=$plan.decision;user_signal=$plan.signal;rule_id=$plan.rule;applied_initial=$false;applied_recovery=$false;instruction_chars=0;baseline_num_predict=$null;actual_num_predict=$null;request_message_count=$null;request_chars=$null;think=[bool]$script:ThinkEnabled;additional_model_calls=0}
+        }catch{
+            $script:LfoG2ComputeRecord=$null;$script:LfoG2InterventionPlan=$null
+            Write-Host '[G2 compute policy failed; unmodified request continues.]' -ForegroundColor Yellow
+        }
+    }
 
     # Capture context before appending the current user turn.
     $recentContext = Get-HardGateContext $Prompt
@@ -1612,6 +1647,16 @@ try {
         param($Row,$SourceFile)
         if($null -ne $script:LfoG2LegacyHook){try{$null=& $script:LfoG2LegacyHook $Row $SourceFile}catch{Write-Host '[Legacy L4 failed; chat continues.]'}}
         try{Write-LfoG2Turn $script:LfoG2Controller $Row $SourceFile $script:LogDir}catch{Write-Host '[G2 ledger failed; chat continues.]' -ForegroundColor Yellow}
+        if($script:LfoG2ComputeRecord){
+            try{
+                $rec=$script:LfoG2ComputeRecord
+                $rec.source_file=$SourceFile;$rec.epoch=[int]$Row.epoch;$rec.turn_id=[int]$Row.turn_id
+                $rec.user_sha256=Get-LfoEpistemicHash ([string]$Row.user)
+                $rec.final_sha256=Get-LfoEpistemicHash ([string]$Row.assistant)
+                $rec.route=[string]$Row.route
+                Append-JsonLine (Join-Path $script:LogDir ('compute-'+$SourceFile.Substring(13,7)+'.jsonl')) $rec
+            }catch{Write-Host '[G2 compute ledger failed; chat continues.]' -ForegroundColor Yellow}
+        }
     }
     Write-Host ('[G2 '+$script:LfoG2Controller.Mode+'; /epistemic status; 0 additional model calls]')
 } catch {Write-Host '[G2 unavailable; chat continues.]' -ForegroundColor Yellow}

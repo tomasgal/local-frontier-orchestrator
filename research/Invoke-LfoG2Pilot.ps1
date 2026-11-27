@@ -7,10 +7,13 @@ param(
     [switch]$OfflineOnly,
     [switch]$Pilot2,
     [switch]$Pilot3,
-    [switch]$Pilot4
+    [switch]$Pilot4,
+    [switch]$Pilot5
 )
 $ErrorActionPreference='Stop'
-if(@(@($Pilot2,$Pilot3,$Pilot4)|Where-Object{$_}).Count -gt 1){throw 'Choose one pilot.'}
+if(@(@($Pilot2,$Pilot3,$Pilot4,$Pilot5)|Where-Object{$_}).Count -gt 1){throw 'Choose one pilot.'}
+# Pilot 05 includes the complete Pilot 04 offline regression.
+if($Pilot5){$Pilot4=$true}
 $state=$null
 if(-not $RepositoryRoot){
     $state=Get-Content -LiteralPath (Join-Path $InstallRoot 'config/install-state.json') -Raw -Encoding UTF8|ConvertFrom-Json
@@ -68,15 +71,48 @@ if($Pilot4){
     $liveBank.prompts=$schedule
     JsonFile (Join-Path $run 'live-schedule.json') $schedule
 }
+$designHash=$null
+if($Pilot5){
+    $designPath=Join-Path $PSScriptRoot 'g2/Pilot05Design.json'
+    $design=Get-Content -LiteralPath $designPath -Raw -Encoding UTF8|ConvertFrom-Json
+    if($design.schemaVersion -ne 1){throw 'Unknown Pilot05 schema.'}
+    $designHash=(Get-FileHash -LiteralPath $designPath -Algorithm SHA256).Hash
+    Copy-Item -LiteralPath $designPath -Destination (Join-Path $run 'pilot05-design.json')
+    $schedule=@()
+    for($rep=1;$rep -le 2;$rep++){
+        $items=@($design.singlePrompts)
+        if($rep -eq 2){[array]::Reverse($items)}
+        $j=0
+        foreach($item in $items){
+            $j++
+            $arms=if(($rep+$j)%2 -eq 0){@('OBSERVE','INTERVENE')}else{@('INTERVENE','OBSERVE')}
+            foreach($arm in $arms){
+                $schedule+=[pscustomobject]@{id=($item.id+'-R'+$rep+'-'+$arm);pair=$item.pair;condition=$item.condition;claim=$item.claim;text=$item.text;repetition=$rep;arm=$arm;prompts=@([string]$item.text)}
+            }
+        }
+    }
+    $j=0
+    foreach($chain in $design.chains){
+        $j++
+        $arms=if($j%2 -eq 0){@('INTERVENE','OBSERVE')}else{@('OBSERVE','INTERVENE')}
+        foreach($arm in $arms){
+            $schedule+=[pscustomobject]@{id=($chain.id+'-'+$arm);pair=$chain.id;condition='CHAIN';claim='';text=[string]$chain.turns[0];repetition=1;arm=$arm;prompts=@($chain.turns)}
+        }
+    }
+    $liveBank.prompts=$schedule
+    JsonFile (Join-Path $run 'live-schedule.json') $schedule
+}
 $sourceFiles=@('LFO.ps1','src/QwenChat.ps1','src/QwenMemory.ps1','src/LfoEpistemicController.ps1','src/epistemic/VerificationClaim.ps1','src/epistemic/ConfirmationSeeking.ps1','src/LfoEvidenceProvenance.ps1','src/LfoL4Runtime.ps1','config/EpistemicRegistry.psd1')
 if($Pilot4){$sourceFiles+='src/epistemic/ResponseStance.ps1'}
+if($Pilot5){$sourceFiles+='src/LfoG2ComputePolicy.ps1'}
 $hashes=[ordered]@{}
 foreach($file in $sourceFiles){$hashes[$file]=(Get-FileHash -LiteralPath (Join-Path $RepositoryRoot $file) -Algorithm SHA256).Hash}
-$manifest=[ordered]@{schemaVersion=1;purpose='G2 exploratory detector and integration pilot';sourceCommit=if($state){$state.SourceCommit}else{'CI checkout'};sourceHashes=$hashes;runnerSha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash;bankSha256=(Get-FileHash -LiteralPath $bankPath -Algorithm SHA256).Hash;liveBankSha256=(Get-FileHash -LiteralPath $livePath -Algorithm SHA256).Hash;powerShell=$PSVersionTable.PSVersion.ToString();startedUtc=[DateTime]::UtcNow.ToString('o');offlineOnly=[bool]$OfflineOnly;pilot=if($Pilot4){4}elseif($Pilot3){3}elseif($Pilot2){2}else{1};extensionSha256=$extensionHash;frozenBankSha256=$frozenHash;challengeSha256=$challengeHash;stanceBankSha256=$stanceHash;model=$null;context=$null;ollamaVersion=$null;modelDigest=$null;status='STARTED'}
+$manifest=[ordered]@{schemaVersion=1;purpose='G2 exploratory detector and integration pilot';sourceCommit=if($state){$state.SourceCommit}else{'CI checkout'};sourceHashes=$hashes;runnerSha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash;bankSha256=(Get-FileHash -LiteralPath $bankPath -Algorithm SHA256).Hash;liveBankSha256=(Get-FileHash -LiteralPath $livePath -Algorithm SHA256).Hash;powerShell=$PSVersionTable.PSVersion.ToString();startedUtc=[DateTime]::UtcNow.ToString('o');offlineOnly=[bool]$OfflineOnly;designSha256=$designHash;pilot=if($Pilot5){5}elseif($Pilot4){4}elseif($Pilot3){3}elseif($Pilot2){2}else{1};extensionSha256=$extensionHash;frozenBankSha256=$frozenHash;challengeSha256=$challengeHash;stanceBankSha256=$stanceHash;model=$null;context=$null;ollamaVersion=$null;modelDigest=$null;status='STARTED'}
 $offline=New-Object Collections.Generic.List[object]
 $live=New-Object Collections.Generic.List[object]
 $frozenResults=New-Object Collections.Generic.List[object]
 $review=New-Object Collections.Generic.List[object]
+$computeReview=New-Object Collections.Generic.List[object]
 $failure=$null
 try{
     foreach($m in @('LfoEvidenceProvenance','LfoL4Runtime','LfoEpistemicController')){. (Join-Path $RepositoryRoot ('src/'+$m+'.ps1'))}
@@ -156,7 +192,7 @@ try{
         if($fn.Count -ne 1){throw 'Expected one existing runtime adapter function.'}
         . ([scriptblock]::Create($fn[0].Extent.Text))
         $adapter=Join-Path $RepositoryRoot ('src/QwenChat.g2pilot-'+[guid]::NewGuid().ToString('N')+'.ps1')
-        $envNames=@('LFO_INSTALL_ROOT','LFO_RUNTIME_BATCH','LFO_RUNTIME_DEVICE','LFO_L4_ENABLED','LFO_L4_ENDPOINT','LFO_L4_RUNTIME_CREDENTIAL','LFO_L4_OBSERVABILITY','LFO_EPISTEMIC_PROFILE')
+        $envNames=@('LFO_INSTALL_ROOT','LFO_RUNTIME_BATCH','LFO_RUNTIME_DEVICE','LFO_L4_ENABLED','LFO_L4_ENDPOINT','LFO_L4_RUNTIME_CREDENTIAL','LFO_L4_OBSERVABILITY','LFO_EPISTEMIC_PROFILE','LFO_G2_COMPUTE_SHADOW','LFO_G2_INTERVENTION')
         $saved=@{};foreach($n in $envNames){$saved[$n]=[Environment]::GetEnvironmentVariable($n,'Process')}
         try{
             $null=New-LfoQwen963Adapter (Join-Path $RepositoryRoot 'src/QwenChat.ps1') $adapter
@@ -171,11 +207,17 @@ try{
             $env:LFO_RUNTIME_BATCH='0';$env:LFO_RUNTIME_DEVICE='UMA';$env:LFO_L4_ENABLED='0';$env:LFO_L4_OBSERVABILITY='0'
             Remove-Item Env:LFO_L4_ENDPOINT,Env:LFO_L4_RUNTIME_CREDENTIAL -ErrorAction SilentlyContinue
             $env:LFO_EPISTEMIC_PROFILE=$profiles['MEDIUM']
+            $env:LFO_G2_COMPUTE_SHADOW=if($Pilot5){'1'}else{'0'}
+            $env:LFO_G2_INTERVENTION='0'
+            if($Pilot5){$manifest.livePolicy='Forced LOCAL; THINK OFF; G2 OBSERVE ledger; experimental explicit E4 prompt safeguard in INTERVENE arm only; shadow compute recommendations never change settings; isolated session per arm; matched multi-turn chains retain normal memory.'}
             # No production logs or SQLite/Surreal state are copied. Each synthetic case starts fresh.
             foreach($case in $liveBank.prompts){
                 $dir=Join-Path $run ('live-'+$case.id);$null=New-Item -ItemType Directory -Path $dir
                 $inputFile=Join-Path $dir 'input.json'
-                JsonFile $inputFile @{prompts=@(@{text=$case.text;clear_before=$false})}
+                $casePrompts=if($Pilot5){@($case.prompts)}else{@([string]$case.text)}
+                $casePrompts=@($casePrompts)
+                if($Pilot5){$env:LFO_G2_INTERVENTION=if($case.arm -eq 'INTERVENE'){'1'}else{'0'}}
+                JsonFile $inputFile @{prompts=@($casePrompts|ForEach-Object{@{text=[string]$_;clear_before=$false}})}
                 $dataDir=Join-Path $dir 'isolated-memory'
                 Write-Host ('Live '+$case.id+' / '+$liveBank.prompts.Count+': '+$case.text) -ForegroundColor Cyan
                 $oldPref=$ErrorActionPreference
@@ -187,22 +229,50 @@ try{
                 $logDir=Join-Path $dataDir 'logs'
                 $turns=@(Get-ChildItem -LiteralPath $logDir -Filter 'conversation-*.jsonl' -File -ErrorAction SilentlyContinue|ForEach-Object{Get-Content -LiteralPath $_.FullName -Encoding UTF8|ForEach-Object{$_|ConvertFrom-Json}}|Where-Object event -eq 'turn')
                 $events=@(Get-ChildItem -LiteralPath $logDir -Filter 'epistemic-*.jsonl' -File -ErrorAction SilentlyContinue|ForEach-Object{Get-Content -LiteralPath $_.FullName -Encoding UTF8|ForEach-Object{$_|ConvertFrom-Json}})
-                $hashOK=$false
-                if($turns.Count -eq 1 -and $events.Count -eq $expectedEvents){
-                    $t=$turns[0]
-                    $hashOK=@($events|Where-Object{
-                        $raw=if($_.actor -eq 'USER'){[string]$t.user}else{[string]$t.assistant}
-                        $_.content_sha256 -cne (Get-LfoEpistemicHash $raw) -or $_.epoch -ne $t.epoch -or $_.turn_id -ne $t.turn_id -or ($_.actor -eq 'INTERACTION' -and ($_.linked_user_sha256 -cne (Get-LfoEpistemicHash ([string]$t.user)) -or $_.linked_user_stage_id -cne (@($t.stage_sources|Where-Object actor -eq 'USER')[0].stage_id)))
-                    }).Count -eq 0
+                $expectedTurns=$casePrompts.Count
+                $hashOK=$true
+                $compute=@()
+                if($Pilot5){
+                    $compute=@(Get-ChildItem -LiteralPath $logDir -Filter 'compute-*.jsonl' -File -ErrorAction SilentlyContinue|ForEach-Object{Get-Content -LiteralPath $_.FullName -Encoding UTF8|ForEach-Object{$_|ConvertFrom-Json}})
                 }
-                $pass=($exitCode -eq 0 -and $turns.Count -eq 1 -and $events.Count -eq $expectedEvents -and $hashOK -and $turns[0].route -eq 'LOCAL' -and $turns[0].external_evidence_status -eq 'NONE' -and @($events|Where-Object{$_.assessment -eq 'FAILED_ISOLATED' -or $_.additional_model_calls -ne 0 -or $_.mode -ne 'OBSERVE' -or $_.sensitivity -ne 'MEDIUM'}).Count -eq 0)
-                $live.Add([pscustomobject]@{id=$case.id;exitCode=$exitCode;turns=$turns.Count;events=$events.Count;hashOK=$hashOK;route=if($turns.Count){$turns[0].route}else{''};externalEvidence=if($turns.Count){$turns[0].external_evidence_status}else{''};result=if($pass){'PASS'}else{'FAIL'}})
+                $pass=($exitCode -eq 0 -and $turns.Count -eq $expectedTurns -and $events.Count -eq ($expectedTurns*$expectedEvents))
+                if($Pilot5 -and $compute.Count -ne $expectedTurns){$pass=$false}
+                $index=0
+                foreach($t in $turns){
+                    $index++
+                    $ev=@($events|Where-Object{$_.epoch -eq $t.epoch -and $_.turn_id -eq $t.turn_id})
+                    $uStage=@($t.stage_sources|Where-Object actor -eq 'USER')
+                    $aStage=@($t.stage_sources|Where-Object actor -eq 'FINAL')
+                    $userHash=Get-LfoEpistemicHash ([string]$t.user)
+                    $answerHash=Get-LfoEpistemicHash ([string]$t.assistant)
+                    if($ev.Count -ne $expectedEvents -or $uStage.Count -ne 1 -or $aStage.Count -ne 1){$hashOK=$false}
+                    foreach($e in $ev){
+                        if($e.actor -eq 'USER'){if($e.content_sha256 -cne $userHash -or $e.stage_id -cne $uStage[0].stage_id){$hashOK=$false}}
+                        else{if($e.content_sha256 -cne $answerHash -or $e.stage_id -cne $aStage[0].stage_id){$hashOK=$false}}
+                        if($e.actor -eq 'INTERACTION' -and ($e.linked_user_sha256 -cne $userHash -or $e.linked_user_stage_id -cne $uStage[0].stage_id)){$hashOK=$false}
+                        if($e.assessment -eq 'FAILED_ISOLATED' -or $e.additional_model_calls -ne 0 -or $e.mode -ne 'OBSERVE' -or $e.sensitivity -ne 'MEDIUM'){$pass=$false}
+                    }
+                    if($index -gt $expectedTurns -or [string]$t.user -cne [string]$casePrompts[$index-1] -or $t.route -ne 'LOCAL' -or $t.external_evidence_status -ne 'NONE'){$pass=$false}
+                    if($Pilot5){
+                        $cr=@($compute|Where-Object{$_.epoch -eq $t.epoch -and $_.turn_id -eq $t.turn_id})
+                        if($cr.Count -ne 1){$pass=$false}
+                        else{
+                            $cRec=$cr[0];$sig=@($ev|Where-Object detector -eq 'confirmation-seeking')
+                            $expectedApply=($case.arm -eq 'INTERVENE' -and $sig.Count -eq 1 -and $sig[0].phenomenon -eq 'CONFIRMATION_SEEKING')
+                            if($cRec.user_sha256 -cne $userHash -or $cRec.final_sha256 -cne $answerHash -or $cRec.session_turn -ne $index -or $cRec.additional_model_calls -ne 0 -or [bool]$cRec.applied_initial -ne $expectedApply -or $cRec.think -ne $false -or $null -eq $cRec.baseline_num_predict -or $null -eq $cRec.actual_num_predict){$pass=$false}
+                            if(-not $expectedApply -and $cRec.baseline_num_predict -ne $cRec.actual_num_predict){$pass=$false}
+                            $computeReview.Add([pscustomobject]@{id=$case.id;pair=$case.pair;arm=$case.arm;turn=$index;condition=$case.condition;recommendation=$cRec.recommendation;reason=$cRec.recommendation_reason;continuation=$cRec.continuation;expected_apply=$expectedApply;applied=$cRec.applied_initial;recovery_applied=$cRec.applied_recovery;baseline_num_predict=$cRec.baseline_num_predict;actual_num_predict=$cRec.actual_num_predict;message_count=$cRec.request_message_count;request_chars=$cRec.request_chars;instruction_chars=$cRec.instruction_chars})
+                        }
+                    }
+                    if($Pilot3 -or $Pilot4){
+                        $review.Add([pscustomobject]@{id=$case.id;turn=$index;pair=$case.pair;condition=$case.condition;arm=$case.arm;repetition=$case.repetition;claim=$case.claim;user=[string]$t.user;assistant=(Get-LfoHistoricalAssistantText $t);response_label='';counterevidence_handling='';unsupported_inference='';rationale='';annotator=''})
+                    }
+                }
+                $pass=($pass -and $hashOK)
+                $live.Add([pscustomobject]@{id=$case.id;arm=$case.arm;expectedTurns=$expectedTurns;exitCode=$exitCode;turns=$turns.Count;events=$events.Count;computeRows=$compute.Count;hashOK=$hashOK;route=if($turns.Count){$turns[0].route}else{''};externalEvidence=if($turns.Count){$turns[0].external_evidence_status}else{''};result=if($pass){'PASS'}else{'FAIL'}})
                 $live|Export-Csv -LiteralPath (Join-Path $run 'live-summary.csv') -NoTypeInformation -Encoding UTF8
-                if(($Pilot3 -or $Pilot4) -and $turns.Count -eq 1){
-                    # Outcome annotation is deliberately empty; no automatic interaction diagnosis.
-                    $review.Add([pscustomobject]@{id=$case.id;pair=$case.pair;condition=$case.condition;repetition=$case.repetition;claim=$case.claim;user=[string]$turns[0].user;assistant=(Get-LfoHistoricalAssistantText $turns[0]);response_label='';counterevidence_handling='';unsupported_inference='';rationale='';annotator=''})
-                    $review|Export-Csv -LiteralPath (Join-Path $run 'interaction-review.csv') -NoTypeInformation -Encoding UTF8
-                }
+                if($review.Count){$review|Export-Csv -LiteralPath (Join-Path $run 'interaction-review.csv') -NoTypeInformation -Encoding UTF8}
+                if($computeReview.Count){$computeReview|Export-Csv -LiteralPath (Join-Path $run 'compute-review.csv') -NoTypeInformation -Encoding UTF8}
             }
         }finally{
             foreach($n in $envNames){[Environment]::SetEnvironmentVariable($n,$saved[$n],'Process')}
@@ -219,6 +289,8 @@ try{
     $manifest.finishedUtc=[DateTime]::UtcNow.ToString('o')
     $manifest.offlineEvaluations=$offline.Count
     $manifest.liveCases=$live.Count
+    $manifest.liveTurns=($live|Measure-Object -Property turns -Sum).Sum
+    $manifest.computeReviewRows=$computeReview.Count
     $manifest.frozenEvaluations=$frozenResults.Count
     $manifest.interactionReviewRows=$review.Count
     JsonFile (Join-Path $run 'manifest.json') $manifest
