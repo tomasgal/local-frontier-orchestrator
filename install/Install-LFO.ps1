@@ -935,6 +935,9 @@ foreach($name in @('Start-LFO.ps1','Start-LFO-GPU.ps1','Start-LFO-CPU.ps1','Star
     Copy-Item -LiteralPath $src -Destination (Join-Path $LaunchRoot $name) -Force
 }
 Copy-Item -LiteralPath (Join-Path $AppRoot 'LFO.ps1') -Destination (Join-Path $LaunchRoot 'LFO.ps1') -Force
+foreach($name in @('lfo-config.ps1','lfo-config.cmd')){
+    Copy-Item -LiteralPath (Join-Path $AppRoot $name) -Destination (Join-Path $LaunchRoot $name) -Force
+}
 # Add double-clickable BAT wrappers without changing the PowerShell launch contract.
 $cpuBat=Join-Path $LaunchRoot 'Start-LFO-CPU.bat'
 $gpuBat=Join-Path $LaunchRoot 'Start-LFO-GPU.bat'
@@ -966,6 +969,8 @@ Write-Host ('Export:        '+$ExportDirectory)
 Write-Host ''
 Write-Host 'Launch options:' -ForegroundColor Cyan
 Write-Host '  .\LFO.ps1           (primary v9.7-dev entrypoint; Auto device, High priority by default)'
+Write-Host '  .\lfo-config.ps1    (standalone configuration manager)'
+Write-Host '  .\LFO.ps1 -Configure (delegates to configuration manager)'
 Write-Host '  Start-LFO-CPU.bat   (double-click or Command Prompt)'
 Write-Host '  Start-LFO-GPU.bat   (double-click or Command Prompt)'
 Write-Host '  Start-LFO-UMA.bat   (double-click or Command Prompt)'

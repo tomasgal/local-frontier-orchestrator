@@ -4,6 +4,8 @@ param(
     [string]$Experiment,
     [string]$InstallRoot,
     [switch]$Resume,
+    [switch]$Configure,
+    [switch]$Ascii,
 
     # Internal re-entry used by unattended experiments. Not part of the public CLI.
     [switch]$InternalBatchChild,
@@ -1403,6 +1405,11 @@ try {
     $selfPath = $MyInvocation.MyCommand.Path
     $resolvedInstallRoot = Resolve-LfoInstallRoot -RequestedRoot $InstallRoot -ScriptRoot $scriptRoot
     $state = Get-LfoInstallState $resolvedInstallRoot
+    if($Configure){
+        if($Experiment -or $Resume -or $InternalBatchChild){throw '-Configure is standalone.'}
+        & (Join-Path ([string]$state.AppRoot) 'lfo-config.ps1') -InstallRoot $resolvedInstallRoot -Ascii:$Ascii
+        exit 0
+    }
 
     if (-not [string]::IsNullOrWhiteSpace($Experiment)) {
         $result = Invoke-LfoExperiment -ExperimentPath $Experiment -DeviceOverride $Device `
@@ -1415,7 +1422,12 @@ try {
 
     if ($Resume) { throw '-Resume is valid only with -Experiment.' }
 
-    $requestedDevice = if ([string]::IsNullOrWhiteSpace($Device)) { 'Auto' } else { $Device }
+    . (Join-Path ([string]$state.AppRoot) 'src/LfoConfiguration.ps1')
+    $baseConfig=Import-PowerShellDataFile -LiteralPath ([string]$state.LFO.ConfigPath)
+    $userRegistry=Get-LfoConfigurationRegistry $baseConfig $state ([string]$state.AppRoot)
+    $userSettings=Read-LfoConfiguration $userRegistry (Get-LfoConfigurationPath $resolvedInstallRoot)
+    Assert-LfoConfiguration $userRegistry $userSettings
+    $requestedDevice = if ([string]::IsNullOrWhiteSpace($Device)) { Get-LfoConfigurationValue $userRegistry $userSettings 'Runtime.Device' } else { $Device }
     $resolvedDevice = Resolve-LfoDevice $requestedDevice $state 6144
     $modelSpec = Get-LfoModelSpec $state $resolvedDevice
     $env:LFO_RUNTIME_DEVICE = $resolvedDevice
@@ -1424,6 +1436,8 @@ try {
     if (-not (Test-Path -LiteralPath $config -PathType Leaf)) { throw "LFO config not found: $config" }
     $runtimePriority = if (-not [string]::IsNullOrWhiteSpace($Priority)) {
         $Priority
+    } elseif ($userSettings.ContainsKey('Runtime.Priority')) {
+        [string]$userSettings['Runtime.Priority']
     } elseif ($state.LFO -and [string]$state.LFO.DefaultPriority -in @('Normal','High','Realtime')) {
         [string]$state.LFO.DefaultPriority
     } else {
@@ -1472,8 +1486,8 @@ try {
         $env:LFO_L4_OBSERVABILITY = '1'
 
         Write-Host ''
-        Write-Host 'Local Frontier Orchestrator (LFO) 9.6.8' -ForegroundColor Cyan
-        Write-Host 'Runtime contract: v9.6.8 | UMA, manifest compatibility and console Markdown.'
+        Write-Host 'Local Frontier Orchestrator (LFO) 9.7-dev' -ForegroundColor Cyan
+        Write-Host 'Runtime contract: v9.7-dev | G2 and configuration manager.'
         Write-Host ("Install root: {0}" -f $resolvedInstallRoot)
         Write-Host ("Device:      {0} (requested: {1})" -f $resolvedDevice,$requestedDevice)
         Write-Host ("Model:       {0}" -f [string]$modelSpec.Model)
@@ -1512,7 +1526,7 @@ try {
     exit 0
 } catch {
     Write-Host ''
-    Write-Host 'LFO 9.6.8 FAILED' -ForegroundColor Red
+    Write-Host 'LFO 9.7-dev FAILED' -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
     if ($VerbosePreference -ne 'SilentlyContinue' -and $_.ScriptStackTrace) {
         Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray

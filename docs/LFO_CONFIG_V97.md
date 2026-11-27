@@ -1,0 +1,9 @@
+# LFO Configuration Manager (v9.7-dev)
+
+Standalone entrypoint: lfo-config.ps1 / lfo-config.cmd in the installed launch directory. LFO.ps1 -Configure delegates to it before services start. In chat /config, /cfg, /e or /model opens the same UI; original /epistemic, /think, /route and /stream switches remain. /e E1 3 or /e 200200 are short session-only sensitivity controls.
+
+Two panels, cursor keys, Tab, Enter, F1 help, F2 persist, F5 named profiles, F9 static validation, F10 return (apply live settings in chat), Esc discard unsaved edits. F2 already saved values are not undone by Esc. Nerd Font pictograms are rendered by the user's terminal font; -Ascii or LFO_CONFIG_ASCII=1 removes pictograms. Narrow or unsupported consoles use a line fallback. No model or service is started by standalone configuration. Model aliases and service/credential bindings are read-only until provision/adapter management is implemented. No arbitrary executable config.
+
+Persistent overrides are in install-root/config/user-settings.json; profiles in config/profiles. They are separate from bootstrap-generated PSD1 and install-state.json. Explicit launcher device/priority and explicit research profile take precedence; unattended batch runs do not consume user overrides. Session commands change current state only. Saving from the chat explicitly persists the staged configuration. Numeric/boolean existing runtime parameters are exposed from the installed config, validated statically, and require restart. Sensitive credentials, frozen contracts and structured regex rules remain managed. This is not a full hardware or model compatibility validator.
+
+Acceptance still requires a real Windows/SSH terminal run and verification that the chosen Nerd Font displays glyphs. Do not equate PowerShell parser/unit tests with visual acceptance. Model listing/selection/pull, service relocation and provider adapters are extension points, not delivered here.

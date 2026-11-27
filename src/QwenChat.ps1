@@ -25,6 +25,21 @@ $script:LfoRouteMode = 'AUTO'
 $script:LfoTurnRouteMode = 'AUTO'
 $script:LfoStreamEnabled = ($env:LFO_RUNTIME_DEVICE -eq 'UMA' -and $env:LFO_RUNTIME_BATCH -ne '1')
 $script:LfoStreamShownPrefix = ''
+$script:LfoUserSettings=@{}
+$script:LfoUserRegistry=$null
+$script:LfoUserSettingsPath=$null
+if($env:LFO_RUNTIME_BATCH -ne '1' -and $env:LFO_INSTALL_ROOT){
+    . (Join-Path $PSScriptRoot 'LfoConfiguration.ps1')
+    . (Join-Path $PSScriptRoot 'LfoConfigurationTui.ps1')
+    $installedState=Get-Content -LiteralPath (Join-Path $env:LFO_INSTALL_ROOT 'config/install-state.json') -Raw -Encoding UTF8|ConvertFrom-Json
+    $script:LfoUserRegistry=Get-LfoConfigurationRegistry $script:Config $installedState (Split-Path -Parent $PSScriptRoot)
+    $script:LfoUserSettingsPath=Get-LfoConfigurationPath $env:LFO_INSTALL_ROOT
+    $script:LfoUserSettings=Read-LfoConfiguration $script:LfoUserRegistry $script:LfoUserSettingsPath
+    Assert-LfoConfiguration $script:LfoUserRegistry $script:LfoUserSettings
+    Set-LfoChatConfiguration $script:Config $script:LfoUserSettings
+    if($script:LfoUserSettings.ContainsKey('Session.Route')){$script:LfoRouteMode=$script:LfoUserSettings['Session.Route']}
+    if($script:LfoUserSettings.ContainsKey('Session.Stream') -and $script:LfoUserSettings['Session.Stream'] -ne 'AUTO'){$script:LfoStreamEnabled=$script:LfoUserSettings['Session.Stream'] -eq 'ON'}
+}
 
 if ([string]::IsNullOrWhiteSpace($Model)) {
     $Model = [string]$script:Config.Model
@@ -107,6 +122,7 @@ foreach ($l3ModuleName in @('LfoL3Store.ps1','LfoL3Planner.ps1','LfoL3Runtime.ps
 }
 
 $ThinkEnabled = [bool]$Think
+if(-not $PSBoundParameters.ContainsKey('Think') -and $script:LfoUserSettings.ContainsKey('Session.Think')){$ThinkEnabled=[bool]$script:LfoUserSettings['Session.Think']}
 Initialize-QwenMemoryConfiguration `
     $ContextLengthHint `
     $MemoryRecentTurns `
@@ -1588,6 +1604,7 @@ $script:LfoG2Controller=$null
 try {
     . (Join-Path $PSScriptRoot 'LfoEpistemicController.ps1')
     $script:LfoG2Controller=Initialize-LfoG2Controller (Split-Path -Parent $PSScriptRoot) $env:LFO_EPISTEMIC_PROFILE
+    if(-not $env:LFO_EPISTEMIC_PROFILE -and $script:LfoUserRegistry){Set-LfoEpistemicConfiguration $script:LfoG2Controller $script:LfoUserSettings}
     if($env:LFO_RUNTIME_BATCH -eq '1' -and -not $env:LFO_EPISTEMIC_PROFILE){$script:LfoG2Controller.Mode='OFF'}
     if(-not $script:MemoryEnabled -or -not $script:L0StageSourcesEnabled){$script:LfoG2Controller.Mode='OFF'}
     $script:LfoG2LegacyHook=$script:LfoL4PostL0
@@ -1623,12 +1640,39 @@ $script:LfoLastExportAnswer=''
 $script:LfoImportQueue=$null
 # Reserve slash-prefixed interactive entries for the local command UI.
 # Invalid commands must not reach routing, inference, memory or Codex.
+function Open-LfoChatConfiguration([string]$Section){
+    if(-not $script:LfoUserRegistry){Write-Host '[Configuration unavailable without installed state.]';return}
+    if($env:LFO_EPISTEMIC_PROFILE){Write-Host '[Explicit research profile in use: persistent configuration menu disabled.]';return}
+    $current=@{};foreach($id in $script:LfoUserSettings.Keys){$current[$id]=$script:LfoUserSettings[$id]}
+    $current['Session.Think']=[bool]$script:ThinkEnabled
+    $current['Session.Route']=$script:LfoRouteMode
+    $current['Session.Stream']=if($script:LfoStreamEnabled){'ON'}else{'OFF'}
+    if($script:LfoG2Controller){
+        $current['Epistemic.Mode']=$script:LfoG2Controller.Mode
+        foreach($axis in $script:LfoG2Controller.Axes.Keys){$current['Epistemic.Axis.'+$axis]=$script:LfoG2Controller.Axes[$axis]}
+        foreach($det in $script:LfoG2Controller.Modules.Keys){$current['Epistemic.Detector.'+$det]=[bool]$script:LfoG2Controller.Modules[$det].Enabled}
+    }
+    $new=Show-LfoConfigurationTui $script:LfoUserRegistry $current $script:LfoUserSettingsPath -Section $Section -Session -Ascii:($env:LFO_CONFIG_ASCII -eq '1')
+    if($null -eq $new){return}
+    $script:LfoUserSettings=$new
+    $script:ThinkEnabled=Get-LfoConfigurationValue $script:LfoUserRegistry $new 'Session.Think'
+    $script:LfoRouteMode=Get-LfoConfigurationValue $script:LfoUserRegistry $new 'Session.Route'
+    $stream=Get-LfoConfigurationValue $script:LfoUserRegistry $new 'Session.Stream'
+    $script:LfoStreamEnabled=if($stream -eq 'AUTO'){$env:LFO_RUNTIME_DEVICE -eq 'UMA'}else{$stream -eq 'ON'}
+    Set-LfoEpistemicConfiguration $script:LfoG2Controller $new
+    if($script:LfoG2Controller -and (-not $script:MemoryEnabled -or -not $script:L0StageSourcesEnabled)){$script:LfoG2Controller.Mode='OFF'}
+    Write-Host '[Live settings applied; restart-class changes require F2 save and relaunch.]'
+}
 function Get-LfoSlashCommands {
     return [ordered]@{
         '/help'=@{Usage='/help [command]';Pattern='\A/help(?:[ \t]+/?[a-z-]+)?\z'}
         '/think'=@{Usage='/think on | /think off';Pattern='\A/think[ \t]+(?:on|off)\z'}
         '/route'=@{Usage='/route auto | /route local | /route frontier';Pattern='\A/route[ \t]+(?:auto|local|frontier)\z'}
         '/stream'=@{Usage='/stream on | /stream off';Pattern='\A/stream[ \t]+(?:on|off)\z'}
+        '/config'=@{Usage='/config';Pattern='\A/config\z'}
+        '/cfg'=@{Usage='/cfg';Pattern='\A/cfg\z'}
+        '/model'=@{Usage='/model';Pattern='\A/model\z'}
+        '/e'=@{Usage='/e [status|off|observe|advise|E1 0..3|000000]';Pattern='\A/e(?:[ \t]+(?:status|off|observe|advise|E[1-9][0-9]*[ \t]+[0-3]|[0-3]{6}))?\z'}
         '/epistemic'=@{Usage='/epistemic status | off | observe | advise | set E1 low|medium|high|off';Pattern='\A/epistemic(?:[ \t]+(?:status|off|observe|advise|set[ \t]+E[1-9][0-9]*[ \t]+(?:off|low|medium|high)))?\z'}
         '/analyze'=@{Usage='/analyze [1..100 turns] (default: 8)';Pattern='\A/analyze(?:[ \t]+(?:0{0,2}[1-9]|0?[1-9][0-9]|100))?\z'}
         '/files'=@{Usage='/files';Pattern='\A/files\z'}
@@ -1701,8 +1745,25 @@ while ($true) {
             Show-LfoSlashHelp ([string]$Matches[1]) -ExplicitHelp
             continue
         }
+        '^/(?:config|cfg|model)$' {
+            Open-LfoChatConfiguration $(if($prompt.Trim() -eq '/model'){'Models'}else{'Epistemic'})
+            continue
+        }
+        '^/e(?:\s|$)' {
+            $tail=$prompt.Trim().Substring(2).Trim()
+            if(-not $tail){Open-LfoChatConfiguration 'Epistemic';continue}
+            if($null -eq $script:LfoG2Controller){Write-Host '[G2 unavailable]';continue}
+            $levels=@('OFF','LOW','MEDIUM','HIGH')
+            if($tail -match '^([0-3]{6})$'){
+                for($i=0;$i -lt 6;$i++){$axis='E'+($i+1);if($script:LfoG2Controller.Axes.ContainsKey($axis)){$script:LfoG2Controller.Axes[$axis]=$levels[[int]::Parse($tail.Substring($i,1))]}}
+                Invoke-LfoG2Command $script:LfoG2Controller '/epistemic status'
+            }elseif($tail -match '^(E[1-9][0-9]*)\s+([0-3])$'){
+                Invoke-LfoG2Command $script:LfoG2Controller ('/epistemic set '+$Matches[1]+' '+$levels[[int]$Matches[2]])
+            }else{Invoke-LfoG2Command $script:LfoG2Controller ('/epistemic '+$tail)}
+            continue
+        }
         '^/epistemic(?:\s|$)' {
-            Invoke-LfoG2Command $script:LfoG2Controller $prompt
+            if($prompt.Trim() -eq '/epistemic'){Open-LfoChatConfiguration 'Epistemic'}else{Invoke-LfoG2Command $script:LfoG2Controller $prompt}
             continue
         }
         '^/analyze(?:\s|$)' {
