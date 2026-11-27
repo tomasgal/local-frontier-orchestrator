@@ -104,7 +104,13 @@ function Save-LfoConfiguration($Registry,$Values,[string]$Path){
     $temp=Join-Path $dir ('.settings-'+[guid]::NewGuid().ToString('N')+'.tmp')
     try{
         [IO.File]::WriteAllText($temp,($payload|ConvertTo-Json -Depth 8),(New-Object Text.UTF8Encoding($false)))
-        if([IO.File]::Exists($Path)){[IO.File]::Replace($temp,$Path,$null)}else{[IO.File]::Move($temp,$Path)}
+        if([IO.File]::Exists($Path)){
+            # Windows PowerShell 5.1 can marshal $null as an empty string.
+            # Use a unique real backup path for atomic replacement.
+            $backup=$temp+'.bak'
+            [IO.File]::Replace($temp,$Path,$backup)
+            if([IO.File]::Exists($backup)){[IO.File]::Delete($backup)}
+        }else{[IO.File]::Move($temp,$Path)}
     }finally{if([IO.File]::Exists($temp)){[IO.File]::Delete($temp)}}
 }
 function Set-LfoChatConfiguration($Config,$Values){
