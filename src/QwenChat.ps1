@@ -1739,7 +1739,7 @@ try {
             }catch{Write-Host '[G2 compute ledger failed; chat continues.]' -ForegroundColor Yellow}
         }
     }
-    Write-Host ('[G2 '+$script:LfoG2Controller.Mode+'; /epistemic status; 0 additional model calls]')
+    Write-Host ('[G2 '+$script:LfoG2Controller.Mode+'; policy='+$script:LfoG2Controller.InterventionPolicy+'; /epistemic status]')
 } catch {Write-Host '[G2 unavailable; chat continues.]' -ForegroundColor Yellow}
 $script:PolicyFingerprint = Get-PolicyFingerprint
 

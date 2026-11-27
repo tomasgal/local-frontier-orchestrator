@@ -35,7 +35,7 @@ function Add-LfoG2RequestSafeguard {
     if($null -eq $Plan -or -not $Plan.eligible -or -not $Plan.instruction){return $Messages}
     if($Messages.Count -lt 1 -or [string]$Messages[0].role -ne 'system'){throw 'Expected system message for G2 safeguard.'}
     # Copy only the first message; never mutate the stored history or user message.
-    $copy=@($Messages)
+    $copy=[object[]]$Messages.Clone()
     $copy[0]=@{role='system';content=([string]$Messages[0].content+[Environment]::NewLine+[Environment]::NewLine+$Plan.instruction)}
     return $copy
 }

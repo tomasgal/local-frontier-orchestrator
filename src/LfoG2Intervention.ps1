@@ -43,7 +43,7 @@ function Invoke-LfoG2InterventionCascade {
     $check=Get-LfoG2E1Check $Controller $Answer $Evidence
     $initialCheck=$check.assessment
     $selected=$Answer;$edited=$false;$calls=0;$status='NOT_TRIGGERED';$changedBy='NONE'
-    if($check.assessment -eq 'CHECK_FAILED'){$status='CHECK_FAILED'}
+    if($check.assessment -eq 'CHECK_FAILED'){$status='CHECK_FAILED';if($Notify){& $Notify '[G2] E1 check failed; no correction attempted.'}}
     elseif($check.assessment -eq 'CONTRADICTED'){
         $attempts.Add([pscustomobject]@{phase='initial';answer=$Answer;raw='';assessment=$check.assessment;rule=$check.rule;start=$check.start;length=$check.length;valid=$true})
         if($Notify){& $Notify '[G2] E1: current-turn external verification claim conflicts with runtime provenance.'}
