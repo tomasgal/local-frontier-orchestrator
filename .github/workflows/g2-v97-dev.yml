@@ -94,3 +94,9 @@ jobs:
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2CesScreen12.ps1 -SelfTest
           if($LASTEXITCODE -ne 0){throw 'CES12 screen contract failed'}
+
+      - name: CES13 witness and runtime state contract
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2CesScreen13.ps1 -SelfTest
+          if($LASTEXITCODE -ne 0){throw 'CES13 screen contract failed'}
