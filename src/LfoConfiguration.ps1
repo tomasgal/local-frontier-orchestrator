@@ -4,7 +4,7 @@ function Get-LfoConfigurationRegistry {
     param([hashtable]$BaseConfig,$InstallState,[string]$RepositoryRoot)
     $r=[ordered]@{}
     function AddEntry($id,$section,$value,$kind,$choices,$apply,$description,$editable=$true){
-        $r[$id]=[pscustomobject]@{Id=$id;Section=$section;Default=$value;Kind=$kind;Choices=@($choices);Apply=$apply;Description=$description;Editable=$editable}
+        $r[$id]=[pscustomobject]@{Id=$id;Section=$section;Default=$value;Kind=$kind;Choices=@($choices);Apply=$apply;Description=$description;LongHelp='';Editable=$editable}
     }
     $profile=Get-Content -LiteralPath (Join-Path $RepositoryRoot 'config/EpistemicProfile.json') -Raw -Encoding UTF8|ConvertFrom-Json
     $ep=Import-PowerShellDataFile -LiteralPath (Join-Path $RepositoryRoot 'config/EpistemicRegistry.psd1')
@@ -47,6 +47,24 @@ function Get-LfoConfigurationRegistry {
             $display=if($kind -eq 'complex'){'[structured value: repository managed]'}else{$v}
             AddEntry ('Chat.'+$group+'.'+$key) $section $display $kind @() $(if($edit){'Restart'}else{'Managed'}) ($group+'.'+$key+'; existing runtime parameter.') $edit
         }
+    }
+    $helpPath=Join-Path $RepositoryRoot 'config/ConfigurationHelp.json'
+    if(Test-Path -LiteralPath $helpPath -PathType Leaf){
+        $help=Get-Content -LiteralPath $helpPath -Raw -Encoding UTF8|ConvertFrom-Json
+        foreach($id in $r.Keys){
+            $entry=$r[$id];$h=$help.PSObject.Properties[$id]
+            if($h){$entry.Description=[string]$h.Value[0];$entry.LongHelp=[string]$h.Value[1]}
+        }
+    }
+    foreach($entry in $r.Values){
+        if($entry.LongHelp){continue}
+        if($entry.Id -match '^Chat\.(LocalGeneration|SynthesisGeneration)\..*NumPredict'){
+            $entry.Description='Maximum generated token budget for the named generation path.'
+            $entry.LongHelp='Normal/Think and UMA variants apply to their corresponding generation conditions. Higher budgets can increase latency and reduce available context. Actual output can stop earlier and is subject to runtime budgeting.'
+        }elseif($entry.Id -match '^Chat\..*\.Temperature$'){
+            $entry.Description='Sampling temperature for the named generation or memory path.'
+            $entry.LongHelp='Lower values generally reduce sampling variability; higher values increase it. Temperature is not a factual-accuracy or bias score. Keep fixed in comparative experiments.'
+        }else{$entry.LongHelp=$entry.Description}
     }
     return $r
 }

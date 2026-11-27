@@ -1,0 +1,126 @@
+{
+  "Runtime.Device": [
+    "Selects the execution profile for the next LFO launch.",
+    "Auto resolves the device using the launcher policy and installed profile. CPU uses the CPU profile; GPU uses the discrete GPU profile; UMA uses the shared-memory accelerator profile (e.g. Strix Halo). Each selects the corresponding provisioned model alias and context. An explicit -Device parameter overrides this setting."
+  ],
+  "Runtime.Priority": [
+    "Sets the Windows process priority used by the interactive launcher.",
+    "Normal favors coexistence with other applications. High raises scheduling priority. Realtime can starve other processes and should be used only for controlled tests. This is not a GPU clock or inference-speed setting. Explicit -Priority takes precedence."
+  ],
+  "Session.Think": [
+    "Enables Ollama thinking during local generation.",
+    "ON requests the model's thinking mode and can increase latency and token consumption. OFF requests ordinary generation. Actual support depends on the selected model. The /think switch changes the current session without saving a persistent default."
+  ],
+  "Session.Route": [
+    "Selects automatic routing, local-only processing or FRONTIER delegation.",
+    "AUTO uses the hard gates and model routing policy. LOCAL keeps ordinary requests on the local model; FRONTIER requests delegation to the configured external client. External access depends on client readiness and is not proof of verification. /route changes the current session."
+  ],
+  "Session.Stream": [
+    "Controls incremental console rendering of generated answers.",
+    "AUTO uses the device-specific default (streaming on UMA). ON renders provisional answer blocks as they arrive; OFF waits for completion. Streaming does not guarantee validity or completeness of an answer. /stream overrides the current session."
+  ],
+  "Epistemic.Mode": [
+    "Controls whether the G2 controller records or reports epistemic signals.",
+    "OFF disables the new G2 observer. OBSERVE logs signals after L0 persistence without modifying the answer. ADVISE also prints a post-answer notice. INTERVENE is not implemented. Legacy L4 recording remains independent. No extra inference calls are added by the supplied detectors."
+  ],
+  "Epistemic.Axis.E1": [
+    "Integrity: sensitivity to unsupported evidence or operation claims.",
+    "The implemented verification-claim detector checks narrow English/Slovak declarations against runtime external-evidence status. LOW requires an explicit current-turn scope, MEDIUM allows standalone completed-operation claims, HIGH adds lexical forms. NONE can contradict a recognized current operation; REQUESTED does not prove verification."
+  ],
+  "Epistemic.Axis.E2": [
+    "Selection: attention, retrieval and relevance of evidence.",
+    "No supplied detector is registered for this axis yet. Changing sensitivity reserves a configuration value only; it does not activate a functioning detector or measure a bias."
+  ],
+  "Epistemic.Axis.E3": [
+    "Inference: validity of conclusions drawn from available evidence.",
+    "No supplied detector is registered for this axis yet. Future modules may test bounded reasoning errors against an explicit reference or control."
+  ],
+  "Epistemic.Axis.E4": [
+    "Independence: sensitivity to explicit confirmation-seeking signals.",
+    "LOW and MEDIUM currently use the same frozen T1 asymmetric evidence-request rule. HIGH also recognizes the existing explicit framing signal. A detected phrase is not a diagnosis of a person's confirmation bias."
+  ],
+  "Epistemic.Axis.E5": [
+    "Calibration: appropriateness of certainty, trust and reliance.",
+    "No supplied detector is registered for this axis yet. Confidence calibration and human reliance require an appropriate independent reference, not merely a language match."
+  ],
+  "Epistemic.Axis.E6": [
+    "Revision: ability to update conclusions in response to evidence.",
+    "No supplied detector is registered for this axis yet. Longitudinal correction and amplification require observations over multiple turns; a single response is insufficient."
+  ],
+  "Epistemic.Detector.verification-claim": [
+    "Enables the deterministic E1 external-operation claim detector.",
+    "The detector runs only if E1 is not OFF and the G2 controller is active with L0 stage provenance. It abstains on ambiguous or unmatched text. Its observations are not factual verification or a measure of overall model accuracy."
+  ],
+  "Epistemic.Detector.confirmation-seeking": [
+    "Enables the deterministic E4 user-input signal detector.",
+    "Requires E4 sensitivity above OFF and an active G2 controller with L0 stage provenance. Uses frozen T1 rules. Signals represent observable language, not inferred personality or latent cognitive traits."
+  ],
+  "Chat.HistoryMaxMessages": [
+    "Limits the number of messages retained in the active chat history.",
+    "Lower values reduce recent conversational context. Persistent memory and retrieved context are separate mechanisms. Increasing this limit consumes context capacity."
+  ],
+  "Chat.CodexTimeoutSec": [
+    "Sets the maximum time allowed for a Codex FRONTIER call, in seconds.",
+    "A higher limit lets slow external calls complete but may increase waiting time. A timeout does not establish that the requested evidence was obtained."
+  ],
+  "Chat.Memory.Enabled": [
+    "Controls persistent conversation memory and associated logging.",
+    "Disabling memory changes what can be recovered between turns and disables the G2 post-L0 observation path when no durable L0 provenance is available. It does not erase existing records."
+  ],
+  "Chat.Memory.StructuredEnabled": [
+    "Controls the L2 structured-memory subsystem.",
+    "L2 stores structured records subject to existing write guards. Disabling it prevents structured-memory use; it does not delete existing records. Structured read requires structured memory."
+  ],
+  "Chat.Memory.StructuredReadEnabled": [
+    "Allows eligible current L2 facts to enter retrieval context.",
+    "This is a configurable read path, not a guarantee of correct or externally verified facts. Requires StructuredEnabled. Keep fixed during controlled experiments."
+  ],
+  "Chat.Memory.L0StageSourcesEnabled": [
+    "Reports whether L0 captures source stages for provenance.",
+    "Bootstrap-managed. Required for legacy L4 and G2 source-linked observations. It is not a toggle for deleting logs."
+  ],
+  "Chat.Memory.RecentTurns": [
+    "Controls the number of recent turns considered for persistent context.",
+    "Larger values may improve continuity but consume context capacity; this is separate from the active history message limit."
+  ],
+  "Chat.ResearchLogging.Enabled": [
+    "Controls the extended research trace facility.",
+    "L0 conversation logging is separate. Disabling research traces can reduce reproducibility and does not erase existing files."
+  ],
+  "Chat.ResearchLogging.IncludeRawText": [
+    "Controls inclusion of raw text in research traces.",
+    "Raw prompts and responses can contain sensitive data. This option affects future traces, not previously stored text or all L0 logging."
+  ],
+  "Chat.ResearchLogging.IncludeMemorySnapshots": [
+    "Controls inclusion of memory snapshots in research traces.",
+    "Useful for reproducing context effects, but may increase storage and privacy exposure. Does not remove previous snapshots."
+  ],
+  "Chat.Frontier.MaxPromptChars": [
+    "Limits the prompt text passed to the FRONTIER client.",
+    "A smaller bound reduces transmitted context; a larger bound may expose more context and consume more remote capacity. It does not enable or disable FRONTIER."
+  ],
+  "Chat.LocalGeneration.CompactReadSchemaEnabled": [
+    "Enables the experimental compact schema for eligible read-only LOCAL turns.",
+    "Candidate A omits selected write fields only on the eligible read path. It does not relax the frozen write guards. Compare with the baseline under isolated conditions."
+  ],
+  "Chat.LocalGeneration.LeanReadPolicyEnabled": [
+    "Enables the experimental lean L2 read policy.",
+    "Candidate B requires CompactReadSchemaEnabled. It removes redundant write-extraction policy in eligible read-only turns; the existing persistence guards remain."
+  ],
+  "Chat.LocalGeneration.LowerTrustL2EvidenceEnabled": [
+    "Places eligible retrieved L2 evidence in a lower-trust message.",
+    "Candidate C requires the compact and lean read path. It is an experimental context-placement change, not a proof of prompt-injection security."
+  ],
+  "Chat.LocalGeneration.MixedUserEvidenceWriteEnabled": [
+    "Enables the experimental bounded mixed user-write path.",
+    "Allows the current-user quote/span parser to authorize at most one typed operation under the existing guards. Keep OFF outside the accepted experimental scope."
+  ],
+  "Chat.HardGates.Rules": [
+    "Displays the repository-managed routing rule set.",
+    "Rules are executable routing policy data, not user preference sliders. Changing them requires code review and regression tests."
+  ],
+  "Chat.L4.Enabled": [
+    "Displays the legacy L4 recording configuration.",
+    "The production launcher supplies runtime L4 settings. This managed entry is not the G2 mode. Use Epistemic.Mode for the new observer."
+  ]
+}

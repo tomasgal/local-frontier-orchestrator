@@ -27,7 +27,7 @@ try{
 . (Join-Path $root 'src/LfoConfigurationTui.ps1')
 foreach($size in @(@(80,25),@(180,50),@(240,60))){
     $v=Get-LfoConfigurationViewport $size[0] $size[1]
-    if($v.Width -ne ($size[0]-1) -or $v.Height -ne $size[1] -or $v.Rows+6 -ne $size[1] -or $v.Left+$v.Right+3 -ne $v.Width){throw 'Viewport geometry failed'}
+    if($v.Width -ne ($size[0]-1) -or $v.Height -ne $size[1] -or $v.Rows+9 -ne $size[1] -or $v.Left+$v.Right+3 -ne $v.Width){throw 'Viewport geometry failed'}
 }
 $small=$false;try{$null=Get-LfoConfigurationViewport 60 15}catch{$small=$true}
 if(-not $small){throw 'Small terminal must fall back'}
@@ -37,3 +37,17 @@ if($word -notmatch $cfg.HardGates.FollowUpPattern){throw 'UTF-8 data-file regex 
 $bytes=[IO.File]::ReadAllBytes((Join-Path $root 'config/QwenChat.config.psd1'))
 if($bytes[0] -ne 239 -or $bytes[1] -ne 187 -or $bytes[2] -ne 191){throw 'UTF-8 BOM missing from repository PSD1'}
 Write-Host 'Viewport and UTF-8 data-file contract PASS.'
+
+foreach($entry in $r.Values){
+    $h=Get-LfoConfigurationHint $entry $true 1
+    if(-not $h.Meaning -or -not $h.Action -or -not $h.Impact -or -not $h.LongHelp){throw ('Missing context help: '+$entry.Id)}
+}
+$h=Get-LfoConfigurationHint $r['Runtime.Device'] $true 1
+if($h.Action -notmatch 'Auto / CPU / GPU / UMA' -or $h.LongHelp -notmatch 'Strix Halo' -or $h.Impact -notmatch 'relaunch'){throw 'Device help semantics'}
+$h=Get-LfoConfigurationHint $r['Epistemic.Mode'] $true 1
+if($h.LongHelp -notmatch 'OBSERVE' -or $h.Impact -notmatch 'F10'){throw 'Live help semantics'}
+$h=Get-LfoConfigurationHint $r['Models.UMA'] $false 1
+if($h.Action -notmatch 'Read-only'){throw 'Read-only help semantics'}
+$wrapped=@(Split-LfoConfigurationHelpText 'one two three four five' 8)
+if(($wrapped -join ' ') -ne 'one two three four five' -or @($wrapped|Where-Object{$_.Length -gt 8}).Count){throw 'Help wrap'}
+Write-Host 'Context help and footer layout PASS.'

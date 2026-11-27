@@ -4,7 +4,32 @@ function Get-LfoConfigurationViewport([int]$Columns,[int]$Lines){
     # Leave the final cell to EL; never trigger terminal auto-wrap.
     $width=$Columns-1
     $left=[Math]::Min(26,[Math]::Max(19,[int][Math]::Floor($width/5)))
-    [pscustomobject]@{Width=$width;Height=$Lines;Left=$left;Right=$width-$left-3;Rows=$Lines-6}
+    [pscustomobject]@{Width=$width;Height=$Lines;Left=$left;Right=$width-$left-3;Rows=$Lines-9}
+}
+function Get-LfoConfigurationHint($Entry,[bool]$Session,[int]$Focus=1){
+    if($null -eq $Entry){return [pscustomobject]@{Meaning='No settings in this section.';Action='Tab: switch panels.';Impact='';LongHelp=''}}
+    $action=if(-not $Entry.Editable){'Read-only; cannot be changed here.'}elseif($Focus -eq 0){'Tab or Right: select the parameter panel.'}else{
+        switch($Entry.Kind){
+            'enum' {'Left/Right or Enter: cycle '+($Entry.Choices -join ' / ')}
+            'bool' {'Space, Left/Right or Enter: toggle ON/OFF.'}
+            'int' {'Enter: type a whole number; blank cancels.'}
+            'number' {'Enter: type a decimal number (use a decimal point).'}
+            default{'Enter: edit value.'}
+        }
+    }
+    $impact=if(-not $Entry.Editable){'Managed by bootstrap or repository; displayed for information.'}elseif($Session -and $Entry.Apply -eq 'Live'){'F10 applies to this session; F2 also saves the persistent default.'}elseif($Entry.Apply -eq 'Live'){'F2 saves the default for subsequent LFO launches.'}else{'F2 saves; relaunch LFO to apply. Current session is unchanged.'}
+    [pscustomobject]@{Meaning=$Entry.Description;Action=$action;Impact=$impact;LongHelp=$Entry.LongHelp}
+}
+function Split-LfoConfigurationHelpText([string]$Text,[int]$Width){
+    if($Width -lt 1){throw 'Invalid help width.'}
+    $remaining=$Text.Trim()
+    while($remaining.Length -gt $Width){
+        $cut=$remaining.LastIndexOf(' ',$Width)
+        if($cut -le 0){$cut=$Width}
+        $remaining.Substring(0,$cut).TrimEnd()
+        $remaining=$remaining.Substring($cut).TrimStart()
+    }
+    if($remaining){$remaining}
 }
 function Show-LfoConfigurationTui {
     param($Registry,[hashtable]$Values,[string]$Path,[string]$Section='Epistemic',[switch]$Session,[switch]$Ascii)
@@ -35,6 +60,47 @@ function Show-LfoConfigurationTui {
         $inputValue=Read-Host ('New value (current '+$old+'; blank cancels)')
         if($inputValue -eq ''){return 'Cancelled.'}
         try{$work[$entry.Id]=ConvertTo-LfoConfigurationValue $entry $inputValue;return 'Changed (not saved).'}catch{return $_.Exception.Message}
+    }
+    function ShowContextHelp($entry){
+        if($null -eq $entry){return}
+        $h=Get-LfoConfigurationHint $entry ([bool]$Session) 1
+        $lines=@(
+            $entry.Id
+            ''
+            $h.Meaning
+            ''
+            $h.LongHelp
+            ''
+            ('Default: '+(Label $entry.Default))
+            ('Current: '+(Label (Get-LfoConfigurationValue $Registry $work $entry.Id)))
+            $h.Action
+            $h.Impact
+            ''
+            'Tab: switch panels. F2 saves persistent settings. F5 manages profiles.'
+            'F10 exits (applies live changes in chat). Esc discards unsaved edits.'
+            'F4 toggles Nerd Font / ASCII.'
+        )
+        $page=0
+        while($true){
+            $w=[Math]::Max(20,[Console]::WindowWidth-3)
+            $hgt=[Math]::Max(5,[Console]::WindowHeight-3)
+            $wrapped=@(foreach($line in $lines){if($line -eq ''){''}else{Split-LfoConfigurationHelpText $line $w}})
+            $maxPage=[Math]::Max(0,[Math]::Ceiling($wrapped.Count/$hgt)-1)
+            $page=[Math]::Min($page,$maxPage)
+            [Console]::Write($esc+'[37;44m'+$esc+'[2J'+$esc+'[H')
+            [Console]::WriteLine($esc+'[30;46m'+(Fit ' LFO-CONFIG | CONTEXT HELP' $w)+$esc+'[37;44m')
+            for($j=0;$j -lt $hgt;$j++){
+                $idx=$page*$hgt+$j
+                $line=if($idx -lt $wrapped.Count){$wrapped[$idx]}else{''}
+                [Console]::WriteLine((Fit $line $w))
+            }
+            [Console]::Write($esc+'[34;47m'+(Fit (' Up/Down: page | Esc/Enter/F1: back | '+($page+1)+'/'+($maxPage+1)) $w)+$esc+'[0m')
+            $key=[Console]::ReadKey($true).Key
+            if($key -in @('Escape','Enter','F1','F10')){break}
+            if($key -in @('DownArrow','PageDown')){$page=[Math]::Min($maxPage,$page+1)}
+            if($key -in @('UpArrow','PageUp')){$page=[Math]::Max(0,$page-1)}
+        }
+        [Console]::Write($esc+'[37;44m'+$esc+'[2J'+$esc+'[H')
     }
     function DoSave {
         try{Save-LfoConfiguration $Registry $work $Path;return 'Saved persistent settings.'}catch{return ('Save failed: '+$_.Exception.Message)}
@@ -102,9 +168,13 @@ function Show-LfoConfigurationTui {
                     }else{[void]$sb.Append(' '*$right)}
                     [void]$sb.Append($esc+'[K')
                 }
-                $hint=if($items.Count){$items[$ri].Description}else{'No settings.'}
+                $entry=if($items.Count){$items[$ri]}else{$null}
+                $hint=Get-LfoConfigurationHint $entry ([bool]$Session) $focus
                 $mark=if($Ascii){'i'}else{[string][char]0xf05a}
-                [void]$sb.Append([Environment]::NewLine+$yellow+(Fit (' '+$mark+' '+$hint) $width)+$esc+'[K')
+                [void]$sb.Append([Environment]::NewLine+$blue+(Fit ($rule*$width) $width)+$esc+'[K')
+                [void]$sb.Append([Environment]::NewLine+$yellow+(Fit (' '+$mark+' '+$hint.Meaning) $width)+$esc+'[K')
+                [void]$sb.Append([Environment]::NewLine+$blue+(Fit (' Action: '+$hint.Action) $width)+$esc+'[K')
+                [void]$sb.Append([Environment]::NewLine+$blue+(Fit (' Effect: '+$hint.Impact) $width)+$esc+'[K')
                 [void]$sb.Append([Environment]::NewLine+$blue+(Fit (' '+$status) $width)+$esc+'[K')
                 [void]$sb.Append([Environment]::NewLine+$grey+(Fit ' F1 Help  F2 Save  F4 Font  F5 Profiles  F9 Validate  F10 Exit' $width)+$esc+'[K'+$esc+'[0m')
                 [Console]::Write($sb.ToString())
@@ -128,7 +198,7 @@ function Show-LfoConfigurationTui {
                     'RightArrow' {if($focus -eq 1 -and $items.Count){$status=UpdateValue $items[$ri] 1}else{$focus=1}}
                     'Spacebar' {if($focus -eq 1 -and $items.Count){$status=UpdateValue $items[$ri] 1}}
                     'Enter' {if($focus -eq 0){$focus=1}else{if($items.Count){[Console]::Write($esc+'[?25h'+$esc+'[0m'+$esc+'[2J'+$esc+'[H');$status=EditValue $items[$ri];[Console]::Write($esc+'[?25l')}}}
-                    'F1' {$status='Arrows: select/change; Tab: focus; Enter: numeric edit; F2: persist; Esc: cancel.'}
+                    'F1' {if($items.Count){ShowContextHelp $items[$ri]}}
                     'F2' {$status=DoSave}
                     'F4' {$Ascii=-not $Ascii;$status=if($Ascii){'ASCII symbols'}else{'Nerd Font symbols (requires client font)'}}
                     'F5' {[Console]::Write($esc+'[?25h'+$esc+'[0m'+$esc+'[2J'+$esc+'[H');$status=ProfileAction;[Console]::Write($esc+'[?25l')}
@@ -148,7 +218,7 @@ function Show-LfoConfigurationTui {
         Write-Host ('LFO-CONFIG | '+$sections[$si]+' | '+$status)
         $items=@($Registry.Values|Where-Object Section -eq $sections[$si])
         for($i=0;$i -lt $items.Count;$i++){Write-Host ('{0,2} {1} = {2} [{3}]' -f ($i+1),$items[$i].Id,(Label (Get-LfoConfigurationValue $Registry $work $items[$i].Id)),$items[$i].Apply)}
-        Write-Host 'n/p section | number edit | s save | f profiles | v validate | q exit | x cancel'
+        Write-Host 'n/p section | number edit | h<number> help | s save | f profiles | v validate | q exit | x cancel'
         $choice=Read-Host 'Select'
         if($null -eq $choice -or $choice -eq 'x'){return $null}
         if($choice -eq 'q'){if($Session){try{Assert-LfoConfiguration $Registry $work;return $work}catch{$status=$_.Exception.Message;continue}};return $null}
@@ -158,7 +228,16 @@ function Show-LfoConfigurationTui {
             's'{$status=DoSave}
             'f'{$status=ProfileAction}
             'v'{$status=DoValidate}
-            default{$idx=0;if([int]::TryParse($choice,[ref]$idx) -and $idx -ge 1 -and $idx -le $items.Count){$status=EditValue $items[$idx-1]}}
+            default{
+                if($choice -match '^h([0-9]+)$'){
+                    $idx=[int]$Matches[1]
+                    if($idx -ge 1 -and $idx -le $items.Count){
+                        $h=Get-LfoConfigurationHint $items[$idx-1] ([bool]$Session) 1
+                        Write-Host $h.Meaning;Write-Host $h.LongHelp;Write-Host $h.Action;Write-Host $h.Impact
+                        $null=Read-Host 'Enter to return'
+                    }
+                }else{$idx=0;if([int]::TryParse($choice,[ref]$idx) -and $idx -ge 1 -and $idx -le $items.Count){$status=EditValue $items[$idx-1]}}
+            }
         }
     }
 }
