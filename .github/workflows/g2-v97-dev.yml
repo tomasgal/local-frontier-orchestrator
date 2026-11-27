@@ -34,3 +34,9 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'Research regression failed'}
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Test-LfoUmaBootstrapContract.ps1
           if($LASTEXITCODE -ne 0){throw 'UMA regression failed'}
+
+      - name: G2 exploratory replay export smoke
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2Pilot.ps1 -RepositoryRoot $PWD -OutputRoot $env:RUNNER_TEMP -OfflineOnly
+          if($LASTEXITCODE -ne 0){throw 'G2 replay export failed'}
