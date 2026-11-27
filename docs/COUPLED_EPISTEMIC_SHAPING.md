@@ -164,3 +164,17 @@ Initial literature was scoped through SciSpace and primary/institutional bibliog
 ## 10. Decision log
 
 - 2026-11-27: Establish CES as a living hypothesis and strategy registry on v9.7-dev. Retain E1–E6 as functional coordinates; distinguish quality, sensitivity, intervention action and observed response. Permit signed and context-reversing couplings. No coefficient matrix, production integration, new defaults or accepted geometric measurement. Require substantive scholarly support and recognized methodology before promoting any shaping change. Future strategies will be added to this document with versioned evidence and decisions.
+
+## 11. Pilot 11: structural shaping candidates (2026-11-27)
+
+The reordered conceptual heatmap concentrates all eight hypothesized positive directed edges within E1/E3/E5/E6; E2/E4 have only conditional or unknown outgoing/ incoming links in the proposed graph. This is a property of the hypothesis, not a discovery from empirical data. The two-block hypothesis (core plus modulation, E5 bridge) is represented symbolically in [CesExperimental11.json](../research/g2/CesExperimental11.json); no numerical weights or automatic propagation. E1–E6 remain evaluation coordinates. Pilot 11 evaluates concrete operators rather than the topology as a whole. See [CES11](../research/g2/CES11.md).
+
+| ID | Candidate | Status / foundation |
+|---|---|---|
+| CES-C09 | Semantic signal aggregation, conditional coupling, MERGE/COUPLE/INHIBIT/ABSTAIN | HYPOTHESIS; M1–M3; two-block compression not validated |
+| CES-C10 | MASK_CONTEXT (safe stance isolation) | EXPERIMENTAL; Dror & Kukucka 2021 LSU-E, relevance/objectivity/biasing power; transfer to LLM experimental |
+| CES-C11 | COLLAPSE_PROVENANCE (read-side grouping, including recent messages) | HYPOTHESIS; Green et al. 2007 Provenance Semirings, source lineage not independent evidence; verify full method before promotion |
+| CES-C12 | CONSTRUCT_WITNESS (bounded runtime counterexample) | HYPOTHESIS; Gao et al. 2023 PAL; validate semantic mapping separately |
+| CES-C13 | Independent reconstructive inference without prior draft | HYPOTHESIS; R9/R11 and LSU-E analogy; matched feedback controls |
+
+Pilot 11 adds an experimental config and composer with deduplication, protected-span inhibition and no recursive propagation. No live shaping profile, parser, memory writes, or production setting changes. CheckList (Ribeiro et al., ACL 2020) supplies behavioral test design; NIST full factorial design supplies interaction methodology. Full source and transfer gates remain mandatory for promotion.

@@ -82,3 +82,9 @@ jobs:
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2SemanticCompiler.ps1 -SelfTest
           if($LASTEXITCODE -ne 0){throw 'Semantic compiler contract failed'}
+
+      - name: CES factorial and protected span contract
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2CesScreen.ps1 -SelfTest
+          if($LASTEXITCODE -ne 0){throw 'CES screen contract failed'}

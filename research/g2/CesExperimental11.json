@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "status": "EXPERIMENTAL_ONLY",
+  "defaultProfile": "INDEPENDENT",
+  "productionEnabled": false,
+  "coordinates": [
+    "E1",
+    "E2",
+    "E3",
+    "E4",
+    "E5",
+    "E6"
+  ],
+  "topology": {
+    "status": "HYPOTHESIS",
+    "core": [
+      "E1",
+      "E3",
+      "E5",
+      "E6"
+    ],
+    "modulation": [
+      "E2",
+      "E4"
+    ],
+    "bridge": "E5",
+    "orientation": "rows outcomes; columns primary action focus; UNKNOWN is not zero",
+    "matrix": [
+      [
+        "SELF",
+        "UNKNOWN",
+        "UNKNOWN",
+        "UNKNOWN",
+        "CONDITIONAL",
+        "POSITIVE"
+      ],
+      [
+        "UNKNOWN",
+        "SELF",
+        "UNKNOWN",
+        "CONDITIONAL",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      [
+        "POSITIVE",
+        "CONDITIONAL",
+        "SELF",
+        "CONDITIONAL",
+        "POSITIVE",
+        "POSITIVE"
+      ],
+      [
+        "UNKNOWN",
+        "CONDITIONAL",
+        "UNKNOWN",
+        "SELF",
+        "CONDITIONAL",
+        "CONDITIONAL"
+      ],
+      [
+        "CONDITIONAL",
+        "CONDITIONAL",
+        "POSITIVE",
+        "CONDITIONAL",
+        "SELF",
+        "CONDITIONAL"
+      ],
+      [
+        "POSITIVE",
+        "UNKNOWN",
+        "POSITIVE",
+        "CONDITIONAL",
+        "POSITIVE",
+        "SELF"
+      ]
+    ]
+  },
+  "operators": [
+    {
+      "id": "MASK_CONTEXT",
+      "block": "MODULATION",
+      "functions": [
+        "E2",
+        "E4",
+        "E5"
+      ],
+      "requires": "ORACLE_SAFE_MASK",
+      "source": "LSU-E",
+      "status": "EXPERIMENTAL"
+    },
+    {
+      "id": "STRUCTURE_EVIDENCE",
+      "block": "RECONSTRUCTION",
+      "functions": [
+        "E1",
+        "E3",
+        "E5"
+      ],
+      "requires": "ORACLE_EXACT_SEGMENTS",
+      "source": "Pilot09/10; NIST factorial design",
+      "status": "EXPERIMENTAL"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "INDEPENDENT",
+      "operators": []
+    },
+    {
+      "id": "MODULATION",
+      "operators": [
+        "MASK_CONTEXT"
+      ]
+    },
+    {
+      "id": "RECONSTRUCTION",
+      "operators": [
+        "STRUCTURE_EVIDENCE"
+      ]
+    },
+    {
+      "id": "COUPLED",
+      "operators": [
+        "MASK_CONTEXT",
+        "STRUCTURE_EVIDENCE"
+      ]
+    }
+  ],
+  "composition": {
+    "order": [
+      "MASK_CONTEXT",
+      "STRUCTURE_EVIDENCE"
+    ],
+    "deduplicate": true,
+    "recursivePropagation": false,
+    "unknownPolicy": "ABSTAIN_MASK",
+    "maskProtectedRoles": [
+      "TASK",
+      "EVIDENCE",
+      "CONSTRAINT",
+      "PREFERENCE",
+      "ASSUMPTION",
+      "QUOTATION_TASK",
+      "UNKNOWN"
+    ],
+    "maxExtraModelCalls": 0
+  }
+}
