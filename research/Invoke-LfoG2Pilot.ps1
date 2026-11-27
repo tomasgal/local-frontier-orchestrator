@@ -5,9 +5,11 @@ param(
     [string]$OutputRoot,
     [string]$ExpectedSource,
     [switch]$OfflineOnly,
-    [switch]$Pilot2
+    [switch]$Pilot2,
+    [switch]$Pilot3
 )
 $ErrorActionPreference='Stop'
+if($Pilot2 -and $Pilot3){throw 'Choose one pilot.'}
 $state=$null
 if(-not $RepositoryRoot){
     $state=Get-Content -LiteralPath (Join-Path $InstallRoot 'config/install-state.json') -Raw -Encoding UTF8|ConvertFrom-Json
@@ -21,8 +23,16 @@ $null=New-Item -ItemType Directory -Path $run -Force
 $utf8=New-Object Text.UTF8Encoding($false)
 function JsonFile($path,$obj){[IO.File]::WriteAllText($path,($obj|ConvertTo-Json -Depth 20),$utf8)}
 # The runner can be downloaded alone; the reviewed corpus comes from its own directory.
-$bankPath=Join-Path $PSScriptRoot 'g2/PilotCases.json'
-$livePath=Join-Path $PSScriptRoot 'g2/LivePrompts.json'
+$bankPath=Join-Path $PSScriptRoot $(if($Pilot3){'g2/PilotCases03.json'}else{'g2/PilotCases.json'})
+$livePath=Join-Path $PSScriptRoot $(if($Pilot3){'g2/LivePrompts03.json'}else{'g2/LivePrompts.json'})
+$frozenPath=Join-Path $PSScriptRoot 'g2/FrozenInteractions03.json'
+$frozenHash=$null
+if($Pilot3){
+    $frozenBank=Get-Content -LiteralPath $frozenPath -Raw -Encoding UTF8|ConvertFrom-Json
+    if($frozenBank.schemaVersion -ne 1){throw 'Frozen interaction schema mismatch.'}
+    Copy-Item -LiteralPath $frozenPath -Destination (Join-Path $run 'frozen-interactions.json')
+    $frozenHash=(Get-FileHash -LiteralPath $frozenPath -Algorithm SHA256).Hash
+}
 $bank=Get-Content -LiteralPath $bankPath -Raw -Encoding UTF8|ConvertFrom-Json
 $liveBank=Get-Content -LiteralPath $livePath -Raw -Encoding UTF8|ConvertFrom-Json
 Copy-Item -LiteralPath $bankPath -Destination (Join-Path $run 'pilot-cases.json')
@@ -39,9 +49,11 @@ Copy-Item -LiteralPath $livePath -Destination (Join-Path $run 'live-prompts.json
 $sourceFiles=@('LFO.ps1','src/QwenChat.ps1','src/QwenMemory.ps1','src/LfoEpistemicController.ps1','src/epistemic/VerificationClaim.ps1','src/epistemic/ConfirmationSeeking.ps1','src/LfoEvidenceProvenance.ps1','src/LfoL4Runtime.ps1','config/EpistemicRegistry.psd1')
 $hashes=[ordered]@{}
 foreach($file in $sourceFiles){$hashes[$file]=(Get-FileHash -LiteralPath (Join-Path $RepositoryRoot $file) -Algorithm SHA256).Hash}
-$manifest=[ordered]@{schemaVersion=1;purpose='G2 exploratory detector and integration pilot';sourceCommit=if($state){$state.SourceCommit}else{'CI checkout'};sourceHashes=$hashes;runnerSha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash;bankSha256=(Get-FileHash -LiteralPath $bankPath -Algorithm SHA256).Hash;liveBankSha256=(Get-FileHash -LiteralPath $livePath -Algorithm SHA256).Hash;powerShell=$PSVersionTable.PSVersion.ToString();startedUtc=[DateTime]::UtcNow.ToString('o');offlineOnly=[bool]$OfflineOnly;pilot=if($Pilot2){2}else{1};extensionSha256=$extensionHash;model=$null;context=$null;ollamaVersion=$null;modelDigest=$null;status='STARTED'}
+$manifest=[ordered]@{schemaVersion=1;purpose='G2 exploratory detector and integration pilot';sourceCommit=if($state){$state.SourceCommit}else{'CI checkout'};sourceHashes=$hashes;runnerSha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash;bankSha256=(Get-FileHash -LiteralPath $bankPath -Algorithm SHA256).Hash;liveBankSha256=(Get-FileHash -LiteralPath $livePath -Algorithm SHA256).Hash;powerShell=$PSVersionTable.PSVersion.ToString();startedUtc=[DateTime]::UtcNow.ToString('o');offlineOnly=[bool]$OfflineOnly;pilot=if($Pilot3){3}elseif($Pilot2){2}else{1};extensionSha256=$extensionHash;frozenBankSha256=$frozenHash;model=$null;context=$null;ollamaVersion=$null;modelDigest=$null;status='STARTED'}
 $offline=New-Object Collections.Generic.List[object]
 $live=New-Object Collections.Generic.List[object]
+$frozenResults=New-Object Collections.Generic.List[object]
+$review=New-Object Collections.Generic.List[object]
 $failure=$null
 try{
     foreach($m in @('LfoEvidenceProvenance','LfoL4Runtime','LfoEpistemicController')){. (Join-Path $RepositoryRoot ('src/'+$m+'.ps1'))}
@@ -67,13 +79,37 @@ try{
             $observations=@(Invoke-LfoG2Controller $c $row 'conversation-2026-11.jsonl'|Where-Object detector -eq $case.detector)
             if($observations.Count -ne 1 -or $observations[0].assessment -eq 'FAILED_ISOLATED'){throw ('Detector execution failed: '+$case.id+' '+$level)}
             $o=$observations[0]
-            $offline.Add([pscustomobject]@{id=$case.id;detector=$case.detector;sensitivity=$level;label=$case.label;assessment=$o.assessment;detector_version=$o.detector_version;phenomenon=$o.phenomenon;rule_id=$o.rule_id;claim_scope=$o.claim_scope;evidence_start=$o.evidence_start;evidence_length=$o.evidence_length;evidence=$case.evidence;elapsed_ms=$o.elapsed_ms;additional_model_calls=$o.additional_model_calls})
+            $offline.Add([pscustomobject]@{id=$case.id;detector=$case.detector;sensitivity=$level;label=$case.label;assessment=$o.assessment;reference_scope=$case.reference_scope;detector_version=$o.detector_version;phenomenon=$o.phenomenon;rule_id=$o.rule_id;claim_scope=$o.claim_scope;evidence_start=$o.evidence_start;evidence_length=$o.evidence_length;evidence=$case.evidence;elapsed_ms=$o.elapsed_ms;additional_model_calls=$o.additional_model_calls})
         }
     }
     $offline|Export-Csv -LiteralPath (Join-Path $run 'offline-results.csv') -NoTypeInformation -Encoding UTF8
     $summary=@(foreach($g in ($offline|Group-Object detector,sensitivity,label,assessment)){[pscustomobject]@{detector=$g.Group[0].detector;sensitivity=$g.Group[0].sensitivity;label=$g.Group[0].label;assessment=$g.Group[0].assessment;count=$g.Count}})
     $summary|Export-Csv -LiteralPath (Join-Path $run 'offline-confusion.csv') -NoTypeInformation -Encoding UTF8
     Write-Host ('Offline replay: '+$offline.Count+' detector evaluations; classifications are exploratory.') -ForegroundColor Cyan
+    if($Pilot3){
+        foreach($level in @('LOW','MEDIUM','HIGH')){
+            $c=Initialize-LfoG2Controller $RepositoryRoot $profiles[$level]
+            if(@($c.Modules.Values|Where-Object{$_.Descriptor.Version -ne '2.0.0'}).Count){throw 'Pilot 03 requires unchanged detector version 2.0.0.'}
+            $i=0
+            foreach($case in $frozenBank.cases){
+                $i++
+                $row=[pscustomobject]@{user=[string]$case.user;assistant=[string]$case.assistant;route='LOCAL';external_evidence_status=$case.external_evidence_status;runtime_annotation='';epoch=1;turn_id=$i;stage_sources_schema=1;stage_sources=@(
+                    [pscustomobject]@{actor='USER';source_field='user';stage_id='s1';producer='USER'}
+                    [pscustomobject]@{actor='FINAL';source_field='assistant';stage_id='s2';producer='LOCAL'}
+                )}
+                $events=@(Invoke-LfoG2Controller $c $row 'conversation-2026-11.jsonl')
+                if($events.Count -ne 2 -or @($events|Where-Object{$_.assessment -eq 'FAILED_ISOLATED' -or $_.additional_model_calls -ne 0}).Count){throw ('Frozen replay execution failed: '+$case.id)}
+                foreach($o in $events){
+                    $frozenResults.Add([pscustomobject]@{id=$case.id;pair=$case.pair;response_label=$case.response_label;sensitivity=$level;detector=$o.detector;assessment=$o.assessment;phenomenon=$o.phenomenon;rule_id=$o.rule_id;claim_scope=$o.claim_scope;content_sha256=$o.content_sha256;elapsed_ms=$o.elapsed_ms;additional_model_calls=$o.additional_model_calls})
+                }
+            }
+        }
+        $frozenResults|Export-Csv -LiteralPath (Join-Path $run 'frozen-results.csv') -NoTypeInformation -Encoding UTF8
+        foreach($group in ($frozenResults|Where-Object detector -eq 'confirmation-seeking'|Group-Object pair,sensitivity)){
+            if(@($group.Group|ForEach-Object{($_.assessment+'|'+$_.phenomenon+'|'+$_.rule_id+'|'+$_.content_sha256)}|Sort-Object -Unique).Count -ne 1){throw ('User-only E4 changed across fixed-prompt response variants: '+$group.Name)}
+        }
+        Write-Host ('Frozen interactions: '+$frozenResults.Count+' detector events; fixed-user E4 invariance checked.') -ForegroundColor Cyan
+    }
     if(-not $OfflineOnly){
         $manifest.model=[string]$state.Ollama.UMAModel
         $manifest.context=[int]$state.Ollama.UMAContext
@@ -136,6 +172,11 @@ try{
                 $pass=($exitCode -eq 0 -and $turns.Count -eq 1 -and $events.Count -eq 2 -and $hashOK -and $turns[0].route -eq 'LOCAL' -and $turns[0].external_evidence_status -eq 'NONE' -and @($events|Where-Object{$_.assessment -eq 'FAILED_ISOLATED' -or $_.additional_model_calls -ne 0 -or $_.mode -ne 'OBSERVE' -or $_.sensitivity -ne 'MEDIUM'}).Count -eq 0)
                 $live.Add([pscustomobject]@{id=$case.id;exitCode=$exitCode;turns=$turns.Count;events=$events.Count;hashOK=$hashOK;route=if($turns.Count){$turns[0].route}else{''};externalEvidence=if($turns.Count){$turns[0].external_evidence_status}else{''};result=if($pass){'PASS'}else{'FAIL'}})
                 $live|Export-Csv -LiteralPath (Join-Path $run 'live-summary.csv') -NoTypeInformation -Encoding UTF8
+                if($Pilot3 -and $turns.Count -eq 1){
+                    # Outcome annotation is deliberately empty; no automatic interaction diagnosis.
+                    $review.Add([pscustomobject]@{id=$case.id;pair=$case.pair;condition=$case.condition;claim=$case.claim;user=[string]$turns[0].user;assistant=(Get-LfoHistoricalAssistantText $turns[0]);response_label='';counterevidence_handling='';unsupported_inference='';rationale='';annotator=''})
+                    $review|Export-Csv -LiteralPath (Join-Path $run 'interaction-review.csv') -NoTypeInformation -Encoding UTF8
+                }
             }
         }finally{
             foreach($n in $envNames){[Environment]::SetEnvironmentVariable($n,$saved[$n],'Process')}
@@ -152,6 +193,8 @@ try{
     $manifest.finishedUtc=[DateTime]::UtcNow.ToString('o')
     $manifest.offlineEvaluations=$offline.Count
     $manifest.liveCases=$live.Count
+    $manifest.frozenEvaluations=$frozenResults.Count
+    $manifest.interactionReviewRows=$review.Count
     JsonFile (Join-Path $run 'manifest.json') $manifest
     $zip=$run+'.zip'
     Compress-Archive -LiteralPath $run -DestinationPath $zip -Force

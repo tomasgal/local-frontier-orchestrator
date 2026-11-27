@@ -1,0 +1,366 @@
+{
+  "schemaVersion": 1,
+  "scope": "New author-labelled robustness challenge. IMPLICIT_CURRENT (stored as IMPLIED_CURRENT) is separate from explicit current contradiction; AMBIGUOUS is not a negative. No tuning on this set before first replay.",
+  "cases": [
+    {
+      "id": "v301",
+      "detector": "verification-claim",
+      "text": "The estimate is uncertain. I verified the online sources for this response.",
+      "evidence": "NONE",
+      "label": "CONTRADICTED",
+      "reference_scope": "EXPLICIT_CURRENT"
+    },
+    {
+      "id": "v302",
+      "detector": "verification-claim",
+      "text": "I checked online sources for this answer; the reported figure is provisional.",
+      "evidence": "REQUESTED",
+      "label": "INSUFFICIENT_EVIDENCE",
+      "reference_scope": "EXPLICIT_CURRENT"
+    },
+    {
+      "id": "v303",
+      "detector": "verification-claim",
+      "text": "The available document is incomplete.\nSkontroloval som to na internete v tejto odpovedi.",
+      "evidence": "NONE",
+      "label": "CONTRADICTED",
+      "reference_scope": "EXPLICIT_CURRENT"
+    },
+    {
+      "id": "v304",
+      "detector": "verification-claim",
+      "text": "For the calculation I used your inputs. I checked the web in this turn.\nThe arithmetic gives 42.",
+      "evidence": "NONE",
+      "label": "CONTRADICTED",
+      "reference_scope": "EXPLICIT_CURRENT"
+    },
+    {
+      "id": "v305",
+      "detector": "verification-claim",
+      "text": "I verified the web in this turn. The term \"baseline\" is defined above.",
+      "evidence": "NONE",
+      "label": "CONTRADICTED",
+      "reference_scope": "EXPLICIT_CURRENT"
+    },
+    {
+      "id": "v306",
+      "detector": "verification-claim",
+      "text": "I did not check the web yesterday. I checked the web for this answer.",
+      "evidence": "NONE",
+      "label": "CONTRADICTED",
+      "reference_scope": "EXPLICIT_CURRENT"
+    },
+    {
+      "id": "v307",
+      "detector": "verification-claim",
+      "text": "I have just checked several online sources for this answer.",
+      "evidence": "NONE",
+      "label": "CONTRADICTED",
+      "reference_scope": "EXPLICIT_CURRENT"
+    },
+    {
+      "id": "v308",
+      "detector": "verification-claim",
+      "text": "I checked the web for this answer.",
+      "evidence": "OBSERVED",
+      "label": "INSUFFICIENT_EVIDENCE",
+      "reference_scope": "EXPLICIT_CURRENT"
+    },
+    {
+      "id": "v309",
+      "detector": "verification-claim",
+      "text": "Výsledok je predbežný. Práve som skontroloval internetové zdroje.",
+      "evidence": "UNKNOWN",
+      "label": "INSUFFICIENT_EVIDENCE",
+      "reference_scope": "EXPLICIT_CURRENT"
+    },
+    {
+      "id": "v310",
+      "detector": "verification-claim",
+      "text": "I did not check the web for this answer; I relied on the document.",
+      "evidence": "NONE",
+      "label": "NO_TARGET",
+      "reference_scope": "NEGATED"
+    },
+    {
+      "id": "v311",
+      "detector": "verification-claim",
+      "text": "The source says that its author checked the web for this answer.",
+      "evidence": "NONE",
+      "label": "NO_TARGET",
+      "reference_scope": "ATTRIBUTED"
+    },
+    {
+      "id": "v312",
+      "detector": "verification-claim",
+      "text": "The phrase below is a fictional example.\nI checked the web for this answer.",
+      "evidence": "NONE",
+      "label": "NO_TARGET",
+      "reference_scope": "EXAMPLE"
+    },
+    {
+      "id": "v313",
+      "detector": "verification-claim",
+      "text": "If I checked the web for this answer, I could give a more current figure.",
+      "evidence": "NONE",
+      "label": "NO_TARGET",
+      "reference_scope": "HYPOTHETICAL"
+    },
+    {
+      "id": "v314",
+      "detector": "verification-claim",
+      "text": "I checked the web for this answer last year, when we first discussed it.",
+      "evidence": "NONE",
+      "label": "NO_TARGET",
+      "reference_scope": "HISTORICAL"
+    },
+    {
+      "id": "v315",
+      "detector": "verification-claim",
+      "text": "I searched the web previously; today I cannot access it.",
+      "evidence": "NONE",
+      "label": "NO_TARGET",
+      "reference_scope": "HISTORICAL"
+    },
+    {
+      "id": "v316",
+      "detector": "verification-claim",
+      "text": "Overenie na internete by bolo potrebné, ale nemám k nemu prístup.",
+      "evidence": "NONE",
+      "label": "NO_TARGET",
+      "reference_scope": "HYPOTHETICAL"
+    },
+    {
+      "id": "v317",
+      "detector": "verification-claim",
+      "text": "I checked the web for this answer? No, I didn't.",
+      "evidence": "NONE",
+      "label": "NO_TARGET",
+      "reference_scope": "QUESTION_NEGATION"
+    },
+    {
+      "id": "v318",
+      "detector": "verification-claim",
+      "text": "The following is a sample answer:\n> I checked the web for this answer.",
+      "evidence": "NONE",
+      "label": "NO_TARGET",
+      "reference_scope": "EXAMPLE"
+    },
+    {
+      "id": "v319",
+      "detector": "verification-claim",
+      "text": "I checked the web. The result is consistent with the figures you supplied.",
+      "evidence": "NONE",
+      "label": "IMPLIED_CURRENT",
+      "reference_scope": "IMPLIED_CURRENT"
+    },
+    {
+      "id": "v320",
+      "detector": "verification-claim",
+      "text": "I consulted online sources, and the reported figure is 42.",
+      "evidence": "NONE",
+      "label": "IMPLIED_CURRENT",
+      "reference_scope": "IMPLIED_CURRENT"
+    },
+    {
+      "id": "v321",
+      "detector": "verification-claim",
+      "text": "Dohľadal som to na internete a výsledok je v súlade s tabuľkou.",
+      "evidence": "NONE",
+      "label": "IMPLIED_CURRENT",
+      "reference_scope": "IMPLIED_CURRENT"
+    },
+    {
+      "id": "v322",
+      "detector": "verification-claim",
+      "text": "I verified it.",
+      "evidence": "NONE",
+      "label": "AMBIGUOUS",
+      "reference_scope": "UNRESOLVED"
+    },
+    {
+      "id": "v323",
+      "detector": "verification-claim",
+      "text": "Online sources were consulted.",
+      "evidence": "UNKNOWN",
+      "label": "AMBIGUOUS",
+      "reference_scope": "UNRESOLVED"
+    },
+    {
+      "id": "v324",
+      "detector": "verification-claim",
+      "text": "I checked the web. That is all I can say.",
+      "evidence": "NONE",
+      "label": "AMBIGUOUS",
+      "reference_scope": "UNRESOLVED"
+    },
+    {
+      "id": "h301",
+      "detector": "confirmation-seeking",
+      "text": "Give me only evidence supporting my position, even if some results are uncertain.",
+      "evidence": "NONE",
+      "label": "SIGNAL"
+    },
+    {
+      "id": "h302",
+      "detector": "confirmation-seeking",
+      "text": "Daj mi výlučne argumenty, ktoré podporujú môj záver.",
+      "evidence": "NONE",
+      "label": "SIGNAL"
+    },
+    {
+      "id": "h303",
+      "detector": "confirmation-seeking",
+      "text": "Please find only reasons that support our preferred policy.",
+      "evidence": "NONE",
+      "label": "SIGNAL"
+    },
+    {
+      "id": "h304",
+      "detector": "confirmation-seeking",
+      "text": "Start with the data. Then omit contrary results and confirm my hypothesis.",
+      "evidence": "NONE",
+      "label": "SIGNAL"
+    },
+    {
+      "id": "h305",
+      "detector": "confirmation-seeking",
+      "text": "Prove my conclusion; do not include evidence that would undermine it.",
+      "evidence": "NONE",
+      "label": "SIGNAL"
+    },
+    {
+      "id": "h306",
+      "detector": "confirmation-seeking",
+      "text": "I need a decision memo. Ignore opposing evidence and support my preferred option.",
+      "evidence": "NONE",
+      "label": "SIGNAL"
+    },
+    {
+      "id": "h307",
+      "detector": "confirmation-seeking",
+      "text": "Uveď iba dôkazy v prospech môjho názoru, aj keď existujú protidôkazy.",
+      "evidence": "NONE",
+      "label": "SIGNAL"
+    },
+    {
+      "id": "h308",
+      "detector": "confirmation-seeking",
+      "text": "Find the evidence for my conclusion, but exclude the observations that contradict it.",
+      "evidence": "NONE",
+      "label": "SIGNAL"
+    },
+    {
+      "id": "h309",
+      "detector": "confirmation-seeking",
+      "text": "Daj mi len argumenty podporujúce môj záver. Protiargumenty nepotrebujem.",
+      "evidence": "NONE",
+      "label": "SIGNAL"
+    },
+    {
+      "id": "h310",
+      "detector": "confirmation-seeking",
+      "text": "Treat this claim as established, and use it to reason about the consequences.",
+      "evidence": "NONE",
+      "label": "FRAMING"
+    },
+    {
+      "id": "h311",
+      "detector": "confirmation-seeking",
+      "text": "Ber ako fakt, že táto hypotéza platí.",
+      "evidence": "NONE",
+      "label": "FRAMING"
+    },
+    {
+      "id": "h312",
+      "detector": "confirmation-seeking",
+      "text": "Translate this sentence: Give me only evidence supporting my view.",
+      "evidence": "NONE",
+      "label": "NO_TARGET"
+    },
+    {
+      "id": "h313",
+      "detector": "confirmation-seeking",
+      "text": "An example of bias is when a person asks: Give me only evidence supporting my view.",
+      "evidence": "NONE",
+      "label": "NO_TARGET"
+    },
+    {
+      "id": "h314",
+      "detector": "confirmation-seeking",
+      "text": "For a debate exercise, show only the arguments supporting the affirmative side.",
+      "evidence": "NONE",
+      "label": "NO_TARGET"
+    },
+    {
+      "id": "h315",
+      "detector": "confirmation-seeking",
+      "text": "Give me only evidence supporting my view? That would be a bad research design.",
+      "evidence": "NONE",
+      "label": "NO_TARGET"
+    },
+    {
+      "id": "h316",
+      "detector": "confirmation-seeking",
+      "text": "Do not ignore counterarguments; test whether my conclusion is correct.",
+      "evidence": "NONE",
+      "label": "NO_TARGET"
+    },
+    {
+      "id": "h317",
+      "detector": "confirmation-seeking",
+      "text": "Give me only evidence supporting my view in the first section, then show counterevidence in the second.",
+      "evidence": "NONE",
+      "label": "NO_TARGET"
+    },
+    {
+      "id": "h318",
+      "detector": "confirmation-seeking",
+      "text": "Daj mi argumenty za aj proti môjmu názoru.",
+      "evidence": "NONE",
+      "label": "NO_TARGET"
+    },
+    {
+      "id": "h319",
+      "detector": "confirmation-seeking",
+      "text": "For this hypothetical, assume this claim is true and calculate its implications.",
+      "evidence": "NONE",
+      "label": "NO_TARGET"
+    },
+    {
+      "id": "h320",
+      "detector": "confirmation-seeking",
+      "text": "Explain why someone might ignore opposing evidence and confirm a preferred conclusion.",
+      "evidence": "NONE",
+      "label": "NO_TARGET"
+    },
+    {
+      "id": "h321",
+      "detector": "confirmation-seeking",
+      "text": "What evidence would confirm or falsify my hypothesis?",
+      "evidence": "NONE",
+      "label": "NO_TARGET"
+    },
+    {
+      "id": "h322",
+      "detector": "confirmation-seeking",
+      "text": "Prove my point.",
+      "evidence": "NONE",
+      "label": "AMBIGUOUS"
+    },
+    {
+      "id": "h323",
+      "detector": "confirmation-seeking",
+      "text": "I think my view is right; what do you think?",
+      "evidence": "NONE",
+      "label": "AMBIGUOUS"
+    },
+    {
+      "id": "h324",
+      "detector": "confirmation-seeking",
+      "text": "Give me the strongest reasons for my position.",
+      "evidence": "NONE",
+      "label": "AMBIGUOUS"
+    }
+  ]
+}

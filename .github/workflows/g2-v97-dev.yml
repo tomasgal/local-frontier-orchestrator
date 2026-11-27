@@ -40,3 +40,9 @@ jobs:
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2Pilot.ps1 -RepositoryRoot $PWD -OutputRoot $env:RUNNER_TEMP -OfflineOnly -Pilot2
           if($LASTEXITCODE -ne 0){throw 'G2 replay export failed'}
+
+      - name: G2 frozen detector robustness and interaction replay
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2Pilot.ps1 -RepositoryRoot $PWD -OutputRoot $env:RUNNER_TEMP -OfflineOnly -Pilot3
+          if($LASTEXITCODE -ne 0){throw 'G2 Pilot 03 replay export failed'}
