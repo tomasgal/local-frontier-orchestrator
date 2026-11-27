@@ -27,7 +27,7 @@ function Initialize-LfoG2Controller {
     $modules=@{}
     foreach($d in $registry.Detectors){
         if($d.Id -cnotmatch '^[a-z0-9-]{1,60}$' -or $modules.ContainsKey($d.Id) -or
-           -not $axes.ContainsKey($d.Axis) -or $d.Stage -cnotin @('USER','FINAL') -or
+           -not $axes.ContainsKey($d.Axis) -or $d.Stage -cnotin @('USER','FINAL','INTERACTION') -or
            $d.Module -cnotmatch '^[A-Za-z0-9-]+\.ps1$' -or $d.Function -cnotmatch '^Get-LfoG2[A-Za-z0-9]+$' -or
            $d.Version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+$'){throw 'Invalid G2 detector descriptor.'}
         . (Join-Path (Join-Path $RepositoryRoot 'src/epistemic') $d.Module)
@@ -43,20 +43,30 @@ function Invoke-LfoG2Controller {
     param($Controller,$Row,[string]$SourceFile)
     if($null -eq $Controller -or $Controller.Mode -eq 'OFF'){return}
     if($Row.stage_sources_schema -ne 1 -or $Row.epoch -lt 1 -or $Row.turn_id -lt 1 -or $SourceFile -cnotmatch '^conversation-[0-9]{4}-[0-9]{2}\.jsonl$'){return}
-    foreach($key in @($Controller.Modules.Keys|Sort-Object)){
+    $keys=@($Controller.Modules.Keys|Sort-Object)
+    $orderedKeys=@($keys|Where-Object{$Controller.Modules[$_].Descriptor.Stage -ne 'INTERACTION'})+@($keys|Where-Object{$Controller.Modules[$_].Descriptor.Stage -eq 'INTERACTION'})
+    $userSignal=$null
+    foreach($key in $orderedKeys){
         $m=$Controller.Modules[$key];$d=$m.Descriptor;$s=$Controller.Axes[$d.Axis]
         if(-not $m.Enabled -or $s -eq 'OFF'){continue}
         $field=if($d.Stage -eq 'USER'){'user'}else{'assistant'}
-        $stages=@($Row.stage_sources|Where-Object{$_.actor -ceq $d.Stage -and $_.source_field -ceq $field})
+        $sourceActor=if($d.Stage -eq 'INTERACTION'){'FINAL'}else{$d.Stage}
+        $stages=@($Row.stage_sources|Where-Object{$_.actor -ceq $sourceActor -and $_.source_field -ceq $field})
         if($stages.Count -ne 1){continue}
         $stage=$stages[0];$raw=[string]$Row.$field
-        $text=if($d.Stage -eq 'FINAL'){Get-LfoHistoricalAssistantText $Row}else{$raw}
+        $text=if($sourceActor -eq 'FINAL'){Get-LfoHistoricalAssistantText $Row}else{$raw}
+        $linkedUser=$null
+        if($d.Stage -eq 'INTERACTION'){
+            $userStages=@($Row.stage_sources|Where-Object{$_.actor -ceq 'USER' -and $_.source_field -ceq 'user'})
+            if($userStages.Count -ne 1 -or -not $userStages[0].stage_id -or -not $stage.stage_id){continue}
+            $linkedUser=$userStages[0]
+        }
         $status=Get-LfoExternalEvidenceStatus $Row
-        $ctx=[pscustomobject]@{Text=$text;ExternalEvidence=$status;Route=[string]$Row.route;Stage=$d.Stage}
+        $ctx=[pscustomobject]@{Text=$text;ExternalEvidence=$status;Route=[string]$Row.route;Stage=$d.Stage;UserText=if($linkedUser){[string]$Row.user}else{$null};UserSignal=if($linkedUser){$userSignal}else{$null}}
         $sw=[Diagnostics.Stopwatch]::StartNew()
         $outcome='FAILED_ISOLATED';$detail=$null
         try {
-            if($d.Stage -eq 'FINAL' -and $stage.producer -eq 'WRAPPER'){$outcome='ABSTAIN'}
+            if($sourceActor -eq 'FINAL' -and $stage.producer -eq 'WRAPPER'){$outcome='ABSTAIN'}
             else{
                 $result=@(& $m.Run $ctx $s)
                 if($result.Count -ne 1){throw 'Detector result violates contract.'}
@@ -71,6 +81,7 @@ function Invoke-LfoG2Controller {
             }
         }catch{$outcome='FAILED_ISOLATED'}
         $sw.Stop()
+        if($d.Id -ceq 'confirmation-seeking' -and $outcome -ceq 'OBSERVED_SIGNAL' -and $detail){$userSignal=$detail.Phenomenon}
         [pscustomobject][ordered]@{
             schema_version=1;detector=$d.Id;detector_version=$d.Version;axis=$d.Axis;sensitivity=$s;mode=$Controller.Mode
             actor=$d.Stage;producer=[string]$stage.producer;assessment=$outcome;route=[string]$Row.route;external_evidence_status=$status
@@ -78,6 +89,9 @@ function Invoke-LfoG2Controller {
             content_sha256=(Get-LfoEpistemicHash $raw);elapsed_ms=[Math]::Round($sw.Elapsed.TotalMilliseconds,3)
             phenomenon=if($detail){$detail.Phenomenon}else{$null};rule_id=if($detail){$detail.RuleId}else{$null};claim_scope=if($detail){$detail.Scope}else{$null}
             evidence_start=if($detail){$detail.Start}else{$null};evidence_length=if($detail){$detail.Length}else{$null};evidence_basis='MODEL_TEXT_WITH_WRAPPER_SUFFIX_REMOVED_OR_USER_TEXT_UTF16'
+            linked_user_stage_id=if($linkedUser){[string]$linkedUser.stage_id}else{$null}
+            linked_user_sha256=if($linkedUser){Get-LfoEpistemicHash ([string]$Row.user)}else{$null}
+            linked_user_signal=if($linkedUser){$userSignal}else{$null}
             magnitude=$null;confidence=$null;additional_model_calls=0
         }
     }

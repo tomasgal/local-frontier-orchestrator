@@ -11,6 +11,7 @@
   },
   "detectors": {
     "verification-claim": true,
-    "confirmation-seeking": true
+    "confirmation-seeking": true,
+    "response-stance": false
   }
 }

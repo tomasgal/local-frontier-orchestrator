@@ -7,10 +7,12 @@ function Get-LfoG2VerificationClaim {
     # Do not interpret fenced code, quoted examples or markdown blockquotes.
     # This first implementation abstains on the entire answer when such syntax occurs.
     if($raw -match '(?m)^\s*(?:>|~~~|\x60{3,})' -or $raw -match '["\u2018-\u201f\u00ab\u00bb\x60]'){return 'ABSTAIN'}
+    $all=ConvertTo-LfoG2NormalizedText $raw
+    if($all -match '\b(?:fictional example|sample answer|example sentence|illustrative example|fiktivny priklad|ukazkov\w* odpoved)\b'){return 'ABSTAIN'}
     $explicit='(?:i\s+(?:checked|searched|verified)\s+(?:the\s+)?(?:web|internet|online sources?)|(?:overil|overila|skontroloval|skontrolovala|vyhladal|vyhladala)\s+som\s+(?:to\s+)?(?:na\s+internete|na\s+webe|online))'
     $expanded='(?:i\s+(?:looked it up online|consulted online sources|(?:have\s+)?(?:independently\s+)?confirmed\s+(?:this|it)\s+against\s+(?:\w+\s+)?websites?)|(?:pozrel|pozrela)\s+som\s+sa\s+na\s+(?:web|internet)|(?:dohladal|dohladala)\s+som\s+(?:to\s+)?na\s+(?:internete|webe)|co\s+som\s+prave\s+dohladal\w*\s+na\s+(?:internete|webe))'
     $current='\b(?:in this turn|for this answer|in this response|just now|v tomto turne|v tejto odpovedi|prave)\b'
-    $excluded='\b(?:not|never|if|unless|previous\w*|earlier|yesterday|example\w*|hypothet\w*|quoted|ak|keby|nie|predtym|vcera|minul\w*|priklad\w*|cit\w*)\b'
+    $excluded='\b(?:not|never|if|unless|previous\w*|earlier|yesterday|last\s+(?:year|month|week)|\d+\s+(?:years?|months?|days?)\s+ago|vlani|minuly\s+rok|example\w*|hypothet\w*|quoted|ak|keby|nie|predtym|vcera|minul\w*|priklad\w*|cit\w*)\b'
     $best=$null
     foreach($m in [regex]::Matches($raw,'[^.!?\r\n]+[.!?]?')){
         $t=ConvertTo-LfoG2NormalizedText $m.Value

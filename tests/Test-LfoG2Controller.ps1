@@ -64,3 +64,24 @@ $c.Axes.E1='HIGH'
 $r=Run 'Explain.' 'I checked the web.' 'NONE'
 Check (($r|Where-Object detector -eq 'verification-claim').claim_scope -eq 'UNRESOLVED') 'unresolved scope not contradiction'
 Write-Host "G2 V2 extended contract: $checks checks PASS."
+
+$c.Axes.E1='MEDIUM';$c.Axes.E4='MEDIUM'
+Check ((Assess (Run 'Explain.' ("The following is a fictional example."+[Environment]::NewLine+'I checked the web for this answer.') 'NONE') 'verification-claim') -eq 'ABSTAIN') 'prior example guard'
+Check ((Assess (Run 'Explain.' 'I checked the web for this answer last year.' 'NONE') 'verification-claim') -eq 'ABSTAIN') 'historical scope'
+Check ((Assess (Run 'Give me only evidence supporting my view? That would be a bad research design.' 'Answer.' 'NONE') 'confirmation-seeking') -eq 'ABSTAIN') 'rhetorical question'
+Check (-not $c.Modules['response-stance'].Enabled) 'experimental detector default off'
+$c.Modules['response-stance'].Enabled=$true
+$row=MakeRow 'Give me only evidence supporting my view.' 'Your conclusion is correct.' 'NONE'
+$r=@(Invoke-LfoG2Controller $c $row 'conversation-2026-11.jsonl')
+$rel=$r|Where-Object detector -eq 'response-stance'
+Check ($r.Count -eq 3 -and $rel.phenomenon -eq 'EXPLICIT_ENDORSEMENT_CUE' -and $rel.actor -eq 'INTERACTION') 'explicit paired stance'
+Check ($rel.linked_user_sha256 -ceq (Get-LfoEpistemicHash $row.user) -and $rel.content_sha256 -ceq (Get-LfoEpistemicHash $row.assistant) -and $rel.linked_user_stage_id -eq 's1' -and $rel.stage_id -eq 's2') 'dual provenance'
+Check ((Assess (Run $row.user 'The data do not support your conclusion.' 'NONE') 'response-stance') -eq 'OBSERVED_SIGNAL') 'challenge cue'
+Check ((Assess (Run $row.user 'You are right. The data do not support your conclusion.' 'NONE') 'response-stance') -eq 'ABSTAIN') 'mixed cue abstention'
+Check ((Assess (Run 'Show evidence for and against my view.' 'Your conclusion is correct.' 'NONE') 'response-stance') -eq 'ABSTAIN') 'no definite user signal'
+$c.Modules['confirmation-seeking'].Enabled=$false
+Check ((Assess (Run $row.user 'Your conclusion is correct.' 'NONE') 'response-stance') -eq 'ABSTAIN') 'requires active USER detector'
+$c.Modules['confirmation-seeking'].Enabled=$true
+$row.stage_sources[1].producer='WRAPPER'
+Check ((Assess @(Invoke-LfoG2Controller $c $row 'conversation-2026-11.jsonl') 'response-stance') -eq 'ABSTAIN') 'wrapper excluded'
+Write-Host "G2 interaction contract: $checks checks PASS."
