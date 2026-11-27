@@ -6,8 +6,10 @@ $c.Mode='INTERVENE'
 $checks=0
 function Check($ok,[string]$name){if(-not $ok){throw $name};$script:checks++}
 $plain='I checked the web for this answer.'
-$compound='I checked the web for this answer and found several examples.'
-$clean='The supplied example is insufficient to draw a general conclusion.'
+$compound='I checked the web for this answer and found several reports.'
+$clean='The supplied evidence is insufficient to draw a general conclusion.'
+Check ((Get-LfoG2E1Check $c $compound 'NONE').assessment -eq 'CONTRADICTED') 'compound fixture must actually trigger E1'
+Check ((Get-LfoG2E1Check $c 'I checked the web for this answer and found several examples.' 'NONE').assessment -eq 'ABSTAIN') 'known conservative example guard; no false claim of coverage'
 $bad={param($a,$f,$i) [pscustomobject]@{Raw='raw';Answer=$compound;Valid=$true}}
 $good={param($a,$f,$i) [pscustomobject]@{Raw='raw';Answer=$clean;Valid=$true}}
 $r=Invoke-LfoG2InterventionCascade $c $clean 'NONE' 'CASCADE' 2 {throw 'No call allowed'}
