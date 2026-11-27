@@ -58,3 +58,9 @@ jobs:
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/Test-LfoG2Intervention.ps1
           if($LASTEXITCODE -ne 0){throw 'G2 cascade contract failed'}
+
+      - name: Quality screen offline request contract
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2QualityScreen.ps1 -DryRun -OutputRoot $env:RUNNER_TEMP
+          if($LASTEXITCODE -ne 0){throw 'Quality screen contract failed'}
