@@ -54,13 +54,20 @@ function Invoke-LfoG2Controller {
         $status=Get-LfoExternalEvidenceStatus $Row
         $ctx=[pscustomobject]@{Text=$text;ExternalEvidence=$status;Route=[string]$Row.route;Stage=$d.Stage}
         $sw=[Diagnostics.Stopwatch]::StartNew()
-        $outcome='FAILED_ISOLATED'
+        $outcome='FAILED_ISOLATED';$detail=$null
         try {
             if($d.Stage -eq 'FINAL' -and $stage.producer -eq 'WRAPPER'){$outcome='ABSTAIN'}
             else{
                 $result=@(& $m.Run $ctx $s)
-                if($result.Count -ne 1 -or $result[0] -cnotin @('ABSTAIN','OBSERVED_SIGNAL','CONTRADICTED','INSUFFICIENT_EVIDENCE')){throw 'Detector result violates contract.'}
-                $outcome=[string]$result[0]
+                if($result.Count -ne 1){throw 'Detector result violates contract.'}
+                $r=$result[0]
+                $assessment=if($r -is [string]){$r}else{[string]$r.Assessment}
+                if($assessment -cnotin @('ABSTAIN','OBSERVED_SIGNAL','CONTRADICTED','INSUFFICIENT_EVIDENCE')){throw 'Detector assessment violates contract.'}
+                if($r -isnot [string]){
+                    if($r.Phenomenon -cnotmatch '^[A-Z_]{1,80}$' -or $r.RuleId -cnotmatch '^[A-Z0-9_]{1,80}$' -or $r.Scope -cnotmatch '^[A-Z_]{1,40}$' -or $r.Start -isnot [int] -or $r.Length -isnot [int] -or $r.Start -lt 0 -or $r.Length -lt 1 -or ([long]$r.Start+$r.Length) -gt $text.Length){throw 'Detector evidence span violates contract.'}
+                    $detail=$r
+                }
+                $outcome=$assessment
             }
         }catch{$outcome='FAILED_ISOLATED'}
         $sw.Stop()
@@ -69,6 +76,8 @@ function Invoke-LfoG2Controller {
             actor=$d.Stage;producer=[string]$stage.producer;assessment=$outcome;route=[string]$Row.route;external_evidence_status=$status
             source_file=$SourceFile;epoch=[int]$Row.epoch;turn_id=[int]$Row.turn_id;stage_id=[string]$stage.stage_id
             content_sha256=(Get-LfoEpistemicHash $raw);elapsed_ms=[Math]::Round($sw.Elapsed.TotalMilliseconds,3)
+            phenomenon=if($detail){$detail.Phenomenon}else{$null};rule_id=if($detail){$detail.RuleId}else{$null};claim_scope=if($detail){$detail.Scope}else{$null}
+            evidence_start=if($detail){$detail.Start}else{$null};evidence_length=if($detail){$detail.Length}else{$null};evidence_basis='MODEL_TEXT_WITH_WRAPPER_SUFFIX_REMOVED_OR_USER_TEXT_UTF16'
             magnitude=$null;confidence=$null;additional_model_calls=0
         }
     }

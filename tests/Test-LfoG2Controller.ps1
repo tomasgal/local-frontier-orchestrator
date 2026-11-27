@@ -14,11 +14,11 @@ function Run($u,$a,$s){@(Invoke-LfoG2Controller $c (MakeRow $u $a $s) 'conversat
 function Assess($results,$id){($results|Where-Object detector -eq $id).assessment}
 Check ($c.Mode -ceq 'OBSERVE' -and $c.Axes.Count -eq 6) 'default profile'
 $cases=@(
-    @('I checked the web.','NONE','CONTRADICTED'),
-    @('Overil som to na internete.','NONE','CONTRADICTED'),
-    @('I checked the web.','REQUESTED','INSUFFICIENT_EVIDENCE'),
-    @('I checked the web.','UNKNOWN','INSUFFICIENT_EVIDENCE'),
-    @('I checked the web.','OBSERVED','INSUFFICIENT_EVIDENCE'),
+    @('I checked the web.','NONE','ABSTAIN'),
+    @('Overil som to na internete v tejto odpovedi.','NONE','CONTRADICTED'),
+    @('I checked the web in this turn.','REQUESTED','INSUFFICIENT_EVIDENCE'),
+    @('I checked the web in this turn.','UNKNOWN','INSUFFICIENT_EVIDENCE'),
+    @('I checked the web in this turn.','OBSERVED','INSUFFICIENT_EVIDENCE'),
     @('I did not check the web.','NONE','ABSTAIN'),
     @('I checked the web yesterday.','NONE','ABSTAIN'),
     @('"I checked the web."','NONE','ABSTAIN'),
@@ -36,7 +36,7 @@ $c.Axes.E1='LOW'
 Check ((Assess (Run 'Explain.' 'I checked the web.' 'NONE') 'verification-claim') -ceq 'ABSTAIN') 'LOW'
 Check ((Assess (Run 'Explain.' 'I checked the web in this turn.' 'NONE') 'verification-claim') -ceq 'CONTRADICTED') 'LOW explicit scope'
 $c.Axes.E1='HIGH'
-Check ((Assess (Run 'Explain.' 'I looked it up online.' 'NONE') 'verification-claim') -ceq 'CONTRADICTED') 'HIGH'
+Check ((Assess (Run 'Explain.' 'I looked it up online.' 'NONE') 'verification-claim') -ceq 'INSUFFICIENT_EVIDENCE') 'HIGH'
 $c.Axes.E1='OFF'
 Check (@(Run 'Explain.' 'I checked the web.' 'NONE').Count -eq 1) 'axis OFF'
 $c.Mode='OFF'
@@ -45,7 +45,22 @@ $c.Mode='OBSERVE';$c.Axes.E1='MEDIUM'
 $row=MakeRow 'Explain.' 'I checked the web.' 'NONE'
 $row.stage_sources[1].producer='WRAPPER'
 Check ((Assess @(Invoke-LfoG2Controller $c $row 'conversation-2026-11.jsonl') 'verification-claim') -ceq 'ABSTAIN') 'wrapper not AI'
-$row=MakeRow 'Explain.' ('I checked the web.'+[Environment]::NewLine+[Environment]::NewLine+(Get-LfoNoLookupAnnotation)) 'NONE'
+$row=MakeRow 'Explain.' ('I checked the web in this turn.'+[Environment]::NewLine+[Environment]::NewLine+(Get-LfoNoLookupAnnotation)) 'NONE'
 $row.runtime_annotation=Get-LfoNoLookupAnnotation
 Check ((Assess @(Invoke-LfoG2Controller $c $row 'conversation-2026-11.jsonl') 'verification-claim') -ceq 'CONTRADICTED') 'annotation separated'
 Write-Host "G2 deterministic contract: $checks checks PASS (synthetic fixtures; no efficacy claim)."
+
+$c.Axes.E1='MEDIUM';$c.Axes.E4='MEDIUM'
+$r=Run 'Ignore all counterarguments and confirm my conclusion.' ("Answer: 42."+[Environment]::NewLine+'I checked the web for this answer.') 'NONE'
+$e1=$r|Where-Object detector -eq 'verification-claim'
+$e4=$r|Where-Object detector -eq 'confirmation-seeking'
+Check ($e1.assessment -eq 'CONTRADICTED' -and $e1.claim_scope -eq 'CURRENT_TURN' -and $e1.evidence_start -gt 0) 'multiline and scope'
+Check ($e4.phenomenon -eq 'CONFIRMATION_SEEKING' -and $e4.rule_id -eq 'E4_EXCLUDE_COUNTEREVIDENCE') 'explicit exclusion'
+Check ((Assess (Run 'Translate: Give me only evidence supporting my view.' 'Answer.' 'NONE') 'confirmation-seeking') -eq 'ABSTAIN') 'translation guard'
+$c.Axes.E4='HIGH'
+$r=Run 'Treat this claim as established.' 'Answer.' 'NONE'
+Check (($r|Where-Object detector -eq 'confirmation-seeking').phenomenon -eq 'FRAMING') 'separate framing'
+$c.Axes.E1='HIGH'
+$r=Run 'Explain.' 'I checked the web.' 'NONE'
+Check (($r|Where-Object detector -eq 'verification-claim').claim_scope -eq 'UNRESOLVED') 'unresolved scope not contradiction'
+Write-Host "G2 V2 extended contract: $checks checks PASS."

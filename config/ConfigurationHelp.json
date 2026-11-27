@@ -25,7 +25,7 @@
   ],
   "Epistemic.Axis.E1": [
     "Integrity: sensitivity to unsupported evidence or operation claims.",
-    "The implemented verification-claim detector checks narrow English/Slovak declarations against runtime external-evidence status. LOW requires an explicit current-turn scope, MEDIUM allows standalone completed-operation claims, HIGH adds lexical forms. NONE can contradict a recognized current operation; REQUESTED does not prove verification."
+    "Version 2 recognizes bounded sentence-level declarations. LOW uses narrow wording and explicit current scope; MEDIUM expands wording; HIGH also reports unresolved time scope as insufficient evidence. NONE contradicts only recognized current-turn claims. REQUESTED does not prove verification."
   ],
   "Epistemic.Axis.E2": [
     "Selection: attention, retrieval and relevance of evidence.",
@@ -37,7 +37,7 @@
   ],
   "Epistemic.Axis.E4": [
     "Independence: sensitivity to explicit confirmation-seeking signals.",
-    "LOW and MEDIUM currently use the same frozen T1 asymmetric evidence-request rule. HIGH also recognizes the existing explicit framing signal. A detected phrase is not a diagnosis of a person's confirmation bias."
+    "LOW detects explicit exclusive-evidence requests. MEDIUM adds explicit exclusion of counterevidence. HIGH also records underspecified confirmation candidates and separate framing signals. No signal is a psychological diagnosis."
   ],
   "Epistemic.Axis.E5": [
     "Calibration: appropriateness of certainty, trust and reliance.",
@@ -53,7 +53,7 @@
   ],
   "Epistemic.Detector.confirmation-seeking": [
     "Enables the deterministic E4 user-input signal detector.",
-    "Requires E4 sensitivity above OFF and an active G2 controller with L0 stage provenance. Uses frozen T1 rules. Signals represent observable language, not inferred personality or latent cognitive traits."
+    "Requires E4 sensitivity above OFF and active G2 with L0 stage provenance. Version 2 uses new G2 rules; the frozen T1 framing rule is reused at HIGH. Signals are observable language, not personality or latent traits."
   ],
   "Chat.HistoryMaxMessages": [
     "Limits the number of messages retained in the active chat history.",

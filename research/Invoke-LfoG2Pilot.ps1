@@ -4,7 +4,8 @@ param(
     [string]$RepositoryRoot,
     [string]$OutputRoot,
     [string]$ExpectedSource,
-    [switch]$OfflineOnly
+    [switch]$OfflineOnly,
+    [switch]$Pilot2
 )
 $ErrorActionPreference='Stop'
 $state=$null
@@ -25,11 +26,20 @@ $livePath=Join-Path $PSScriptRoot 'g2/LivePrompts.json'
 $bank=Get-Content -LiteralPath $bankPath -Raw -Encoding UTF8|ConvertFrom-Json
 $liveBank=Get-Content -LiteralPath $livePath -Raw -Encoding UTF8|ConvertFrom-Json
 Copy-Item -LiteralPath $bankPath -Destination (Join-Path $run 'pilot-cases.json')
+$extensionHash=$null
+if($Pilot2){
+    $extensionPath=Join-Path $PSScriptRoot 'g2/PilotCases02.json'
+    $extension=Get-Content -LiteralPath $extensionPath -Raw -Encoding UTF8|ConvertFrom-Json
+    if($extension.schemaVersion -ne 1){throw 'Unknown extension schema.'}
+    $bank.cases=@($bank.cases)+@($extension.cases)
+    Copy-Item -LiteralPath $extensionPath -Destination (Join-Path $run 'pilot-cases02.json')
+    $extensionHash=(Get-FileHash -LiteralPath $extensionPath -Algorithm SHA256).Hash
+}
 Copy-Item -LiteralPath $livePath -Destination (Join-Path $run 'live-prompts.json')
 $sourceFiles=@('LFO.ps1','src/QwenChat.ps1','src/QwenMemory.ps1','src/LfoEpistemicController.ps1','src/epistemic/VerificationClaim.ps1','src/epistemic/ConfirmationSeeking.ps1','src/LfoEvidenceProvenance.ps1','src/LfoL4Runtime.ps1','config/EpistemicRegistry.psd1')
 $hashes=[ordered]@{}
 foreach($file in $sourceFiles){$hashes[$file]=(Get-FileHash -LiteralPath (Join-Path $RepositoryRoot $file) -Algorithm SHA256).Hash}
-$manifest=[ordered]@{schemaVersion=1;purpose='G2 exploratory detector and integration pilot';sourceCommit=if($state){$state.SourceCommit}else{'CI checkout'};sourceHashes=$hashes;runnerSha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash;bankSha256=(Get-FileHash -LiteralPath $bankPath -Algorithm SHA256).Hash;liveBankSha256=(Get-FileHash -LiteralPath $livePath -Algorithm SHA256).Hash;powerShell=$PSVersionTable.PSVersion.ToString();startedUtc=[DateTime]::UtcNow.ToString('o');offlineOnly=[bool]$OfflineOnly;model=$null;context=$null;ollamaVersion=$null;modelDigest=$null;status='STARTED'}
+$manifest=[ordered]@{schemaVersion=1;purpose='G2 exploratory detector and integration pilot';sourceCommit=if($state){$state.SourceCommit}else{'CI checkout'};sourceHashes=$hashes;runnerSha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash;bankSha256=(Get-FileHash -LiteralPath $bankPath -Algorithm SHA256).Hash;liveBankSha256=(Get-FileHash -LiteralPath $livePath -Algorithm SHA256).Hash;powerShell=$PSVersionTable.PSVersion.ToString();startedUtc=[DateTime]::UtcNow.ToString('o');offlineOnly=[bool]$OfflineOnly;pilot=if($Pilot2){2}else{1};extensionSha256=$extensionHash;model=$null;context=$null;ollamaVersion=$null;modelDigest=$null;status='STARTED'}
 $offline=New-Object Collections.Generic.List[object]
 $live=New-Object Collections.Generic.List[object]
 $failure=$null
@@ -57,7 +67,7 @@ try{
             $observations=@(Invoke-LfoG2Controller $c $row 'conversation-2026-11.jsonl'|Where-Object detector -eq $case.detector)
             if($observations.Count -ne 1 -or $observations[0].assessment -eq 'FAILED_ISOLATED'){throw ('Detector execution failed: '+$case.id+' '+$level)}
             $o=$observations[0]
-            $offline.Add([pscustomobject]@{id=$case.id;detector=$case.detector;sensitivity=$level;label=$case.label;assessment=$o.assessment;evidence=$case.evidence;elapsed_ms=$o.elapsed_ms;additional_model_calls=$o.additional_model_calls})
+            $offline.Add([pscustomobject]@{id=$case.id;detector=$case.detector;sensitivity=$level;label=$case.label;assessment=$o.assessment;detector_version=$o.detector_version;phenomenon=$o.phenomenon;rule_id=$o.rule_id;claim_scope=$o.claim_scope;evidence_start=$o.evidence_start;evidence_length=$o.evidence_length;evidence=$case.evidence;elapsed_ms=$o.elapsed_ms;additional_model_calls=$o.additional_model_calls})
         }
     }
     $offline|Export-Csv -LiteralPath (Join-Path $run 'offline-results.csv') -NoTypeInformation -Encoding UTF8
