@@ -1,0 +1,207 @@
+{
+  "schemaVersion": 2,
+  "status": "EXPERIMENTAL_ONLY",
+  "defaultProfile": "M0R0P0",
+  "productionEnabled": false,
+  "coordinates": [
+    "E1",
+    "E2",
+    "E3",
+    "E4",
+    "E5",
+    "E6"
+  ],
+  "topology": {
+    "status": "HYPOTHESIS",
+    "core": [
+      "E1",
+      "E3",
+      "E5",
+      "E6"
+    ],
+    "modulation": [
+      "E2",
+      "E4"
+    ],
+    "bridge": "E5",
+    "orientation": "rows outcomes; columns primary action focus; UNKNOWN is not zero",
+    "matrix": [
+      [
+        "SELF",
+        "UNKNOWN",
+        "UNKNOWN",
+        "UNKNOWN",
+        "CONDITIONAL",
+        "POSITIVE"
+      ],
+      [
+        "UNKNOWN",
+        "SELF",
+        "UNKNOWN",
+        "CONDITIONAL",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      [
+        "POSITIVE",
+        "CONDITIONAL",
+        "SELF",
+        "CONDITIONAL",
+        "POSITIVE",
+        "POSITIVE"
+      ],
+      [
+        "UNKNOWN",
+        "CONDITIONAL",
+        "UNKNOWN",
+        "SELF",
+        "CONDITIONAL",
+        "CONDITIONAL"
+      ],
+      [
+        "CONDITIONAL",
+        "CONDITIONAL",
+        "POSITIVE",
+        "CONDITIONAL",
+        "SELF",
+        "CONDITIONAL"
+      ],
+      [
+        "POSITIVE",
+        "UNKNOWN",
+        "POSITIVE",
+        "CONDITIONAL",
+        "POSITIVE",
+        "SELF"
+      ]
+    ]
+  },
+  "operators": [
+    {
+      "id": "MASK_CONTEXT",
+      "functions": [
+        "E2",
+        "E4",
+        "E5"
+      ],
+      "requires": "ORACLE_SAFE_MASK",
+      "status": "EXPERIMENTAL"
+    },
+    {
+      "id": "RELATE_EVIDENCE",
+      "functions": [
+        "E1",
+        "E2",
+        "E3"
+      ],
+      "requires": "ORACLE_LITERAL_RELATIONS",
+      "status": "EXPERIMENTAL"
+    },
+    {
+      "id": "PRESERVE_SUPPORT",
+      "functions": [
+        "E3",
+        "E5"
+      ],
+      "requires": "SCOPE_PROTECTION",
+      "status": "EXPERIMENTAL"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "M0R0P0",
+      "mask": false,
+      "relations": false,
+      "preserve": false,
+      "operators": []
+    },
+    {
+      "id": "M0R0P1",
+      "mask": false,
+      "relations": false,
+      "preserve": true,
+      "operators": [
+        "PRESERVE_SUPPORT"
+      ]
+    },
+    {
+      "id": "M0R1P0",
+      "mask": false,
+      "relations": true,
+      "preserve": false,
+      "operators": [
+        "RELATE_EVIDENCE"
+      ]
+    },
+    {
+      "id": "M0R1P1",
+      "mask": false,
+      "relations": true,
+      "preserve": true,
+      "operators": [
+        "RELATE_EVIDENCE",
+        "PRESERVE_SUPPORT"
+      ]
+    },
+    {
+      "id": "M1R0P0",
+      "mask": true,
+      "relations": false,
+      "preserve": false,
+      "operators": [
+        "MASK_CONTEXT"
+      ]
+    },
+    {
+      "id": "M1R0P1",
+      "mask": true,
+      "relations": false,
+      "preserve": true,
+      "operators": [
+        "MASK_CONTEXT",
+        "PRESERVE_SUPPORT"
+      ]
+    },
+    {
+      "id": "M1R1P0",
+      "mask": true,
+      "relations": true,
+      "preserve": false,
+      "operators": [
+        "MASK_CONTEXT",
+        "RELATE_EVIDENCE"
+      ]
+    },
+    {
+      "id": "M1R1P1",
+      "mask": true,
+      "relations": true,
+      "preserve": true,
+      "operators": [
+        "MASK_CONTEXT",
+        "RELATE_EVIDENCE",
+        "PRESERVE_SUPPORT"
+      ]
+    }
+  ],
+  "composition": {
+    "order": [
+      "MASK_CONTEXT",
+      "RELATE_EVIDENCE",
+      "PRESERVE_SUPPORT"
+    ],
+    "deduplicate": true,
+    "recursivePropagation": false,
+    "unknownPolicy": "ABSTAIN_MASK",
+    "maskProtectedRoles": [
+      "TASK",
+      "EVIDENCE",
+      "CONSTRAINT",
+      "PREFERENCE",
+      "ASSUMPTION",
+      "QUOTATION_TASK",
+      "UNKNOWN"
+    ],
+    "maxExtraModelCalls": 0
+  }
+}

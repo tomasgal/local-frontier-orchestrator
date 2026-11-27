@@ -88,3 +88,9 @@ jobs:
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2CesScreen.ps1 -SelfTest
           if($LASTEXITCODE -ne 0){throw 'CES screen contract failed'}
+
+      - name: CES12 factorial and literal relation contract
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2CesScreen12.ps1 -SelfTest
+          if($LASTEXITCODE -ne 0){throw 'CES12 screen contract failed'}

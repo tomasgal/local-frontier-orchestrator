@@ -178,3 +178,7 @@ The reordered conceptual heatmap concentrates all eight hypothesized positive di
 | CES-C13 | Independent reconstructive inference without prior draft | HYPOTHESIS; R9/R11 and LSU-E analogy; matched feedback controls |
 
 Pilot 11 adds an experimental config and composer with deduplication, protected-span inhibition and no recursive propagation. No live shaping profile, parser, memory writes, or production setting changes. CheckList (Ribeiro et al., ACL 2020) supplies behavioral test design; NIST full factorial design supplies interaction methodology. Full source and transfer gates remain mandatory for promotion.
+
+## 12. Pilot 12: relation binding and support counterforce (2026-11-27)
+
+P11 screening reported a ceiling in directional correctness and a reduction of support under masking, with structural representation causing a supplier association error. These are engineering observations, not demonstrated human effects. Add candidates CES-C14 RELATE_EVIDENCE (literal source-linked subject/attribute/value associations, no additional independent evidence), and CES-C15 PRESERVE_SUPPORT (scope-bounded support/uncertainty instruction as candidate counterforce). Both EXPERIMENTAL, not validated. [CES12 protocol](../research/g2/CES12.md) specifies 2^3 factors M/R/P, 44 cases and 352 calls, source fidelity guards, explicit interaction tests and adversarial controls. No parser inference or production changes. The symbolic topology remains a hypothesis; no default or numeric shape changes. Source and methodology promotion gate remains mandatory.
