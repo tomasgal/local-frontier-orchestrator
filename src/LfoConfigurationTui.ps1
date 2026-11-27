@@ -1,4 +1,11 @@
 # DOS-inspired two-panel terminal UI. Nerd Font glyphs are optional; no font files.
+function Get-LfoConfigurationViewport([int]$Columns,[int]$Lines){
+    if($Columns -lt 65 -or $Lines -lt 18){throw 'Terminal too small for full-screen UI.'}
+    # Leave the final cell to EL; never trigger terminal auto-wrap.
+    $width=$Columns-1
+    $left=[Math]::Min(26,[Math]::Max(19,[int][Math]::Floor($width/5)))
+    [pscustomobject]@{Width=$width;Height=$Lines;Left=$left;Right=$width-$left-3;Rows=$Lines-6}
+}
 function Show-LfoConfigurationTui {
     param($Registry,[hashtable]$Values,[string]$Path,[string]$Section='Epistemic',[switch]$Session,[switch]$Ascii)
     $work=@{};foreach($id in $Values.Keys){$work[$id]=$Values[$id]}
@@ -55,23 +62,30 @@ function Show-LfoConfigurationTui {
         }catch{return $_.Exception.Message}
     }
     if($useAnsi){
+        $oldEncoding=$null
         try{
+            $oldEncoding=[Console]::OutputEncoding
+            [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
             [Console]::Write($esc+'[?1049h'+$esc+'[?25l')
+            $lastWidth=0;$lastHeight=0;$canPoll=$true
             while($true){
-                $width=[Math]::Min(132,[Console]::WindowWidth-1)
-                $height=[Math]::Min(40,[Console]::WindowHeight)
-                if($width -lt 64 -or $height -lt 18){throw 'Terminal too small for full-screen UI.'}
+                $view=Get-LfoConfigurationViewport ([Console]::WindowWidth) ([Console]::WindowHeight)
+                $width=$view.Width;$height=$view.Height
                 $items=@($Registry.Values|Where-Object Section -eq $sections[$si])
                 if($ri -ge $items.Count){$ri=[Math]::Max(0,$items.Count-1)}
-                $rows=$height-8
+                $rows=$view.Rows
                 if($ri -lt $offset){$offset=$ri};if($ri -ge $offset+$rows){$offset=$ri-$rows+1}
-                $left=19;$right=$width-$left-3
+                $left=$view.Left;$right=$view.Right
                 $blue=$esc+'[37;44m';$cyan=$esc+'[30;46m';$yellow=$esc+'[93;44m';$grey=$esc+'[34;47m'
                 $rule=if($Ascii){'-'}else{[string][char]0x2500}
                 $sb=New-Object Text.StringBuilder
+                if($width -ne $lastWidth -or $height -ne $lastHeight){
+                    [void]$sb.Append($blue+$esc+'[2J')
+                    $lastWidth=$width;$lastHeight=$height
+                }
                 [void]$sb.Append($esc+'[H'+$blue+(Fit ' LFO-CONFIG  |  Configuration Manager  |  v9.7-dev' $width)+$esc+'[K')
-                [void]$sb.Append([Environment]::NewLine+$cyan+(Fit (' '+$sections[$si]+'  |  '+$(if($Session){'session + persistent'}else{'persistent settings'})) $width)+$blue)
-                [void]$sb.Append([Environment]::NewLine+(Fit ($rule*$width) $width))
+                [void]$sb.Append([Environment]::NewLine+$cyan+(Fit (' '+$sections[$si]+'  |  '+$(if($Session){'session + persistent'}else{'persistent settings'})) $width)+$esc+'[K'+$blue)
+                [void]$sb.Append([Environment]::NewLine+(Fit ($rule*$width) $width)+$esc+'[K')
                 for($i=0;$i -lt $rows;$i++){
                     $leftText=''
                     if($i -lt $sections.Count){$glyph=if($Ascii){'>'}else{[string][char]$icons[$i]};$leftText=' '+$glyph+' '+$sections[$i]}
@@ -90,10 +104,21 @@ function Show-LfoConfigurationTui {
                 }
                 $hint=if($items.Count){$items[$ri].Description}else{'No settings.'}
                 $mark=if($Ascii){'i'}else{[string][char]0xf05a}
-                [void]$sb.Append([Environment]::NewLine+$yellow+(Fit (' '+$mark+' '+$hint) $width))
-                [void]$sb.Append([Environment]::NewLine+$blue+(Fit (' '+$status) $width))
-                [void]$sb.Append([Environment]::NewLine+$grey+(Fit ' F1 Help  F2 Save  F5 Profiles  F9 Validate  F10 Exit  Esc Cancel' $width)+$esc+'[0m'+$esc+'[J')
+                [void]$sb.Append([Environment]::NewLine+$yellow+(Fit (' '+$mark+' '+$hint) $width)+$esc+'[K')
+                [void]$sb.Append([Environment]::NewLine+$blue+(Fit (' '+$status) $width)+$esc+'[K')
+                [void]$sb.Append([Environment]::NewLine+$grey+(Fit ' F1 Help  F2 Save  F4 Font  F5 Profiles  F9 Validate  F10 Exit' $width)+$esc+'[K'+$esc+'[0m')
                 [Console]::Write($sb.ToString())
+                # Resize while idle when the console exposes nonblocking key polling.
+                if($canPoll){
+                    $resized=$false
+                    try{
+                        while(-not [Console]::KeyAvailable){
+                            if([Console]::WindowWidth -ne ($width+1) -or [Console]::WindowHeight -ne $height){$resized=$true;break}
+                            Start-Sleep -Milliseconds 100
+                        }
+                    }catch{$canPoll=$false}
+                    if($resized){continue}
+                }
                 $k=[Console]::ReadKey($true).Key
                 switch($k){
                     'Tab' {$focus=1-$focus}
@@ -105,6 +130,7 @@ function Show-LfoConfigurationTui {
                     'Enter' {if($focus -eq 0){$focus=1}else{if($items.Count){[Console]::Write($esc+'[?25h'+$esc+'[0m'+$esc+'[2J'+$esc+'[H');$status=EditValue $items[$ri];[Console]::Write($esc+'[?25l')}}}
                     'F1' {$status='Arrows: select/change; Tab: focus; Enter: numeric edit; F2: persist; Esc: cancel.'}
                     'F2' {$status=DoSave}
+                    'F4' {$Ascii=-not $Ascii;$status=if($Ascii){'ASCII symbols'}else{'Nerd Font symbols (requires client font)'}}
                     'F5' {[Console]::Write($esc+'[?25h'+$esc+'[0m'+$esc+'[2J'+$esc+'[H');$status=ProfileAction;[Console]::Write($esc+'[?25l')}
                     'F9' {$status=DoValidate}
                     'Escape' {return $null}
@@ -112,7 +138,11 @@ function Show-LfoConfigurationTui {
                 }
             }
         }catch{Write-Host 'Full-screen console unavailable; switching to line mode.'}
-        finally{[Console]::Write($esc+'[0m'+$esc+'[?25h'+$esc+'[?1049l')}
+        finally{
+            try{[Console]::Write($esc+'[0m'+$esc+'[?25h'+$esc+'[?1049l')}finally{
+                if($null -ne $oldEncoding){[Console]::OutputEncoding=$oldEncoding}
+            }
+        }
     }
     while($true){
         Write-Host ('LFO-CONFIG | '+$sections[$si]+' | '+$status)

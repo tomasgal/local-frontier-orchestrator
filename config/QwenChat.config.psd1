@@ -1,4 +1,4 @@
-@{
+﻿@{
     # Common QwenChat defaults. Host-specific GPU/CPU/context placement remains in the Ollama model/runtime profile.
     Model = 'qwen3.5:4b-q4_K_M'
     BaseUri = 'http://127.0.0.1:11434'

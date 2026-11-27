@@ -887,7 +887,7 @@ Assert-Lfo ($l4Occurrences -eq 1) ("Expected exactly one default L4 config line,
 $configText=$configText.Replace($l4Default,$l4Line)
 Assert-Lfo ($configText.Contains($l4Line)) 'Generated LFO config text does not contain the resolved L4 line.'
 $installConfigPath=Join-Path $ConfigRoot 'QwenChat.install.local.psd1'
-[IO.File]::WriteAllText($installConfigPath,$configText,$utf8)
+[IO.File]::WriteAllText($installConfigPath,$configText,(New-Object Text.UTF8Encoding($true))) # BOM required by Windows PowerShell 5.1 PSD1 parser
 $parsedInstallConfig=Import-PowerShellDataFile -LiteralPath $installConfigPath
 Assert-Lfo ([string]$parsedInstallConfig.BaseUri -ceq $ollamaBase) 'Generated LFO config has the wrong Ollama BaseUri.'
 Assert-Lfo ([bool]$parsedInstallConfig.Memory.L0StageSourcesEnabled) 'Generated LFO config did not enable L0 stage-source provenance.'
