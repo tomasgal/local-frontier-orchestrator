@@ -51,3 +51,11 @@ if($h.Action -notmatch 'Read-only'){throw 'Read-only help semantics'}
 $wrapped=@(Split-LfoConfigurationHelpText 'one two three four five' 8)
 if(($wrapped -join ' ') -ne 'one two three four five' -or @($wrapped|Where-Object{$_.Length -gt 8}).Count){throw 'Help wrap'}
 Write-Host 'Context help and footer layout PASS.'
+
+$ep=Import-PowerShellDataFile (Join-Path $root 'config/EpistemicRegistry.psd1')
+foreach($axis in $ep.Axes.Keys){
+    $id='Epistemic.Axis.'+$axis
+    if($r[$id].DisplayLabel -cne ($axis+' - '+$ep.Axes[$axis]) -or $r[$id].Id -cne $id){throw ('Axis display label contract: '+$axis)}
+}
+foreach($entry in $r.Values){if(-not $entry.DisplayLabel){throw ('Missing display label: '+$entry.Id)}}
+Write-Host 'Axis display labels PASS (canonical registry; stable configuration IDs).'

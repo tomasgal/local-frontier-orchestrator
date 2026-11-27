@@ -65,7 +65,8 @@ function Show-LfoConfigurationTui {
         if($null -eq $entry){return}
         $h=Get-LfoConfigurationHint $entry ([bool]$Session) 1
         $lines=@(
-            $entry.Id
+            $entry.DisplayLabel
+            ('Parameter ID: '+$entry.Id)
             ''
             $h.Meaning
             ''
@@ -160,7 +161,7 @@ function Show-LfoConfigurationTui {
                     $index=$i+$offset
                     if($index -lt $items.Count){
                         $item=$items[$index];$v=Label (Get-LfoConfigurationValue $Registry $work $item.Id)
-                        $key=($item.Id -replace '^(Chat\.|Epistemic\.|Session\.|Runtime\.|Services\.|Models\.)','')
+                        $key=$item.DisplayLabel
                         $suffix=if($item.Editable){' ['+$item.Apply+']'}else{' [RO]'}
                         $rowText=Fit ($key+' = '+$v+$suffix) $right
                         $rc=if($focus -eq 1 -and $index -eq $ri){$cyan}else{$blue}
@@ -217,7 +218,7 @@ function Show-LfoConfigurationTui {
     while($true){
         Write-Host ('LFO-CONFIG | '+$sections[$si]+' | '+$status)
         $items=@($Registry.Values|Where-Object Section -eq $sections[$si])
-        for($i=0;$i -lt $items.Count;$i++){Write-Host ('{0,2} {1} = {2} [{3}]' -f ($i+1),$items[$i].Id,(Label (Get-LfoConfigurationValue $Registry $work $items[$i].Id)),$items[$i].Apply)}
+        for($i=0;$i -lt $items.Count;$i++){Write-Host ('{0,2} {1} = {2} [{3}]' -f ($i+1),$items[$i].DisplayLabel,(Label (Get-LfoConfigurationValue $Registry $work $items[$i].Id)),$items[$i].Apply)}
         Write-Host 'n/p section | number edit | h<number> help | s save | f profiles | v validate | q exit | x cancel'
         $choice=Read-Host 'Select'
         if($null -eq $choice -or $choice -eq 'x'){return $null}

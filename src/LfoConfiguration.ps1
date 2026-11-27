@@ -4,7 +4,7 @@ function Get-LfoConfigurationRegistry {
     param([hashtable]$BaseConfig,$InstallState,[string]$RepositoryRoot)
     $r=[ordered]@{}
     function AddEntry($id,$section,$value,$kind,$choices,$apply,$description,$editable=$true){
-        $r[$id]=[pscustomobject]@{Id=$id;Section=$section;Default=$value;Kind=$kind;Choices=@($choices);Apply=$apply;Description=$description;LongHelp='';Editable=$editable}
+        $r[$id]=[pscustomobject]@{Id=$id;Section=$section;Default=$value;Kind=$kind;Choices=@($choices);Apply=$apply;Description=$description;LongHelp='';DisplayLabel=($id -replace '^(Chat\.|Epistemic\.|Session\.|Runtime\.|Services\.|Models\.)','');Editable=$editable}
     }
     $profile=Get-Content -LiteralPath (Join-Path $RepositoryRoot 'config/EpistemicProfile.json') -Raw -Encoding UTF8|ConvertFrom-Json
     $ep=Import-PowerShellDataFile -LiteralPath (Join-Path $RepositoryRoot 'config/EpistemicRegistry.psd1')
@@ -13,6 +13,8 @@ function Get-LfoConfigurationRegistry {
         $prop=$profile.axes.PSObject.Properties[$axis];$level=if($prop){[string]$prop.Value}else{'OFF'}
         $count=@($ep.Detectors|Where-Object Axis -eq $axis).Count
         AddEntry ('Epistemic.Axis.'+$axis) 'Epistemic' $level 'enum' @('OFF','LOW','MEDIUM','HIGH') 'Live' ($ep.Axes[$axis]+'; registered detectors: '+$count)
+        # Display names are derived from the canonical axis registry, not a second taxonomy.
+        $r['Epistemic.Axis.'+$axis].DisplayLabel=($axis+' - '+[string]$ep.Axes[$axis])
     }
     foreach($d in @($ep.Detectors|Sort-Object Id)){
         $p=$profile.detectors.PSObject.Properties[$d.Id]
