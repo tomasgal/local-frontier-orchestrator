@@ -1,0 +1,52 @@
+name: Publish immutable LFO v9.6.8
+on:
+  push:
+    branches: [main]
+    paths: ['docs/RELEASE_V9.6.8.md','.github/workflows/publish-v968.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: publish-lfo-v9-6-8
+  cancel-in-progress: false
+jobs:
+  acceptance:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'release-v9.6.8-publish')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with: {persist-credentials: false}
+      - name: Parse and test
+        shell: powershell
+        run: |
+          $targets=@('LFO.ps1','install\Install-LFO.ps1','research\Invoke-LfoResearchTooling.ps1','tests\Test-ResearchToolingV965.ps1')
+          foreach($target in $targets){$tokens=$null;$errors=$null;[void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $target),[ref]$tokens,[ref]$errors);if($errors.Count -gt 0){throw "Parser rejected $target"}}
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-LfoUmaBootstrapContract.ps1
+          if($LASTEXITCODE -ne 0){throw 'UMA and legacy-profile source contract failed'}
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-ResearchToolingV965.ps1
+          if($LASTEXITCODE -ne 0){throw 'Research-tooling tests failed'}
+          & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-LfoCodexInstallerGuard.ps1 -BootstrapPath .\install\Install-LFO.ps1
+          if($LASTEXITCODE -ne 0){throw 'Installer guard failed'}
+  publish:
+    needs: acceptance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with: {persist-credentials: false, fetch-depth: 1}
+      - name: Publish immutable release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          if gh api "repos/$GH_REPO/git/ref/tags/v9.6.8" >/dev/null 2>&1; then exit 1; fi
+          if gh release view v9.6.8 >/dev/null 2>&1; then exit 1; fi
+          tag_object=$(gh api --method POST "repos/$GH_REPO/git/tags" -f tag="v9.6.8" -f message="Local Frontier Orchestrator v9.6.8 - Minimal epistemic provenance" -f object="$GITHUB_SHA" -f type="commit" --jq '.sha')
+          gh api --method POST "repos/$GH_REPO/git/refs" -f ref="refs/tags/v9.6.8" -f sha="$tag_object" >/dev/null
+          gh release create v9.6.8 --verify-tag --title "LFO v9.6.8 - Minimal epistemic provenance" --notes-file docs/RELEASE_V9.6.8.md --latest
+          immutable=false
+          for attempt in 1 2 3 4 5; do immutable=$(gh release view v9.6.8 --json isImmutable --jq '.isImmutable') || immutable=unknown; [[ "$immutable" == "true" ]] && break; sleep 2; done
+          if [[ "$immutable" != "true" ]]; then gh release delete v9.6.8 --yes --cleanup-tag || true; exit 1; fi

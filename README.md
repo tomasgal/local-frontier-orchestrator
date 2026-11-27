@@ -1,8 +1,8 @@
 # Local Frontier Orchestrator
 
-**v9.6.7 — interactive answer and reasoning streaming, explicit routing, local command validation and phase telemetry, on the stable v9.6.6 Windows UMA baseline.** v9.6.5 retains the accepted v9.6.4 security hardening, v9.6.3 Windows runtime behavior, L0–L4 memory semantics and High-priority inference profile. It adds provider-neutral offline tooling for mediator parameter sweeps, frozen-response/replay-bank validation and paired neutral-vs-leading model audits; it does not promote P1/P2 into the normal response path.
+**v9.6.8 — runtime-owned evidence provenance, a dedicated forced-LOCAL policy, separated runtime annotations and single-line streaming progress.** Builds on v9.6.7 interactive streaming and routing and the v9.6.6 Windows UMA baseline. v9.6.5 retains the accepted v9.6.4 security hardening, v9.6.3 Windows runtime behavior, L0–L4 memory semantics and High-priority inference profile. It adds provider-neutral offline tooling for mediator parameter sweeps, frozen-response/replay-bank validation and paired neutral-vs-leading model audits; it does not promote P1/P2 into the normal response path.
 
-Release notes: [v9.6.7 interactive runtime](docs/RELEASE_V9.6.7.md) · [v9.6.6 UMA](docs/RELEASE_V9.6.6.md) · [v9.6.5 research tooling](docs/RELEASE_V9.6.5.md) · [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 runtime baseline](docs/RELEASE_V9.6.3.md).
+Release notes: [v9.6.8 epistemic provenance](docs/RELEASE_V9.6.8.md) · [v9.6.7 interactive runtime](docs/RELEASE_V9.6.7.md) · [v9.6.6 UMA](docs/RELEASE_V9.6.6.md) · [v9.6.5 research tooling](docs/RELEASE_V9.6.5.md) · [v9.6.4 security release](docs/RELEASE_V9.6.4.md) · [v9.6.3 runtime baseline](docs/RELEASE_V9.6.3.md).
 
 ## v9.6.5: controlled Human–AI research tooling
 
@@ -84,13 +84,13 @@ From Windows PowerShell 5.1, choose the bootstrap command for the profile you wa
 **CPU bootstrap** — selects the CPU model profile (`num_gpu 0`, 5120-token context) and automatically starts Qwen with that profile after a successful install:
 
 ~~~powershell
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.7/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile CPU -SourceRef refs/tags/v9.6.7
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.8/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile CPU -SourceRef refs/tags/v9.6.8
 ~~~
 
 **GPU bootstrap** — selects the GPU model profile (`num_gpu 99`, 8192-token context; Ollama performs the actual supported GPU offload) and automatically starts Qwen with that profile after a successful install:
 
 ~~~powershell
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.7/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile GPU -SourceRef refs/tags/v9.6.7
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.8/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile GPU -SourceRef refs/tags/v9.6.8
 ~~~
 
 ### UMA bootstrap (AMD unified-memory host)
@@ -100,7 +100,7 @@ A third `-Profile UMA` is available for the Windows 11 Minisforum / Ryzen AI Max
 The **UMA bootstrap** command is:
 
 ~~~powershell
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.7/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile UMA -SourceRef refs/tags/v9.6.7 -SkipLaunch
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.8/install/Install-LFO.ps1" -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile UMA -SourceRef refs/tags/v9.6.8 -SkipLaunch
 ~~~
 
 The initial `-SkipLaunch` keeps the running inference workload unchanged until a deliberate smoke test. The installer still requires the separate LFO/SurrealDB/Codex prerequisites and runs its L4 acceptance suite. Use `Start-LFO-UMA.ps1` (or `LFO.ps1 -Device UMA`) afterwards. **The reference AMD host passed the documented UMA integration acceptance; other UMA hosts require their own placement verification.** See [UMA bootstrap and MS-S1 MAX validation](docs/UMA_BOOTSTRAP.md) for prerequisites, stable installation, isolation, tests and GPU-placement acceptance.
@@ -559,7 +559,7 @@ The transport path is working:
 local model -> ask_codex -> native Codex frontier -> local model
 ```
 
-**v9.6.6 incorporates the v9.6.5 research baseline.** LOCAL/FRONTIER routing, synthesis, persistent memory and conservative L4 recording retain their accepted architecture. Existing v9.6.3 installations continue working without reinstall. The v9.6.6 source passed reference-host integration testing and remains an immutable historical release. v9.6.7 is the next stable runtime boundary; see [release notes](docs/RELEASE_V9.6.7.md) for acceptance scope and limitations.
+**v9.6.6 incorporates the v9.6.5 research baseline.** LOCAL/FRONTIER routing, synthesis, persistent memory and conservative L4 recording retain their accepted architecture. Existing v9.6.3 installations continue working without reinstall. The v9.6.6 source passed reference-host integration testing and remains an immutable historical release. v9.6.8 is the current stable runtime boundary; see [release notes](docs/RELEASE_V9.6.8.md) for acceptance scope and limitations.
 
 **v9.6.2 remains a historical tagged and Zenodo-archived release boundary.** The v9.6.3 promotion does not reopen the frozen L2/L3 baselines or enable P1/P2 response intervention.
 
@@ -577,6 +577,12 @@ The interactive command UI reserves leading slash entries for local commands, in
 
 Forced LOCAL requests that would normally match a frontier hard gate receive a deterministic no-live-verification notice in the console and final answer, including exported text. Local initial generation and answer-only recovery distinguish historical references from new external verification. Model compliance with the instruction is not guaranteed. Interactive multi-call turns sum prompt/generated tokens and calculate a decode-duration-weighted throughput for answer generation only (not Codex or post-answer memory calls). Missing metrics are shown as n/a, and legacy per-response trace fields and benchmark output remain unchanged.
 
-## v9.6.8-dev: minimal turn evidence provenance
+## v9.6.8: minimal epistemic provenance
 
-Development experiment: additive `external_evidence_status` in existing L0 conversation and research trace rows, inherited by recent and retrieved L0 context (including L3). No SQLite schema migration, new registry, additional inference, detector or intervention. L2 retains its existing source_turn reference; this iteration does not resolve per-fact evidence status. See [design and boundaries](docs/EPISTEMIC_PROVENANCE_V968.md). Stable installation commands above remain pinned to v9.6.7.
+- Existing L0 conversation and research trace rows gain runtime-owned `external_evidence_status`: NONE (no external adapter attempt), REQUESTED (attempt, not proof of source access), UNKNOWN (legacy/unknown), and reserved OBSERVED (requires independently instrumented evidence). A successful Codex result is not automatically OBSERVED.
+- Recent and relevance-selected L0 context, including L3, retain route and evidence labels. L2 keeps its existing source_turn reference; this is turn-level provenance, not per-fact verification.
+- Explicit LOCAL uses a dedicated prompt and matching JSON field descriptions without delegation or empty-answer instructions. Deterministic guards remain. Internal ASCII epistemic guidance applies silently; no new model call or response schema.
+- The no-lookup wrapper notice is retained in delivered text and export, recorded separately as `runtime_annotation`, and omitted from reconstructed model context. Exact terminal legacy LOCAL notices are filtered on read, not rewritten on disk.
+- Stream waiting progress refreshes in place, closing the line before preview, thinking, completion or error. Updates remain chunk-driven.
+
+No new SQLite table, storage migration, detector, L4 intervention or routing algorithm. Reference-host LOCAL/explicit web FRONTIER checks passed; the short implicit freshness request remains a known routing limitation. The final stream heartbeat has deterministic Windows acceptance, with terminal visual confirmation pending. See [release notes](docs/RELEASE_V9.6.8.md) and [design and boundaries](docs/EPISTEMIC_PROVENANCE_V968.md). The installation commands above are pinned to this release.

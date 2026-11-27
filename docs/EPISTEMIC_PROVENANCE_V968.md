@@ -1,4 +1,4 @@
-# Minimal epistemic provenance (v9.6.8-dev)
+# Minimal epistemic provenance (v9.6.8)
 
 Add one runtime-owned field, `external_evidence_status`, to the existing L0 conversation row and research trace. No new database/table or model output field. A runtime turn starts as NONE and changes to REQUESTED immediately before attempting the Codex adapter. Failed attempts remain REQUESTED. OBSERVED is reserved for a future independently instrumented source-access event; this version never emits it from a successful Codex handoff or a model claim. Legacy/malformed metadata renders UNKNOWN. Batch-suppressed FRONTIER never becomes REQUESTED merely because a model requested escalation.
 

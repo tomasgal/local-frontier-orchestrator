@@ -1587,7 +1587,7 @@ $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.6.8-dev. Commands: /exit, /clear, /paste, /think on, /think off, /analyze, /files, /import, /export, /export-log, /route, /stream, /help"
+Write-Host "Qwen local chat v9.6.8. Commands: /exit, /clear, /paste, /think on, /think off, /analyze, /files, /import, /export, /export-log, /route, /stream, /help"
 Write-Host ("Streaming: {0}; routing mode: {1}. /stream on|off; /route auto|local|frontier" -f $script:LfoStreamEnabled,$script:LfoRouteMode)
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"

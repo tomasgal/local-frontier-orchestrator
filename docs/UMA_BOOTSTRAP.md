@@ -1,6 +1,6 @@
 # Windows UMA bootstrap — AMD Ryzen AI Max+ / Radeon 8060S
 
-Status: **reference-host integration accepted on 2026-11-26; stable v9.6.6 baseline; updated for v9.6.7**. Historical release tags remain unchanged.
+Status: **reference-host integration accepted on 2026-11-26; stable v9.6.6 baseline; updated for v9.6.8**. Historical release tags remain unchanged.
 
 ## Intent and boundaries
 
@@ -37,10 +37,10 @@ Do not run a heavy T4AI/ComfyUI inference at the same time as the initial LFO va
 
 ## Installation
 
-For the stable v9.6.7 release, use the matching installer and explicit tag:
+For the stable v9.6.8 release, use the matching installer and explicit tag:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.7/install/Install-LFO.ps1' -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile UMA -SourceRef refs/tags/v9.6.7 -SkipLaunch
+Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/tomasgal/local-frontier-orchestrator/v9.6.8/install/Install-LFO.ps1' -OutFile "$env:TEMP\Install-LFO.ps1"; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\Install-LFO.ps1" -Profile UMA -SourceRef refs/tags/v9.6.8 -SkipLaunch
 ```
 
 For historical reproduction of the feature branch only (not the stable release), download its installer and set matching `-SourceRef`:

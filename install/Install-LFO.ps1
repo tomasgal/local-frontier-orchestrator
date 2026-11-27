@@ -39,7 +39,7 @@ $CpuModel = 'lfo-qwen3.5-4b-cpu5k:latest'
 $UmaBaseModel = 'qwen3.5:35b-a3b-q8_0'
 $UmaModel = 'lfo-qwen3.5-35b-uma16k:latest'
 $UmaContext = 16384
-$RuntimeContract = 'v9.6.8-dev'
+$RuntimeContract = 'v9.6.8'
 
 function Step([string]$Text) { Write-Host "`n==> $Text" -ForegroundColor Cyan }
 function Info([string]$Text) { Write-Host "    $Text" }
@@ -965,7 +965,7 @@ Write-Host ('Import:        '+$ImportDirectory)
 Write-Host ('Export:        '+$ExportDirectory)
 Write-Host ''
 Write-Host 'Launch options:' -ForegroundColor Cyan
-Write-Host '  .\LFO.ps1           (primary v9.6.8-dev entrypoint; Auto device, High priority by default)'
+Write-Host '  .\LFO.ps1           (primary v9.6.8 entrypoint; Auto device, High priority by default)'
 Write-Host '  Start-LFO-CPU.bat   (double-click or Command Prompt)'
 Write-Host '  Start-LFO-GPU.bat   (double-click or Command Prompt)'
 Write-Host '  Start-LFO-UMA.bat   (double-click or Command Prompt)'

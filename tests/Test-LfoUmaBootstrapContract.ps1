@@ -61,8 +61,8 @@ foreach($name in @('Get-OllamaLibraryManifestPath','Test-OllamaStoreHasModel','G
     . ([scriptblock]::Create($fn[0].Extent.Text))
 }
 $archiveBase='https://codeload.github.com/tomasgal/local-frontier-orchestrator/zip/'
-foreach($ref in @('v9.6.7','refs/tags/v9.6.7')){
-    if((Get-LfoSourceArchiveUrl $ref) -cne ($archiveBase+'refs/tags/v9.6.7')){throw 'Release tag archive URL incorrect'}
+foreach($ref in @('v9.6.8','refs/tags/v9.6.8')){
+    if((Get-LfoSourceArchiveUrl $ref) -cne ($archiveBase+'refs/tags/v9.6.8')){throw 'Release tag archive URL incorrect'}
 }
 if((Get-LfoSourceArchiveUrl 'main') -cne ($archiveBase+'refs/heads/main')){throw 'Branch archive URL incorrect'}
 if((Get-LfoSourceArchiveUrl 'refs/heads/feat/example') -cne ($archiveBase+'refs/heads/feat/example')){throw 'Explicit branch archive URL incorrect'}
