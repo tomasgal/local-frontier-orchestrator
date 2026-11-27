@@ -1583,11 +1583,26 @@ try {
         }
     }
 } catch { Write-Host '[L4 unavailable; chat continues.]' -ForegroundColor Yellow }
+# G2 is isolated from frozen legacy L4 and runs only after durable L0.
+$script:LfoG2Controller=$null
+try {
+    . (Join-Path $PSScriptRoot 'LfoEpistemicController.ps1')
+    $script:LfoG2Controller=Initialize-LfoG2Controller (Split-Path -Parent $PSScriptRoot) $env:LFO_EPISTEMIC_PROFILE
+    if($env:LFO_RUNTIME_BATCH -eq '1' -and -not $env:LFO_EPISTEMIC_PROFILE){$script:LfoG2Controller.Mode='OFF'}
+    if(-not $script:MemoryEnabled -or -not $script:L0StageSourcesEnabled){$script:LfoG2Controller.Mode='OFF'}
+    $script:LfoG2LegacyHook=$script:LfoL4PostL0
+    $script:LfoL4PostL0={
+        param($Row,$SourceFile)
+        if($null -ne $script:LfoG2LegacyHook){try{$null=& $script:LfoG2LegacyHook $Row $SourceFile}catch{Write-Host '[Legacy L4 failed; chat continues.]'}}
+        try{Write-LfoG2Turn $script:LfoG2Controller $Row $SourceFile $script:LogDir}catch{Write-Host '[G2 ledger failed; chat continues.]' -ForegroundColor Yellow}
+    }
+    Write-Host ('[G2 '+$script:LfoG2Controller.Mode+'; /epistemic status; 0 additional model calls]')
+} catch {Write-Host '[G2 unavailable; chat continues.]' -ForegroundColor Yellow}
 $script:PolicyFingerprint = Get-PolicyFingerprint
 
 Test-Ollama
 Write-Host ""
-Write-Host "Qwen local chat v9.6.8. Commands: /exit, /clear, /paste, /think on, /think off, /analyze, /files, /import, /export, /export-log, /route, /stream, /help"
+Write-Host "Qwen local chat v9.7-dev. Commands: /exit, /clear, /paste, /think on, /think off, /analyze, /epistemic, /files, /import, /export, /export-log, /route, /stream, /help"
 Write-Host ("Streaming: {0}; routing mode: {1}. /stream on|off; /route auto|local|frontier" -f $script:LfoStreamEnabled,$script:LfoRouteMode)
 Write-Host "Frontier action: ask_codex (read-only, max 1 call per user turn)"
 Write-Host "Routing: hard freshness/web gate + Qwen ROUTE: LOCAL/FRONTIER (no Ollama tools)"
@@ -1614,6 +1629,7 @@ function Get-LfoSlashCommands {
         '/think'=@{Usage='/think on | /think off';Pattern='\A/think[ \t]+(?:on|off)\z'}
         '/route'=@{Usage='/route auto | /route local | /route frontier';Pattern='\A/route[ \t]+(?:auto|local|frontier)\z'}
         '/stream'=@{Usage='/stream on | /stream off';Pattern='\A/stream[ \t]+(?:on|off)\z'}
+        '/epistemic'=@{Usage='/epistemic status | off | observe | advise | set E1 low|medium|high|off';Pattern='\A/epistemic(?:[ \t]+(?:status|off|observe|advise|set[ \t]+E[1-9][0-9]*[ \t]+(?:off|low|medium|high)))?\z'}
         '/analyze'=@{Usage='/analyze [1..100 turns] (default: 8)';Pattern='\A/analyze(?:[ \t]+(?:0{0,2}[1-9]|0?[1-9][0-9]|100))?\z'}
         '/files'=@{Usage='/files';Pattern='\A/files\z'}
         '/import'=@{Usage='/import <filename>';Pattern='\A/import[ \t]+[^\r\n]+\z'}
@@ -1683,6 +1699,10 @@ while ($true) {
     switch -Regex ($prompt.Trim()) {
         '^/help(?:\s+(.+))?$' {
             Show-LfoSlashHelp ([string]$Matches[1]) -ExplicitHelp
+            continue
+        }
+        '^/epistemic(?:\s|$)' {
+            Invoke-LfoG2Command $script:LfoG2Controller $prompt
             continue
         }
         '^/analyze(?:\s|$)' {

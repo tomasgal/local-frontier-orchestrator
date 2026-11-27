@@ -67,7 +67,7 @@ function Resolve-LfoInstallRoot {
         ". Pass -InstallRoot <path> if your LFO bootstrap root is elsewhere.")
 }
 
-$script:Lfo963Version = '9.6.8'
+$script:Lfo963Version = '9.7-dev'
 
 function Get-LfoInstallState {
     param([Parameter(Mandatory=$true)][string]$InstallRoot)

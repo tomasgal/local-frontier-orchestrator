@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "mode": "OBSERVE",
+  "axes": {
+    "E1": "MEDIUM",
+    "E2": "OFF",
+    "E3": "OFF",
+    "E4": "MEDIUM",
+    "E5": "OFF",
+    "E6": "OFF"
+  },
+  "detectors": {
+    "verification-claim": true,
+    "confirmation-seeking": true
+  }
+}
