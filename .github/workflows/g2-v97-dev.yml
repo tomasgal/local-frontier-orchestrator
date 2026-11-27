@@ -70,3 +70,9 @@ jobs:
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2RevisionScreen.ps1 -SelfTest
           if($LASTEXITCODE -ne 0){throw 'Revision screen contract failed'}
+
+      - name: Compiler screen request contract
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2CompilerScreen.ps1 -SelfTest
+          if($LASTEXITCODE -ne 0){throw 'Compiler screen contract failed'}
