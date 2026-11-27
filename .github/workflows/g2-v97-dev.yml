@@ -76,3 +76,9 @@ jobs:
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2CompilerScreen.ps1 -SelfTest
           if($LASTEXITCODE -ne 0){throw 'Compiler screen contract failed'}
+
+      - name: Semantic compiler exact span contract
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File research/Invoke-LfoG2SemanticCompiler.ps1 -SelfTest
+          if($LASTEXITCODE -ne 0){throw 'Semantic compiler contract failed'}
