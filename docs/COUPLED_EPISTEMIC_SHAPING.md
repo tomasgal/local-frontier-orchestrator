@@ -186,3 +186,102 @@ P11 screening reported a ceiling in directional correctness and a reduction of s
 ## 13. Pilot 13 — conditional arithmetic and runtime facts
 
 P12 is diagnostic, not validation of whole CES. Working readiness returned to 67/100; evidence-directed rather than conclusion-polarity-directed intervention is a design constraint, not a measured >90% coverage claim. CES-C12 CONSTRUCT_WITNESS is now implemented experimentally in src/LfoCesWitness.ps1 using eight bounded arithmetic operations and exact source spans, no inferred role binding or extra inference. CES-C05 runtime provenance is tested as a system-level input, with OFF a deterministic capability boundary: central to the answer when live verification is needed, silent otherwise. No output regex rewriting, no extra model invocation, no production changes. See [CES13](../research/g2/CES13.md); P12 relation annotation remains experimental and excluded from P13 active arms. Preserve cap 4096. Source and methodology promotion gate remains mandatory.
+
+
+## 14. Contextual shape optimization and robustness — v9.7.x research methodology (2026-11-27)
+
+**Status:** EXPERIMENTAL methodology / working optimization hypothesis. This section defines the prospective evaluation and selection procedure for research, not a production policy, validated numerical coupling matrix, accepted causal theory, or change to the G2 readiness rubric. The Mandatory Source and Methodology Gate in section 5 remains in force. In particular, the proposed evidence-discrimination operator and its transfer rationale remain SOURCE_REQUIRED until reviewed. P16 results are pending at the time of this entry.
+
+### 14.1 Separate intervention geometry, observed quality and computation
+
+Retain E1–E6 as distinct evaluation coordinates. The radar shape depicts ordinal intervention focus (none, supporting, primary), not measured epistemic quality, an interval-scale dose, a metric space, or a predictor of latency. Its area, perimeter and distance from the center must not be used as objective values. An intervention can improve quality while reducing inference cost; a larger shape can be cheaper than a smaller shape. Conversely, a short answer may omit necessary support.
+
+Let c denote task/evidence/runtime context, x a binary vector of eligible intervention operators or predefined blocks, and X_allowed(c) the admissible combinations. INDEPENDENT (x=0) is the common-policy reference without additional CES operations; it is not an all-operators-on profile. Keep the original L0 and established runtime contracts intact.
+
+For each endpoint Y (each applicable epistemic criterion, critical-error indicator, token count, latency), an experimental second-order response model is
+
+    E[Y | x,c] = beta_0(c) + sum_i beta_i(c) x_i
+                          + sum_{i<j} beta_ij(c) x_i x_j + residual/higher-order effects.
+
+This is a contextual pseudo-Boolean representation. The coefficients are empirical quantities to estimate, not the signs of the speculative coordinate graph. Do not assume additivity, monotonicity, submodularity, universal coefficients, or that pairwise terms exhaust higher-order effects. For a matched 2x2 experiment, I_AB = Y_11 - Y_10 - Y_01 + Y_00; report this on the declared measurement scale and the conditional effects Y_11 - Y_10 and Y_11 - Y_01 as well as the marginal effects. A negative interaction on cost is different from a negative interaction on higher-is-better quality. An interaction is not necessarily a practically favorable combined outcome.
+
+For a small admissible operator set, enumerate feasible shapes deterministically; no additional LLM call or global optimizer is inherently required. Use Pareto comparisons and hard constraints before ranking cost. Learned selection policies, contextual coefficient estimation and adaptive routing remain research hypotheses requiring independent validation.
+
+### 14.2 Cost model and inference-friction hypothesis
+
+Measure end-to-end user-visible latency, intervention/compose and helper costs, load/switch costs, prefill, decode, input/output token counts, extra calls, failures and relevant user effort separately. Do not hide costs in the reference or exclude failures from the outcome denominator. Warm latency and cold latency are different estimands.
+
+A local first-order cost approximation at fixed model, hardware, context regime and inference configuration is
+
+    T_total(x,c) = T_intervention(x,c) + T_load(x,c)
+                  + a(c) N_in(x,c) + b(c) N_out(x,c) + T_other(x,c).
+
+For a warm matched comparison, holding other terms constant, extra input can be worthwhile if
+
+    b * (-Delta N_out) > a * Delta N_in + Delta T_intervention + Delta T_other.
+
+Include any additional load/switch cost if it differs. The approximation is not a scaling law: caching, prompt length, batching, model load, decode throughput and parallelism can change the coefficients.
+
+P15 exploratory example (four logical cases, eight unique requests; shared outcomes are not independent replications): S0 input/output totals 639/886 and warm aggregate time 22.50 s; S1 694/511 and 13.49 s; S2 756/941 and 24.02 s; S3 811/517 and 13.82 s. S1 versus S0 added 55 input tokens, saved 375 output tokens and reduced warm aggregate time by 9.01 s. The original rubric was 11/12 in every shape; an additional post-hoc text-consistency review found a local S1 improvement. All shapes retained a critical false-lookup defect in D03. None is thereby accepted as an epistemically safe optimum.
+
+Wolfram Language exploratory analysis of these P15 aggregates yielded approximately a=0.00158 s/input token and b=0.02426 s/output token (ratio 15.34); median observed per-token phase times gave a ratio about 17.25 (excluding the two-token generation from decode throughput estimation). Four aggregate observations fitted with three parameters cannot establish prediction. Under these limited local approximations, 100 extra input tokens would need to save roughly 6–7 output tokens before additional intervention costs to break even. In D03, output token counts (00,10,01,11)=(139,129,194,135) give the descriptive identity 139 - 10 A + 55 B - 49 AB. This saturated single-case representation has no independent predictive validation; B in P15 is not B in P16.
+
+**Inference friction** is a proposed engineering construct, not a measured internal cognitive state: redundant arguments, material contradictions, repeated revisions without resolution and irrelevant digressions. Code these from whole responses separately from length, and compare token costs only at comparable task quality and support preservation. Test a length-matched ordinary concision instruction on a future suitable independent corpus to distinguish CES effects from mere verbosity reduction. Token savings alone are not evidence of lower bias, improved cognition or lower friction.
+
+### 14.3 Numerical optimum: feasibility first, risk-adjusted efficiency second
+
+For a fixed target context distribution and evaluation protocol, let mu_T(x) and sigma_T(x) denote mean and standard deviation of latency, and mu_Qk(x), sigma_Qk(x) the corresponding summaries of each applicable higher-is-better quality endpoint k. Define the research objective
+
+    J_lambda(x) = mu_T(x) + lambda * sigma_T(x)
+    Q_k,lambda(x) = mu_Qk(x) - lambda * sigma_Qk(x)
+    x*_lambda in argmin_{x in X_feasible} J_lambda(x).
+
+Use lambda=1 as the working balanced engineering selection preference; lambda=0 (mean-only) and lambda=2 (stronger variability penalty) as sensitivity analyses. This is a declared preference for predictable outcomes, not a claim that one or two standard deviations are optimal, a confidence bound, or an assumed 68%/95% coverage interval. If skewness, tails, timeout/censoring or mixtures make mean/SD summaries inadequate, report empirical quantiles and failure counts alongside them; do not infer tail coverage from normality without justification.
+
+Feasibility is lexically prior to cost. Require (i) hard integrity/provenance and protected-task invariants in evaluated scope, (ii) examination of every newly introduced critical error compared with matched reference, (iii) preservation of legitimate preferences, correct agreement, quotations, assumptions and material evidence, and (iv) prespecified context-appropriate quality floors and acceptable risk bounds. For confirmatory acceptance, set explicit practically meaningful noninferiority margins delta_k and critical-error risk tolerance epsilon before accessing outcomes; report uncertainty of paired quality differences and a one-sided upper confidence bound for critical-error risk against epsilon. Do not invent margins retrospectively or allow average quality to offset a hard integrity violation. Zero observed errors does not establish zero risk (for n independent Bernoulli cases with zero events, the exact one-sided 95% upper limit is 1 - 0.05^(1/n)). If no shape satisfies the conditions, report no feasible optimum; baseline fallback is not a certification of baseline correctness. Use established abstention/flagging/escalation as appropriate, within existing policy bounds.
+
+Do not collapse E1–E6 into an arbitrary weighted quality sum. Report the quality vector, applicability denominators, risk and cost; if several feasible shapes are nondominated, retain the Pareto set and apply the documented simplicity preference. This research objective concerns response quality and computational cost, not validated human debiasing efficacy.
+
+### 14.4 Direction and distance from optimum; simplicity preference
+
+Three distinct quantities must not be confused:
+
+1. SD of observed outcomes (dispersion over contexts and/or seeds).
+2. SE or confidence interval of an estimated mean or paired difference (sampling uncertainty).
+3. Distance between interventions (e.g. Hamming distance between eligible binary operator vectors, or a separately calibrated experimental dose axis).
+
+A displacement of one/two outcome SDs is not a displacement of one/two units along the radar axes. No such geometry-to-SD mapping has been identified. For a discrete shape, use adjacent admissible add/drop/swap configurations and paired finite differences. For a future independently calibrated continuous intensity parameter s, an interior cost minimum would require marginal intervention cost to balance marginal inference savings, with a second-order or boundary check; do not presume smoothness, symmetry or an interior minimum. Only after establishing a dose-response scale may standardized displacements along that scale be tested on both sides.
+
+Preferred direction: toward fewer or simpler interventions when epistemic quality, risk and cost remain acceptable. Toward more intervention only when its conditional marginal benefit justifies the added complexity, including cases where it lowers actual end-to-end cost. There is no predetermined universally beneficial direction in E1–E6 space.
+
+Apply a research-only paired **one-standard-error simplicity heuristic**: for a selected provisional best feasible shape x_best and a simpler feasible candidate x, estimate D = J(x) - J(x_best) on matched cases, including uncertainty of the SD penalty when lambda is nonzero. Consider x within one estimated SE of the best if D_hat <= SE(D_hat); among qualifying candidates prefer the simplest (fewer active operators, fewer additional calls, less complex composition; document tie-breaks). For a mean-only paired endpoint, estimate SE from independent paired differences; for the risk-adjusted objective use paired family/cluster resampling of the complete statistic when enough independent clusters exist. Recompute shape summaries together within resamples. With very few clusters, show individual contrasts and mark the SE heuristic inconclusive rather than claiming precise intervals. Use a two-SE band only as a sensitivity check, not an automatic relaxation of quality/risk gates. This is a complexity-selection heuristic, not evidence of statistical equivalence or noninferiority and not a substitute for independent confirmation. Selection on the same corpus can bias estimated optimum performance.
+
+### 14.5 Reduced shapes and prospective P16 analysis
+
+Keep adverse/suboptimal operators in the research registry, excluded from current shape composition and indirect propagation; no deletion of negative results. STRUCTURE_EVIDENCE and RELATE_EVIDENCE showed regressions in development screening; CONSTRUCT_WITNESS is heterogeneous and excluded from this generation, not disproved for every bounded calculation; RUNTIME_ASSERT as an additional shaping block repeatedly failed to guarantee truthful self-lookup claims and is excluded from the new generation, while runtime-owned provenance remains an integrity requirement. PRESERVE_SUPPORT is retained despite its neutral marginal effect: conditional utility may change after exclusions. Reintroduction of inhibited candidates requires a new specific mechanistic rationale, protected controls and evidence, not merely a vacant graph coordinate.
+
+P16 candidate blocks: A = protected modulation (MASK_CONTEXT + PRESERVE_SUPPORT), B = evidence discrimination (EVIDENCE_DISCRIMINATION, context-relevant distinctions among independent/derived, observation/assumption and source/evidence status; no duplicated evidence sidecar). B is SOURCE_REQUIRED for promotion. The proposed E1-to-E2 coupling remains a hypothesis, not a filled-in empirical matrix cell.
+
+| Shape | A | B | Research role |
+|---|---:|---:|---|
+| S0 INDEPENDENT | 0 | 0 | Common-policy reference |
+| S1 PROTECTED MODULATION | 1 | 0 | Retained candidate |
+| S2 EVIDENCE DISCRIMINATION | 0 | 1 | New candidate |
+| S3 SELECTIVE COUPLED II | 1 | 1 | Conditional interaction |
+
+P16 design: 24 cases x 4 shapes = 96 physical requests, planned 76 distinct requests; 16 cases with both blocks eligible, four isolated-block cases, four protected controls. Repeated identical requests are deliberate stability observations, not additional independent cases. Compare all logical arms including abstention, and separately the dual-eligible stratum for interaction estimation. A bundles two operators; P16 cannot identify their separate main effects or their mutual interaction. No P16 inference results are asserted here.
+
+Prospective analysis:
+
+- Check completeness, effective model/profile and matched settings, arm eligibility, recorded failures and denominator accounting. Preserve raw requests/responses and provenance records; routine manual SHA recomputation is not necessary for every pilot absent an integrity concern.
+- Score whole answers against task-specific criteria, correct conclusions, support, calibration, protected content and critical errors; preserve the frozen rubric, and label added exploratory defect categories as such. Independent/arm-blinded human ratings where practical, with agreement/adjudication; Qwen is not the sole evaluator.
+- Report pairwise improvements/regressions/ties against S0 and conditional effects versus S1/S2. Report E1–E6 separately with applicable denominators; do not claim a change in a coordinate not measured. Record per-case contrast vectors for quality, tokens, latency and critical errors, including the interaction I_AB on declared scales.
+- Estimate uncertainty using the matched case or independent family as the sampling unit, not the number of inference rows. Distinguish between-task heterogeneity from within-case seed variance and repeated identical requests. Report dispersion, robust objective at lambda=0,1,2, sensitivity to influential cases and cold/warm accounting. Where estimable use family-clustered paired bootstrap or other appropriate paired intervals; any descriptive screening is not confirmatory.
+- Compare feasible Pareto sets at all three lambdas; apply the paired simplicity heuristic only if uncertainty is estimable and protective criteria are met. Preserve an inconclusive outcome. If results suggest a narrower shape, test neighboring admissible configurations and selected effects on genuinely new families and multiple seeds/models before promotion. Evaluate evidence discrimination against matched alternatives and use a later separate A ablation if its components need isolation.
+- Report cost and quality separately even when both improve; test the inference-friction construct on annotated text rather than infer it from token counts. A zero interaction or equal scores do not prove neutrality or equivalence. A positive interaction on one endpoint is not a general synergy claim.
+
+### 14.6 Methodological foundations and boundary of adoption
+
+Sections 5 and 8 and anchors M1–M3 govern paired factorial designs, contrasts, preregistration, clustering and independent validation. The contextual pseudo-Boolean representation, mean-plus-SD risk preference, Pareto selection and paired one-SE heuristic are proposed mathematical/engineering methodology. The additional scholarly method/source locators and transfer boundaries for these choices must be verified before an acceptance record or runtime policy is promoted. Candidate literature for that review: Boros and Hammer, *Pseudo-Boolean Optimization* (Discrete Applied Mathematics, 2002); qualitative probabilistic networks (Wellman, 1990) as an analogy for signed conditional influence, not an adopted probabilistic semantics; one-standard-error model selection as a simplicity heuristic, adapted here to paired differences rather than treated as a formal equivalence test.
+
+No profile, coefficient, lambda, threshold, detector behavior, production default or stable LFO contract is changed by this documentation entry. The research target is the least burdensome adequate intervention conditional on context, not a larger radar polygon or a mechanically maximized aggregate score.
