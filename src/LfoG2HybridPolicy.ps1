@@ -44,3 +44,27 @@ function New-LfoG2HybridPlan {
     $body=@{state=$Text;questions=@{V=@{type='choice';instructions=$q;criteria=$criteria}}}
     [pscustomobject]@{Profile=$Profile.Name;Contract=$Profile.PredicateContract;ContractVersion=$Profile.ContractVersion;Phase=$Phase;Decision=$null;RequiresNpu=$true;Body=$body}
 }
+
+function Get-LfoG2ExecutionPolicy {
+    param([Parameter(Mandatory)][string]$ConfigPath,[string]$Topology,[bool]$Parallelism,[string]$EdgeDeviceId,[string]$MainDeviceId)
+    $cfg=Import-PowerShellDataFile -LiteralPath $ConfigPath
+    if($cfg.SchemaVersion -ne 1 -or $null -eq $cfg.Execution -or $cfg.Execution.Parallelism -isnot [bool]){throw 'Invalid execution configuration.'}
+    if(-not $PSBoundParameters.ContainsKey('Topology')){$Topology=[string]$cfg.Execution.Topology}
+    if(-not $PSBoundParameters.ContainsKey('Parallelism')){$Parallelism=$cfg.Execution.Parallelism}
+    if(-not $PSBoundParameters.ContainsKey('EdgeDeviceId')){$EdgeDeviceId=[string]$cfg.Execution.EdgeDeviceId}
+    if(-not $PSBoundParameters.ContainsKey('MainDeviceId')){$MainDeviceId=[string]$cfg.Execution.MainDeviceId}
+    if($Topology -cnotin @('AUTO','CPU_GPU','NPU_GPU','GPU_GPU','CPU_CPU','NPU_CPU','GPU_CPU')){throw "Unknown execution topology: $Topology"}
+    $edge='AUTO';$main='AUTO'
+    if($Topology -cne 'AUTO'){$edge,$main=$Topology.Split('_')}
+    [pscustomobject]@{Topology=$Topology;EdgeTarget=$edge;MainTarget=$main;EdgeDeviceId=$EdgeDeviceId;MainDeviceId=$MainDeviceId;Parallelism=$Parallelism}
+}
+function Get-LfoG2DispatchMode {
+    param([Parameter(Mandatory)]$ExecutionPolicy,[Parameter(Mandatory)][ValidateSet('BLOCKING','INDEPENDENT','POST_REQUIRED')][string]$Dependency,[bool]$InputsReady,[bool]$RuntimeSupportsParallel)
+    # RuntimeSupportsParallel is an explicit capability assertion by the adapter.
+    # Placement names and config switches do not establish device availability.
+    if(-not $InputsReady){return 'WAIT_DEPENDENCY'}
+    if($Dependency -ceq 'BLOCKING'){return 'BEFORE_MAIN'}
+    if($Dependency -ceq 'POST_REQUIRED'){return 'AFTER_OUTPUT'}
+    if($ExecutionPolicy.Parallelism -eq $true -and $RuntimeSupportsParallel){return 'PARALLEL'}
+    return 'SERIAL'
+}
