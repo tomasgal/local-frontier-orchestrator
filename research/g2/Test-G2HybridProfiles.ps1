@@ -1,7 +1,9 @@
 [CmdletBinding()]
-param([string]$ConfigPath=(Join-Path $PSScriptRoot '../../config/G2Hybrid.config.psd1'))
+param([string]$ConfigPath)
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot '../../src/LfoG2HybridPolicy.ps1')
+$scriptDir=Split-Path -Parent $MyInvocation.MyCommand.Path
+if(-not $ConfigPath){$ConfigPath=Join-Path $scriptDir '../../config/G2Hybrid.config.psd1'}
+. (Join-Path $scriptDir '../../src/LfoG2HybridPolicy.ps1')
 $script:Checks=0
 function Check([bool]$Condition,[string]$Message){
     if(-not $Condition){throw $Message}
@@ -60,4 +62,22 @@ Check ($dual.EdgeDeviceId -ceq 'gpu-a' -and $dual.MainDeviceId -ceq 'gpu-b') 'Ex
 $rejected=$false
 try{$null=Get-LfoG2ExecutionPolicy -ConfigPath $ConfigPath -Topology INVALID}catch{$rejected=$true}
 Check $rejected 'Unknown topology accepted.'
+$main=Get-LfoG2ModelBinding -ConfigPath $ConfigPath -Role Main
+$edge=Get-LfoG2ModelBinding -ConfigPath $ConfigPath -Role Edge
+$frontier=Get-LfoG2ModelBinding -ConfigPath $ConfigPath -Role Frontier
+Check ($main.Enabled -and $main.ModelId -ceq $raw.Models.Main.ModelId -and $main.Adapter -ceq $raw.Models.Main.Adapter) 'Main binding mismatch.'
+Check ($edge.Enabled -and $edge.ModelId -ceq $raw.Models.Edge.ModelId -and $edge.Adapter -ceq $raw.Models.Edge.Adapter) 'Edge binding mismatch.'
+Check ($frontier.Enabled -eq $raw.Models.Frontier.Enabled) 'Frontier enable mismatch.'
+foreach($role in @('Main','Edge','Frontier')){
+    $replacement=Get-LfoG2ModelBinding -ConfigPath $ConfigPath -Role $role -Adapter 'TEST_ADAPTER' -ModelId 'test-model'
+    Check ($replacement.ModelId -ceq 'test-model' -and $replacement.Adapter -ceq 'TEST_ADAPTER' -and $replacement.Role -eq $role) 'Independent replacement failed.'
+}
+$disabled=Get-LfoG2ModelBinding -ConfigPath $ConfigPath -Role Frontier -Adapter 'TEST_ADAPTER' -ModelId 'test-model'
+Check ($disabled.Enabled -eq $raw.Models.Frontier.Enabled) 'Model override changed frontier authorization.'
+$rejected=$false
+try{$null=Get-LfoG2ModelBinding -ConfigPath $ConfigPath -Role Main -ModelId ''}catch{$rejected=$true}
+Check $rejected 'Empty main model accepted.'
+$rejected=$false
+try{$null=Get-LfoG2ModelBinding -ConfigPath $ConfigPath -Role Edge -Adapter ''}catch{$rejected=$true}
+Check $rejected 'Empty edge adapter accepted.'
 Write-Host "G2 PROFILE UNIT PASS $script:Checks/$script:Checks; default=$($default.Name); topology=$($execution.Topology); parallelism=$($execution.Parallelism)"
