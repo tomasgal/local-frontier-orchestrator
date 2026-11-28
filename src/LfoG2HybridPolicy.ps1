@@ -68,3 +68,21 @@ function Get-LfoG2DispatchMode {
     if($ExecutionPolicy.Parallelism -eq $true -and $RuntimeSupportsParallel){return 'PARALLEL'}
     return 'SERIAL'
 }
+
+function Get-LfoG2ModelBinding {
+    param([Parameter(Mandatory)][string]$ConfigPath,[Parameter(Mandatory)][ValidateSet('Main','Edge','Frontier')][string]$Role,[string]$Adapter,[string]$ModelId)
+    $cfg=Import-PowerShellDataFile -LiteralPath $ConfigPath
+    if($cfg.SchemaVersion -ne 1 -or $null -eq $cfg.Models -or $null -eq $cfg.Models[$Role]){throw "Missing model binding: $Role"}
+    $binding=$cfg.Models[$Role]
+    if(-not $PSBoundParameters.ContainsKey('Adapter')){$Adapter=[string]$binding.Adapter}
+    if(-not $PSBoundParameters.ContainsKey('ModelId')){$ModelId=[string]$binding.ModelId}
+    $enabled=$true
+    if($Role -eq 'Frontier'){
+        if($binding.Enabled -isnot [bool]){throw 'Frontier Enabled must be boolean.'}
+        $enabled=$binding.Enabled
+    }
+    if($enabled -and ([string]::IsNullOrWhiteSpace($Adapter) -or [string]::IsNullOrWhiteSpace($ModelId))){throw "Incomplete model binding: $Role"}
+    # A binding is declarative; actual availability, locality, capabilities,
+    # credentials and outbound dispatch authorization belong to runtime adapters.
+    [pscustomobject]@{Role=$Role;Adapter=$Adapter;ModelId=$ModelId;Enabled=$enabled}
+}
