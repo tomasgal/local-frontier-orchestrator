@@ -249,7 +249,7 @@ try{
             $b=@($rows|Where-Object {$_.arm -ceq $arm -and $_.lang -ceq $lang -and $_.id -ceq 'C01'})[0]
             $same=$false
             if($a.valid -and $b.valid){$same=($a.binding.left -ceq $b.binding.left -and $a.binding.right -ceq $b.binding.right -and $a.binding.relation -ceq $b.binding.relation -and $a.binding.modality -ceq $b.binding.modality)}
-            Write-Host "P73 counterfactual $arm/$lang: identical_binding=$same; D01=$($a.state); C01=$($b.state)"
+            Write-Host "P73 counterfactual $arm/$($lang): identical_binding=$same; D01=$($a.state); C01=$($b.state)"
         }
     }
     Write-Host 'P73 TRANSPORT PASS; 48 Nemotron calls; Nano=0; GPU=0; DB=0; structured evidence supplied'
