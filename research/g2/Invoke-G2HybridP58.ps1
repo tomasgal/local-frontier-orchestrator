@@ -9,7 +9,7 @@ param(
     [ValidateRange(1024,65535)][int]$DbPort=19085
 )
 $ErrorActionPreference='Stop'
-Set-StrictMode -Version 2
+Set-StrictMode -Off # Frozen RPC helper accepts optional response.error.
 $version='p58-hybrid-0.1'
 function Assert-G2([bool]$Condition,[string]$Message) { if(-not $Condition){throw $Message} }
 function Resolve-G2Decision([string]$Semantic,[string]$Runtime) {
@@ -105,8 +105,9 @@ Assert-G2 ((Get-G2Handoff 'D').Length -gt 0 -and (Get-G2Handoff 'U').Length -gt 
 Write-Host "UNIT PASS $checks/$checks"
 if($Mode -ceq 'Unit'){return}
 Assert-Loopback $NpuUri
-Assert-Loopback $OllamaUri
 $state=Get-Content -LiteralPath (Join-Path $InstallRoot 'config\install-state.json') -Raw -Encoding UTF8|ConvertFrom-Json
+if(-not $PSBoundParameters.ContainsKey('OllamaUri') -and $state.Ollama.BaseUri){$OllamaUri=[string]$state.Ollama.BaseUri}
+Assert-Loopback $OllamaUri
 $exe=[string]$state.SurrealDB.Executable
 Assert-G2 (Test-Path -LiteralPath $exe -PathType Leaf) 'Installed SurrealDB executable missing.'
 $transport=Join-Path $PSScriptRoot '../../src/LfoEpistemicStore.ps1'
@@ -115,8 +116,10 @@ $tags=Invoke-RestMethod -Uri ($OllamaUri.TrimEnd('/')+'/api/tags') -TimeoutSec 5
 Assert-G2 (@($tags.models|Where-Object {$_.name -ceq $MainModel}).Count -eq 1) 'Main model alias not available; start existing Ollama.'
 $run=[guid]::NewGuid().ToString('N')
 $dir=Join-Path $ExportRoot ('P58-'+$run)
-New-Item -ItemType Directory -Path $dir|Out-Null
-$dbPath='rocksdb://'+(Join-Path $dir 'processing.db').Replace('\','/')
+New-Item -ItemType Directory -Force -Path $dir|Out-Null
+$labDir=Join-Path $env:LOCALAPPDATA ('LFO-G2-Lab\P58-'+$run)
+New-Item -ItemType Directory -Path $labDir -Force|Out-Null
+$dbPath='rocksdb://'+(Join-Path $labDir 'processing.db').Replace('\','/')
 $endpoint="http://127.0.0.1:$DbPort"
 $listener=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,$DbPort)
 try{$listener.Start()}finally{$listener.Stop()}
@@ -124,6 +127,8 @@ $rootPass=[guid]::NewGuid().ToString('N')+[guid]::NewGuid().ToString('N')
 $runPass=[guid]::NewGuid().ToString('N')+[guid]::NewGuid().ToString('N')
 $root=[pscredential]::new('g2_lab_root',(ConvertTo-SecureString $rootPass -AsPlainText -Force))
 $runtimeCred=[pscredential]::new('g2_lab_runtime',(ConvertTo-SecureString $runPass -AsPlainText -Force))
+$root|Export-Clixml -LiteralPath (Join-Path $labDir 'bootstrap.credential.xml')
+$runtimeCred|Export-Clixml -LiteralPath (Join-Path $labDir 'runtime.credential.xml')
 $oldU=$env:SURREAL_USER;$oldP=$env:SURREAL_PASS
 $p=$null
 $rows=New-Object 'System.Collections.Generic.List[object]'
@@ -138,7 +143,7 @@ try{
     Assert-G2 $ready 'Isolated SurrealDB not ready.'
     $bootstrap=New-LfoEpistemicConnection -Endpoint $endpoint -Credential $root -Bootstrap
     $null=Invoke-LfoEpistemicQuery $bootstrap 'DEFINE NAMESPACE IF NOT EXISTS lfo; USE NS lfo; DEFINE DATABASE IF NOT EXISTS epistemic;'
-    $null=Invoke-LfoEpistemicQuery $bootstrap ('DEFINE TABLE g2_processing SCHEMALESS; DEFINE USER g2_lab_runtime ON DATABASE PASSWORD "'+$runPass+'" ROLES EDITOR;')
+    $null=Invoke-LfoEpistemicQuery $bootstrap ('DEFINE TABLE g2_processing SCHEMALESS; DEFINE USER g2_lab_runtime ON DATABASE PASSWORD '''+$runPass+''' ROLES EDITOR;')
     $conn=New-LfoEpistemicConnection -Endpoint $endpoint -Credential $runtimeCred
     # Fresh store, no R1 schema, no production credentials, no writes to installed LFO.
     $cases=@(
@@ -192,9 +197,11 @@ try{
     $fixturesOut=@($rows|Where-Object type -eq 'fixture')
     Write-Host "P58 TRANSPORT PASS; fixtures $(@($fixturesOut|Where-Object correct).Count)/6; main calls=6; NPU calls=15; processing records=15; production R1 writes=0"
     Write-Host "RESULTS $dir"
+    Write-Host "LAB DB $labDir (local DPAPI credentials retained)"
     $rows.ToArray()|ConvertTo-Json -Depth 30 -Compress
 }finally{
-    if($rows.Count -gt 0){[IO.File]::WriteAllText((Join-Path $dir 'results.json'),($rows.ToArray()|ConvertTo-Json -Depth 30),(New-Object Text.UTF8Encoding($false)))}
-    if($null -ne $p -and -not $p.HasExited){Stop-Process -Id $p.Id -ErrorAction SilentlyContinue}
-    $rootPass=$null;$runPass=$null
+    try{if($rows.Count -gt 0){[IO.File]::WriteAllText((Join-Path $dir 'results.json'),($rows.ToArray()|ConvertTo-Json -Depth 30),(New-Object Text.UTF8Encoding($false)))}}finally{
+        if($null -ne $p -and -not $p.HasExited){Stop-Process -Id $p.Id -ErrorAction SilentlyContinue}
+        $rootPass=$null;$runPass=$null
+    }
 }
