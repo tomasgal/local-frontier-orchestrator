@@ -5,3 +5,7 @@ Exploratory engineering pilot only. Offline corpus has 42 author-labelled cases,
 The live arm runs six synthetic prompts, each in a fresh process with a fresh data root, on the installed UMA model using the existing adapter and interactive LOCAL policy. THINK OFF, OBSERVE, E1/E4 MEDIUM, other axes OFF. The test-specific adapter sets the same LOCAL state as /route local and adds the existing batch guard. Legacy L4 disabled to avoid writes to the production SurrealDB; G2 post-L0 hook remains active. Ollama must already be running. Do not compare live results against THINK ON or claim causal effects. No external source access requested by the harness. No production data is read into the ZIP. Inspect the synthetic run's console traces before sharing.
 
 One ZIP contains corpus, explicit profiles, offline case-level decisions and cross-tabulation, source hashes and manifest, six isolated live L0/epistemic/trace directories and live integration summary. An operational failure produces a partial archive if the run has entered the try block. PASS is integration only; not a validity or debiasing claim. Next: review false positives, missed cases, and abstention; independently annotate a new frozen corpus before confirmatory testing. No runtime configuration change required.
+
+## Later research
+
+- [NPU detection research P32–P55](NPU_EVALUATION_P32_P55.md): MS-S1 MAX setup, two experimental NPU model candidates, screening results and pending P55. No production enablement.
