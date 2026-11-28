@@ -235,7 +235,7 @@ foreach($t in @(
     @('clear','no','clear'),@('defect','no','defect'),@('clear','yes','unknown'),@('defect','yes','unknown'),@('defect','unknown','unknown'),
     @('not_applicable','yes','not_applicable'),@('not_applicable','no','unknown'),@('not_applicable','unknown','unknown'),@('unknown','yes','unknown'),@('invalid','no','invalid')
 )){
-    Assert-G2 ((Merge-P75 $t[0] $t[1]) -ceq $t[2]) 'Merge contract failed.';$checks++
+    Assert-G2 ((Merge-P74 $t[0] $t[1]) -ceq $t[2]) 'Merge contract failed.';$checks++
 }
 $mock=[pscustomobject]@{ms=1.0;response=[pscustomobject]@{model=$gen.ModelId;choices=@([pscustomobject]@{finish_reason='stop';message=[pscustomobject]@{content='{"left":"B","right":"A","relation":"gt","modality":"requested"}'}});usage=[pscustomobject]@{prompt_tokens=100;completion_tokens=20}}}
 $p=Read-P72 $mock $bindSchema
@@ -278,7 +278,7 @@ try{
             $sw=[Diagnostics.Stopwatch]::StartNew()
             $v=Get-P72BindingResult $c $g.map
             $base=$v.state.ToLowerInvariant()
-            $guarded=Merge-P75 $base $n.choice
+            $guarded=Merge-P74 $base $n.choice
             $owned=Get-P75Owned $c $g.map $n.choice
             $sw.Stop()
             $goldGuard=if($c.gold -ceq 'not_applicable'){'yes'}else{'no'}
