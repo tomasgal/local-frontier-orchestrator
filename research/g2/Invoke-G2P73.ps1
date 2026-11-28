@@ -193,6 +193,15 @@ foreach($t in @(
     $m=Read-P72Map $t.raw $bindSchema
     Assert-G2 (($null -ne $m) -eq $t.valid) 'Parser mismatch.';$checks++
 }
+# Exercise the exact live response adapter without HTTP or NPU.
+$mock=[pscustomobject]@{ms=1.0;response=[pscustomobject]@{model=$gen.ModelId;choices=@([pscustomobject]@{finish_reason='stop';message=[pscustomobject]@{content='{"left":"a","right":"b","relation":"gt","modality":"requested"}'}});usage=[pscustomobject]@{prompt_tokens=100;completion_tokens=20}}}
+$p=Read-P72 $mock $bindSchema
+Assert-G2 ($p.valid -and $p.map.relation -ceq 'gt' -and $p.input_tokens -eq 100) 'Live response adapter fixture failed.';$checks++
+$v=Get-P72BindingResult $cases[0] $p.map
+Assert-G2 ($v.state -ceq 'DEFECT') 'Live adapter to CPU fixture failed.';$checks++
+$mock.response.choices[0].finish_reason='length'
+$p=Read-P72 $mock $bindSchema
+Assert-G2 (-not $p.valid) 'Truncated response accepted.';$checks++
 Write-Host "UNIT PASS $checks/$checks"
 if($Mode -ceq 'Unit'){return}
 Assert-Loopback $NpuUri
@@ -206,8 +215,8 @@ $rows=New-Object 'System.Collections.Generic.List[object]'
 $utf8=New-Object Text.UTF8Encoding($false)
 try{
     $warm=New-P72Case 'WARM' 'A scored less than B.' 'A získal menej bodov ako B.' @('a|score|point|round1|1','b|score|point|round1|2') 'clear' @('a','b','lt','asserted')
-    $null=Read-P73 (Invoke-G2Sync $client $uri (New-P72Body $warm 'en' 'FULL')) $bindSchema
-    $null=Read-P73 (Invoke-G2Sync $client $uri (New-P72Body $warm 'en' 'ISOLATED')) $bindSchema
+    $null=Read-P72 (Invoke-G2Sync $client $uri (New-P72Body $warm 'en' 'FULL')) $bindSchema
+    $null=Read-P72 (Invoke-G2Sync $client $uri (New-P72Body $warm 'en' 'ISOLATED')) $bindSchema
     $i=0;$ci=0
     foreach($c in $cases){
         $langs=if($ci%2 -eq 0){@('en','sk')}else{@('sk','en')};$ci++
@@ -215,7 +224,7 @@ try{
             $arms=if($i%2 -eq 0){@('FULL','ISOLATED')}else{@('ISOLATED','FULL')};$i++
             foreach($arm in $arms){
                 $schema=$bindSchema
-                $p=Read-P73 (Invoke-G2Sync $client $uri (New-P72Body $c $lang $arm)) $schema
+                $p=Read-P72 (Invoke-G2Sync $client $uri (New-P72Body $c $lang $arm)) $schema
                 $result=$null;$bindingExact=$null;$bindingEquivalent=$null;$cpuMs=0
                 $state='invalid'
                 if($p.valid){
