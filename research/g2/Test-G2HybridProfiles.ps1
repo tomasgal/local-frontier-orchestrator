@@ -41,4 +41,23 @@ $matrix=@{present=@{NONE='D';UNKNOWN='U';MATCHED='C'};absent=@{NONE='C';UNKNOWN=
 foreach($s in @('present','absent','unknown')){foreach($rt in @('NONE','UNKNOWN','MATCHED')){Check ((Resolve-LfoG2Provenance -Semantic $s -Runtime $rt) -ceq $matrix[$s][$rt]) 'Decision mismatch.'}}
 Check ((Resolve-LfoG2Provenance -Semantic 'invalid' -Runtime NONE) -ceq 'INVALID') 'Invalid semantic accepted.'
 Check ((Resolve-LfoG2Provenance -Semantic present -Runtime invalid) -ceq 'INVALID') 'Invalid runtime accepted.'
-Write-Host "G2 PROFILE UNIT PASS $script:Checks/$script:Checks; default=$($default.Name)"
+$execution=Get-LfoG2ExecutionPolicy -ConfigPath $ConfigPath
+$raw=Import-PowerShellDataFile -LiteralPath $ConfigPath
+Check ($execution.Parallelism -eq $raw.Execution.Parallelism -and $execution.Topology -ceq $raw.Execution.Topology) 'Execution default mismatch.'
+foreach($topology in @('CPU_GPU','NPU_GPU','GPU_GPU','CPU_CPU','NPU_CPU','GPU_CPU')){
+    $on=Get-LfoG2ExecutionPolicy -ConfigPath $ConfigPath -Topology $topology -Parallelism $true
+    $off=Get-LfoG2ExecutionPolicy -ConfigPath $ConfigPath -Topology $topology -Parallelism $false
+    Check (($on.EdgeTarget+'_'+$on.MainTarget) -ceq $topology) 'Topology mismatch.'
+    Check ((Get-LfoG2DispatchMode -ExecutionPolicy $on -Dependency INDEPENDENT -InputsReady $true -RuntimeSupportsParallel $true) -ceq 'PARALLEL') 'Parallel dispatch failed.'
+    Check ((Get-LfoG2DispatchMode -ExecutionPolicy $off -Dependency INDEPENDENT -InputsReady $true -RuntimeSupportsParallel $true) -ceq 'SERIAL') 'Serial override failed.'
+    Check ((Get-LfoG2DispatchMode -ExecutionPolicy $on -Dependency INDEPENDENT -InputsReady $true -RuntimeSupportsParallel $false) -ceq 'SERIAL') 'Capability gate failed.'
+    Check ((Get-LfoG2DispatchMode -ExecutionPolicy $on -Dependency BLOCKING -InputsReady $true -RuntimeSupportsParallel $true) -ceq 'BEFORE_MAIN') 'Blocking dependency bypassed.'
+    Check ((Get-LfoG2DispatchMode -ExecutionPolicy $on -Dependency POST_REQUIRED -InputsReady $true -RuntimeSupportsParallel $true) -ceq 'AFTER_OUTPUT') 'POST dependency bypassed.'
+    Check ((Get-LfoG2DispatchMode -ExecutionPolicy $on -Dependency INDEPENDENT -InputsReady $false -RuntimeSupportsParallel $true) -ceq 'WAIT_DEPENDENCY') 'Unready dependency bypassed.'
+}
+$dual=Get-LfoG2ExecutionPolicy -ConfigPath $ConfigPath -Topology GPU_GPU -EdgeDeviceId 'gpu-a' -MainDeviceId 'gpu-b'
+Check ($dual.EdgeDeviceId -ceq 'gpu-a' -and $dual.MainDeviceId -ceq 'gpu-b') 'Explicit device IDs lost.'
+$rejected=$false
+try{$null=Get-LfoG2ExecutionPolicy -ConfigPath $ConfigPath -Topology INVALID}catch{$rejected=$true}
+Check $rejected 'Unknown topology accepted.'
+Write-Host "G2 PROFILE UNIT PASS $script:Checks/$script:Checks; default=$($default.Name); topology=$($execution.Topology); parallelism=$($execution.Parallelism)"
